@@ -403,17 +403,20 @@ func TestScan_BlocksSSRF_HexOctalIP(t *testing.T) {
 	s := New(cfg)
 
 	tests := []struct {
-		name string
-		url  string
+		name        string
+		url         string
+		wantScanner string
 	}{
-		{"hex full loopback", "http://0x7f000001/admin"},
-		{"hex upper loopback", "http://0X7F000001/admin"},
-		{"octal loopback", "http://0177.0.0.1/admin"},
-		{"decimal integer loopback", "http://2130706433/admin"},
-		{"hex dotted loopback", "http://0x7f.0.0.1/admin"},
-		{"hex metadata endpoint", "http://0xa9fea9fe/latest/meta-data/"},
-		{"octal 10.x private", "http://012.0.0.1/"},
-		{"hex 192.168", "http://0xc0a80001/"},
+		{"hex full loopback", "http://0x7f000001/admin", ScannerSSRF},
+		{"hex upper loopback", "http://0X7F000001/admin", ScannerSSRF},
+		{"octal loopback", "http://0177.0.0.1/admin", ScannerSSRF},
+		{"decimal integer loopback", "http://2130706433/admin", ScannerSSRF},
+		{"hex dotted loopback", "http://0x7f.0.0.1/admin", ScannerSSRF},
+		// 0xa9fea9fe == 169.254.169.254 (AWS / Azure / GCP IMDS): should be
+		// classified as the dedicated metadata subtype, not generic SSRF.
+		{"hex metadata endpoint", "http://0xa9fea9fe/latest/meta-data/", ScannerSSRFMetadata},
+		{"octal 10.x private", "http://012.0.0.1/", ScannerSSRF},
+		{"hex 192.168", "http://0xc0a80001/", ScannerSSRF},
 	}
 
 	for _, tt := range tests {
@@ -422,8 +425,8 @@ func TestScan_BlocksSSRF_HexOctalIP(t *testing.T) {
 			if result.Allowed {
 				t.Errorf("expected %s to be blocked (SSRF hex/octal bypass)", tt.url)
 			}
-			if result.Scanner != ScannerSSRF {
-				t.Errorf("expected scanner=ssrf for %s, got %s", tt.url, result.Scanner)
+			if result.Scanner != tt.wantScanner {
+				t.Errorf("expected scanner=%s for %s, got %s", tt.wantScanner, tt.url, result.Scanner)
 			}
 		})
 	}
@@ -4158,6 +4161,7 @@ func TestHintForBlock(t *testing.T) {
 		{ScannerEntropy, "High-entropy content detected. Review the URL for data exfiltration attempts."},
 		{ScannerSubdomainEntropy, "High-entropy content detected in subdomain. Review for data exfiltration via DNS."},
 		{ScannerSSRF, "SSRF protection blocked this URL. It may resolve to a private IP or DNS resolution failed."},
+		{ScannerSSRFMetadata, "SSRF protection blocked this URL. It resolves to a cloud-provider instance metadata endpoint (AWS / Azure / GCP IMDS)."},
 		{ScannerRateLimit, "Rate limit exceeded. Retry later or adjust fetch_proxy.monitoring.max_requests_per_minute."},
 		{ScannerLength, "URL exceeds maximum length. Check for data stuffing in query parameters."},
 		{ScannerDataBudget, "Session data budget exceeded."},

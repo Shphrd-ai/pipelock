@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/luckyPipewrench/pipelock/internal/audit"
+	"github.com/luckyPipewrench/pipelock/internal/blockreason"
 	"github.com/luckyPipewrench/pipelock/internal/capture"
 	"github.com/luckyPipewrench/pipelock/internal/certgen"
 	"github.com/luckyPipewrench/pipelock/internal/config"
@@ -374,7 +375,9 @@ func newInterceptHandler(
 					RequestID: ic.RequestID,
 					Agent:     ic.Agent,
 				})
-				http.Error(w, "inbound mediation envelope verification failed", http.StatusForbidden)
+				writeBlockedError(w,
+					blockInfoFor(blockreason.EnvelopeVerifyFailed, blockLayerMediationEnvelope),
+					"inbound mediation envelope verification failed", http.StatusForbidden)
 				return
 			}
 		}
@@ -394,7 +397,9 @@ func newInterceptHandler(
 			d := ic.KillSwitch.IsActiveForIP(ic.ClientIP)
 			if d.Active {
 				ic.Metrics.RecordKillSwitchDenial("intercept", r.URL.Path)
-				http.Error(w, "kill switch active", http.StatusServiceUnavailable)
+				writeBlockedError(w,
+					blockInfoFor(blockreason.KillSwitchActive, ""),
+					"kill switch active", http.StatusServiceUnavailable)
 				return
 			}
 		}
@@ -425,7 +430,9 @@ func newInterceptHandler(
 				RequestID: ic.RequestID,
 				Agent:     ic.Agent,
 			})
-			http.Error(w, "authority mismatch: blocked", http.StatusForbidden)
+			writeBlockedError(w,
+				blockInfoFor(blockreason.AuthorityMismatch, ""),
+				"authority mismatch: blocked", http.StatusForbidden)
 			return
 		}
 
@@ -438,7 +445,9 @@ func newInterceptHandler(
 					ic.Logger.LogAirlockDeny(interceptSess.key, tier, TransportConnect, r.Method, ic.ClientIP, ic.RequestID)
 					ic.Metrics.RecordAirlockDenial(tier, TransportConnect, r.Method)
 					ic.Metrics.RecordTLSRequestBlocked("airlock")
-					http.Error(w, "airlock: "+reason, http.StatusForbidden)
+					writeBlockedError(w,
+						blockInfoFor(blockreason.AirlockActive, ""),
+						"airlock: "+reason, http.StatusForbidden)
 					return
 				}
 			}
@@ -538,7 +547,8 @@ func newInterceptHandler(
 				if ic.Config.ExplainBlocksEnabled() && urlResult.Hint != "" {
 					w.Header().Set("X-Pipelock-Hint", urlResult.Hint)
 				}
-				http.Error(w, "blocked: "+urlResult.Reason, status)
+				writeBlockedError(w, blockInfo(urlResult.Scanner),
+					"blocked: "+urlResult.Reason, status)
 				return
 			}
 			// Audit mode: base action is "warn". Adaptive escalation may upgrade to block.
@@ -574,7 +584,8 @@ func newInterceptHandler(
 					RequestID: ic.RequestID,
 					Agent:     ic.Agent,
 				})
-				http.Error(w, "blocked: "+urlResult.Reason+" (escalated)", status)
+				writeBlockedError(w, blockInfo(urlResult.Scanner),
+					"blocked: "+urlResult.Reason+" (escalated)", status)
 				return
 			}
 			// Audit mode near-miss: URL was flagged but allowed. Infrastructure
@@ -632,7 +643,9 @@ func newInterceptHandler(
 						RequestID: ic.RequestID,
 						Agent:     ic.Agent,
 					})
-					http.Error(w, "blocked: "+a2aHdrResult.Reason, http.StatusForbidden)
+					writeBlockedError(w,
+						blockInfoFor(blockreason.DLPMatch, scannerLabelA2A),
+						"blocked: "+a2aHdrResult.Reason, http.StatusForbidden)
 					return
 				}
 				// Audit/warn mode: log finding but continue.
@@ -764,7 +777,8 @@ func newInterceptHandler(
 						RequestID: ic.RequestID,
 						Agent:     ic.Agent,
 					}))
-					http.Error(w, "blocked: "+reason, http.StatusForbidden)
+					writeBlockedError(w, blockInfo(scannerLabel),
+						"blocked: "+reason, http.StatusForbidden)
 					return
 				}
 				// Escalation can upgrade to block even in audit mode, but only
@@ -789,7 +803,8 @@ func newInterceptHandler(
 						RequestID: ic.RequestID,
 						Agent:     ic.Agent,
 					}))
-					http.Error(w, "blocked: "+reason+" (escalated)", http.StatusForbidden)
+					writeBlockedError(w, blockInfo(scannerLabel),
+						"blocked: "+reason+" (escalated)", http.StatusForbidden)
 					return
 				}
 				// Audit/warn mode: log finding but forward the request.
@@ -837,7 +852,9 @@ func newInterceptHandler(
 							RequestID: ic.RequestID,
 							Agent:     ic.Agent,
 						}))
-						http.Error(w, "blocked: "+reason, http.StatusForbidden)
+						writeBlockedError(w,
+							blockInfoFor(blockreason.DLPMatch, scannerLabelA2A),
+							"blocked: "+reason, http.StatusForbidden)
 						return
 					}
 					// Audit/warn mode: log finding but forward the request.
@@ -904,7 +921,9 @@ func newInterceptHandler(
 						RequestID: ic.RequestID,
 						Agent:     ic.Agent,
 					}))
-					http.Error(w, "blocked: request header contains secret", http.StatusForbidden)
+					writeBlockedError(w,
+						blockInfoFor(blockreason.DLPMatch, "header_dlp"),
+						"blocked: request header contains secret", http.StatusForbidden)
 					return
 				}
 				// Audit mode: log but forward.
@@ -972,7 +991,9 @@ func newInterceptHandler(
 					RequestID: ic.RequestID,
 					Agent:     ic.Agent,
 				}))
-				http.Error(w, "blocked: "+ceeRes.Reason, http.StatusForbidden)
+				writeBlockedError(w,
+					blockInfoFor(blockreason.CrossRequestDeny, "cross_request"),
+					"blocked: "+ceeRes.Reason, http.StatusForbidden)
 				return
 			}
 		}
@@ -1015,7 +1036,10 @@ func newInterceptHandler(
 				RequestID: ic.RequestID,
 				Agent:     ic.Agent,
 			}))
-			http.Error(w, "blocked: session escalation level "+session.EscalationLabel(recEscalationLevel(ic.Recorder)), http.StatusForbidden)
+			writeBlockedError(w,
+				blockInfoFor(blockreason.EscalationLevel, "session_deny"),
+				"blocked: session escalation level "+session.EscalationLabel(recEscalationLevel(ic.Recorder)),
+				http.StatusForbidden)
 			return
 		}
 
@@ -1064,7 +1088,9 @@ func newInterceptHandler(
 					RequestID: ic.RequestID,
 					Agent:     ic.Agent,
 				}))
-				http.Error(w, "blocked: "+blockedErr.reason, http.StatusForbidden)
+				writeBlockedError(w,
+					blockInfoFor(blockreason.OutboundEnvelopeFailed, blockedErr.layer),
+					"blocked: "+blockedErr.reason, http.StatusForbidden)
 				return
 			}
 		}
@@ -1094,7 +1120,9 @@ func newInterceptHandler(
 				RequestID: ic.RequestID,
 				Agent:     ic.Agent,
 			}))
-			http.Error(w, "blocked: compressed response cannot be scanned", http.StatusForbidden)
+			writeBlockedError(w,
+				blockInfoFor(blockreason.CompressedResponse, "tls_response_blocked"),
+				"blocked: compressed response cannot be scanned", http.StatusForbidden)
 			return
 		}
 
@@ -1165,7 +1193,9 @@ func newInterceptHandler(
 					RequestID: ic.RequestID,
 					Agent:     ic.Agent,
 				}))
-				http.Error(w, "blocked: "+msg, http.StatusForbidden)
+				writeBlockedError(w,
+					blockInfoFor(blockreason.CompressedResponse, sseLayer),
+					"blocked: "+msg, http.StatusForbidden)
 				return
 			}
 
@@ -1239,7 +1269,9 @@ func newInterceptHandler(
 				RequestID: ic.RequestID,
 				Agent:     ic.Agent,
 			}))
-			http.Error(w, "blocked: response read error", http.StatusForbidden)
+			writeBlockedError(w,
+				blockInfoFor(blockreason.ParseError, "tls_response_blocked"),
+				"blocked: response read error", http.StatusForbidden)
 			return
 		}
 		if int64(len(respBody)) > maxResp {
@@ -1256,7 +1288,9 @@ func newInterceptHandler(
 				RequestID: ic.RequestID,
 				Agent:     ic.Agent,
 			}))
-			http.Error(w, "blocked: response too large for scanning", http.StatusForbidden)
+			writeBlockedError(w,
+				blockInfoFor(blockreason.DataBudget, "tls_response_blocked"),
+				"blocked: response too large for scanning", http.StatusForbidden)
 			return
 		}
 
@@ -1267,7 +1301,9 @@ func newInterceptHandler(
 			respBody, shieldBlocked = ic.Proxy.applyShield(respBody, resp.Header.Get("Content-Type"), ic.TargetHost, resp.Header, ic.Config, actx, ic.ClientIP, ic.RequestID, TransportConnect)
 			if shieldBlocked {
 				ic.Metrics.RecordTLSResponseBlocked("shield_oversize")
-				http.Error(w, "blocked: response body exceeds browser shield size limit", http.StatusForbidden)
+				writeBlockedError(w,
+					blockInfoFor(blockreason.BrowserShieldOversize, "shield_oversize"),
+					"blocked: response body exceeds browser shield size limit", http.StatusForbidden)
 				return
 			}
 			// If shield modified the body, update Content-Length to prevent
@@ -1304,7 +1340,9 @@ func newInterceptHandler(
 				RequestID: ic.RequestID,
 				Agent:     ic.Agent,
 			}))
-			http.Error(w, "blocked: "+mediaVerdict.BlockReason, http.StatusForbidden)
+			writeBlockedError(w,
+				blockInfoFor(blockreason.MediaPolicy, "media_policy"),
+				"blocked: "+mediaVerdict.BlockReason, http.StatusForbidden)
 			return
 		}
 		if mediaVerdict.StripResult != nil && mediaVerdict.StripResult.Changed() {
@@ -1382,7 +1420,9 @@ func newInterceptHandler(
 						RequestID: ic.RequestID,
 						Agent:     ic.Agent,
 					}))
-					http.Error(w, "blocked: "+reason, http.StatusForbidden)
+					writeBlockedError(w,
+						blockInfoFor(blockreason.PromptInjection, scannerLabelA2A),
+						"blocked: "+reason, http.StatusForbidden)
 					return
 				}
 				// Audit/warn mode: log finding but forward response.
@@ -1486,7 +1526,9 @@ func newInterceptHandler(
 						RequestID: ic.RequestID,
 						Agent:     ic.Agent,
 					}))
-					http.Error(w, "blocked: response contains injection", http.StatusForbidden)
+					writeBlockedError(w,
+						blockInfoFor(blockreason.PromptInjection, "response_scan"),
+						"blocked: response contains injection", http.StatusForbidden)
 					return
 				case config.ActionStrip:
 					// Record SignalStrip for adaptive enforcement scoring.

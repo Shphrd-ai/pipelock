@@ -29,6 +29,7 @@ import (
 
 	readability "github.com/go-shiori/go-readability"
 	"github.com/luckyPipewrench/pipelock/internal/audit"
+	"github.com/luckyPipewrench/pipelock/internal/blockreason"
 	"github.com/luckyPipewrench/pipelock/internal/capture"
 	"github.com/luckyPipewrench/pipelock/internal/certgen"
 	"github.com/luckyPipewrench/pipelock/internal/config"
@@ -2318,11 +2319,13 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 		// by the CONNECT, WebSocket, and reverse-proxy paths.
 		p.logger.LogError(audit.NewMethodLogContext(r.Method),
 			fmt.Errorf("inbound envelope verify rejected fetch: %w", err))
-		writeJSON(w, http.StatusForbidden, FetchResponse{
-			Blocked:    true,
-			Error:      "inbound mediation envelope verification failed",
-			StatusCode: http.StatusForbidden,
-		})
+		writeBlockedJSON(w,
+			blockInfoFor(blockreason.EnvelopeVerifyFailed, blockLayerMediationEnvelope),
+			http.StatusForbidden, FetchResponse{
+				Blocked:    true,
+				Error:      "inbound mediation envelope verification failed",
+				StatusCode: http.StatusForbidden,
+			})
 		return
 	}
 	// Strip inbound mediation envelope headers after optional trust
@@ -2344,11 +2347,13 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 			RequestID: requestID,
 			Agent:     agent,
 		})
-		writeJSON(w, http.StatusServiceUnavailable, FetchResponse{
-			Blocked:    true,
-			Error:      scannerPatternUnavailable,
-			StatusCode: http.StatusServiceUnavailable,
-		})
+		writeBlockedJSON(w,
+			blockInfoFor(blockreason.PatternUnavailable, scannerLabelUnavailable),
+			http.StatusServiceUnavailable, FetchResponse{
+				Blocked:    true,
+				Error:      scannerPatternUnavailable,
+				StatusCode: http.StatusServiceUnavailable,
+			})
 		return
 	}
 
@@ -2450,10 +2455,12 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 		if tier == config.AirlockTierDrain {
 			p.logger.LogAirlockDeny(fetchSess.key, tier, TransportFetch, r.Method, clientIP, requestID)
 			p.metrics.RecordAirlockDenial(tier, TransportFetch, "read")
-			writeJSON(w, http.StatusForbidden, FetchResponse{
-				URL: displayURL, Agent: agent, Blocked: true,
-				BlockReason: "session in airlock drain",
-			})
+			writeBlockedJSON(w,
+				blockInfoFor(blockreason.AirlockActive, ""),
+				http.StatusForbidden, FetchResponse{
+					URL: displayURL, Agent: agent, Blocked: true,
+					BlockReason: "session in airlock drain",
+				})
 			return
 		}
 	}
@@ -2516,7 +2523,7 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 			if cfg.ExplainBlocksEnabled() {
 				resp.Hint = result.Hint
 			}
-			writeJSON(w, status, resp)
+			writeBlockedJSON(w, blockInfo(result.Scanner), status, resp)
 			return
 		}
 		// Audit mode: base action is "warn". Adaptive escalation may upgrade to block.
@@ -2559,12 +2566,14 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 			if audit.IsContentScanner(result.Scanner) {
 				escalatedEchoURL = audit.RedactContentBearingURL(displayURL)
 			}
-			writeJSON(w, escalatedStatus, FetchResponse{
-				URL:         escalatedEchoURL,
-				Agent:       agent,
-				Blocked:     true,
-				BlockReason: result.Reason + " (escalated)",
-			})
+			writeBlockedJSON(w,
+				blockInfo(result.Scanner),
+				escalatedStatus, FetchResponse{
+					URL:         escalatedEchoURL,
+					Agent:       agent,
+					Blocked:     true,
+					BlockReason: result.Reason + " (escalated)",
+				})
 			return
 		}
 		log.LogAnomaly(actx, result.Scanner, result.Reason, result.Score)
@@ -2591,12 +2600,14 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 			TaintDecisionReason: fetchTaint.Result.Reason,
 			TaskOverrideApplied: fetchTaint.TaskOverrideApplied,
 		})
-		writeJSON(w, http.StatusForbidden, FetchResponse{
-			URL:         displayURL,
-			Agent:       agent,
-			Blocked:     true,
-			BlockReason: sr.Detail,
-		})
+		writeBlockedJSON(w,
+			blockInfoFor(blockreason.SessionAnomaly, "session_profiling"),
+			http.StatusForbidden, FetchResponse{
+				URL:         displayURL,
+				Agent:       agent,
+				Blocked:     true,
+				BlockReason: sr.Detail,
+			})
 		return
 	}
 
@@ -2630,12 +2641,14 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 			TaintDecisionReason: fetchTaint.Result.Reason,
 			TaskOverrideApplied: fetchTaint.TaskOverrideApplied,
 		})
-		writeJSON(w, http.StatusForbidden, FetchResponse{
-			URL:         displayURL,
-			Agent:       agent,
-			Blocked:     true,
-			BlockReason: "session escalation level " + session.EscalationLabel(sr.Level),
-		})
+		writeBlockedJSON(w,
+			blockInfoFor(blockreason.EscalationLevel, ""),
+			http.StatusForbidden, FetchResponse{
+				URL:         displayURL,
+				Agent:       agent,
+				Blocked:     true,
+				BlockReason: "session escalation level " + session.EscalationLabel(sr.Level),
+			})
 		return
 	}
 
@@ -2703,12 +2716,14 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 			TaintDecisionReason: fetchTaint.Result.Reason,
 			TaskOverrideApplied: fetchTaint.TaskOverrideApplied,
 		})
-		writeJSON(w, http.StatusForbidden, FetchResponse{
-			URL:         displayURL,
-			Agent:       agent,
-			Blocked:     true,
-			BlockReason: "request header contains secret",
-		})
+		writeBlockedJSON(w,
+			blockInfoFor(blockreason.DLPMatch, scanner.ScannerDLP),
+			http.StatusForbidden, FetchResponse{
+				URL:         displayURL,
+				Agent:       agent,
+				Blocked:     true,
+				BlockReason: "request header contains secret",
+			})
 		return
 	}
 	// Re-check block_all after header DLP near-miss may have escalated the session.
@@ -2737,12 +2752,14 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 			TaintDecisionReason: fetchTaint.Result.Reason,
 			TaskOverrideApplied: fetchTaint.TaskOverrideApplied,
 		})
-		writeJSON(w, http.StatusForbidden, FetchResponse{
-			URL:         displayURL,
-			Agent:       agent,
-			Blocked:     true,
-			BlockReason: "session escalation level " + session.EscalationLabel(fetchRec.EscalationLevel()),
-		})
+		writeBlockedJSON(w,
+			blockInfoFor(blockreason.EscalationLevel, ""),
+			http.StatusForbidden, FetchResponse{
+				URL:         displayURL,
+				Agent:       agent,
+				Blocked:     true,
+				BlockReason: "session escalation level " + session.EscalationLabel(fetchRec.EscalationLevel()),
+			})
 		return
 	}
 
@@ -2772,12 +2789,14 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 			TaintDecisionReason: fetchTaint.Result.Reason,
 			TaskOverrideApplied: fetchTaint.TaskOverrideApplied,
 		})
-		writeJSON(w, http.StatusTooManyRequests, FetchResponse{
-			URL:         displayURL,
-			Agent:       agent,
-			Blocked:     true,
-			BlockReason: reason,
-		})
+		writeBlockedJSON(w,
+			blockInfoFor(blockreason.DataBudget, "budget"),
+			http.StatusTooManyRequests, FetchResponse{
+				URL:         displayURL,
+				Agent:       agent,
+				Blocked:     true,
+				BlockReason: reason,
+			})
 		return
 	}
 
@@ -2844,12 +2863,14 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 				TaintDecisionReason: fetchTaint.Result.Reason,
 				TaskOverrideApplied: fetchTaint.TaskOverrideApplied,
 			})
-			writeJSON(w, http.StatusForbidden, FetchResponse{
-				URL:         displayURL,
-				Agent:       agent,
-				Blocked:     true,
-				BlockReason: ceeRes.Reason,
-			})
+			writeBlockedJSON(w,
+				blockInfoFor(blockreason.CrossRequestDeny, "cross_request"),
+				http.StatusForbidden, FetchResponse{
+					URL:         displayURL,
+					Agent:       agent,
+					Blocked:     true,
+					BlockReason: ceeRes.Reason,
+				})
 			return
 		}
 
@@ -2878,12 +2899,14 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 				TaintDecisionReason: fetchTaint.Result.Reason,
 				TaskOverrideApplied: fetchTaint.TaskOverrideApplied,
 			})
-			writeJSON(w, http.StatusForbidden, FetchResponse{
-				URL:         displayURL,
-				Agent:       agent,
-				Blocked:     true,
-				BlockReason: "session escalation level " + session.EscalationLabel(fetchRec.EscalationLevel()),
-			})
+			writeBlockedJSON(w,
+				blockInfoFor(blockreason.EscalationLevel, ""),
+				http.StatusForbidden, FetchResponse{
+					URL:         displayURL,
+					Agent:       agent,
+					Blocked:     true,
+					BlockReason: "session escalation level " + session.EscalationLabel(fetchRec.EscalationLevel()),
+				})
 			return
 		}
 	}
@@ -2955,12 +2978,14 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 				TaskOverrideApplied: fetchTaint.TaskOverrideApplied,
 			})
 			p.metrics.RecordBlocked(parsed.Hostname(), blockedErr.layer, time.Since(start), agentLabel)
-			writeJSON(w, http.StatusForbidden, FetchResponse{
-				URL:         displayURL,
-				Agent:       agent,
-				Blocked:     true,
-				BlockReason: blockedErr.reason,
-			})
+			writeBlockedJSON(w,
+				blockInfoFor(blockreason.OutboundEnvelopeFailed, blockedErr.layer),
+				http.StatusForbidden, FetchResponse{
+					URL:         displayURL,
+					Agent:       agent,
+					Blocked:     true,
+					BlockReason: blockedErr.reason,
+				})
 			return
 		}
 	}
@@ -2997,7 +3022,9 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 				RequestID: requestID,
 				Agent:     agent,
 			})
-			writeJSON(w, http.StatusForbidden, resp)
+			writeBlockedJSON(w,
+				blockInfoFor(blockreason.RedirectScanDenied, blockedErr.layer),
+				http.StatusForbidden, resp)
 			return
 		}
 		log.LogError(actx, err)
@@ -3031,12 +3058,14 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 			RequestID: requestID,
 			Agent:     agent,
 		})
-		writeJSON(w, http.StatusForbidden, FetchResponse{
-			URL:         displayURL,
-			Agent:       agent,
-			Blocked:     true,
-			BlockReason: "compressed response cannot be scanned",
-		})
+		writeBlockedJSON(w,
+			blockInfoFor(blockreason.CompressedResponse, "response_scan"),
+			http.StatusForbidden, FetchResponse{
+				URL:         displayURL,
+				Agent:       agent,
+				Blocked:     true,
+				BlockReason: "compressed response cannot be scanned",
+			})
 		return
 	}
 
@@ -3083,12 +3112,14 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 				RequestID: requestID,
 				Agent:     agent,
 			})
-			writeJSON(w, http.StatusBadGateway, FetchResponse{
-				URL:         displayURL,
-				Agent:       agent,
-				Blocked:     true,
-				BlockReason: reason,
-			})
+			writeBlockedJSON(w,
+				blockInfoFor(blockreason.DataBudget, "response_size"),
+				http.StatusBadGateway, FetchResponse{
+					URL:         displayURL,
+					Agent:       agent,
+					Blocked:     true,
+					BlockReason: reason,
+				})
 			return
 		}
 		// Budget was the limiter: return 429.
@@ -3107,12 +3138,14 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 			RequestID: requestID,
 			Agent:     agent,
 		})
-		writeJSON(w, http.StatusTooManyRequests, FetchResponse{
-			URL:         displayURL,
-			Agent:       agent,
-			Blocked:     true,
-			BlockReason: reason,
-		})
+		writeBlockedJSON(w,
+			blockInfoFor(blockreason.DataBudget, "budget"),
+			http.StatusTooManyRequests, FetchResponse{
+				URL:         displayURL,
+				Agent:       agent,
+				Blocked:     true,
+				BlockReason: reason,
+			})
 		return
 	}
 
@@ -3140,10 +3173,12 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 			RequestID: requestID,
 			Agent:     agent,
 		})
-		writeJSON(w, http.StatusForbidden, FetchResponse{
-			URL: displayURL, Agent: agent, Blocked: true,
-			BlockReason: "response body exceeds browser shield size limit",
-		})
+		writeBlockedJSON(w,
+			blockInfoFor(blockreason.BrowserShieldOversize, "shield_oversize"),
+			http.StatusForbidden, FetchResponse{
+				URL: displayURL, Agent: agent, Blocked: true,
+				BlockReason: "response body exceeds browser shield size limit",
+			})
 		return
 	}
 
@@ -3172,10 +3207,12 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 			RequestID: requestID,
 			Agent:     agent,
 		})
-		writeJSON(w, http.StatusForbidden, FetchResponse{
-			URL: displayURL, Agent: agent, Blocked: true,
-			BlockReason: mediaVerdict.BlockReason,
-		})
+		writeBlockedJSON(w,
+			blockInfoFor(blockreason.MediaPolicy, ""),
+			http.StatusForbidden, FetchResponse{
+				URL: displayURL, Agent: agent, Blocked: true,
+				BlockReason: mediaVerdict.BlockReason,
+			})
 		return
 	}
 	if mediaVerdict.StripResult != nil && mediaVerdict.StripResult.Changed() {
@@ -3247,7 +3284,10 @@ func (p *Proxy) handleFetch(w http.ResponseWriter, r *http.Request) {
 			RequestID: requestID,
 			Agent:     agent,
 		})
-		writeJSON(w, http.StatusForbidden, FetchResponse{URL: displayURL, Agent: agent, Blocked: true, BlockReason: reason})
+		writeBlockedJSON(w,
+			blockInfoFor(blockreason.PromptInjection, ""),
+			http.StatusForbidden,
+			FetchResponse{URL: displayURL, Agent: agent, Blocked: true, BlockReason: reason})
 		return
 	}
 
@@ -3464,7 +3504,10 @@ func (p *Proxy) filterAndActOnResponseScan(
 			RequestID: requestID,
 			Agent:     agent,
 		})
-		writeJSON(w, http.StatusForbidden, FetchResponse{URL: displayURL, Agent: agent, Blocked: true, BlockReason: reason})
+		writeBlockedJSON(w,
+			blockInfoFor(blockreason.PromptInjection, "response_scan"),
+			http.StatusForbidden,
+			FetchResponse{URL: displayURL, Agent: agent, Blocked: true, BlockReason: reason})
 		return true, "", true
 	case config.ActionAsk:
 		if p.approver == nil {
@@ -3482,7 +3525,10 @@ func (p *Proxy) filterAndActOnResponseScan(
 				RequestID: requestID,
 				Agent:     agent,
 			})
-			writeJSON(w, http.StatusForbidden, FetchResponse{URL: displayURL, Agent: agent, Blocked: true, BlockReason: reason})
+			writeBlockedJSON(w,
+				blockInfoFor(blockreason.PromptInjection, "response_scan"),
+				http.StatusForbidden,
+				FetchResponse{URL: displayURL, Agent: agent, Blocked: true, BlockReason: reason})
 			return true, "", true
 		}
 		preview := content
@@ -3517,7 +3563,10 @@ func (p *Proxy) filterAndActOnResponseScan(
 				RequestID: requestID,
 				Agent:     agent,
 			})
-			writeJSON(w, http.StatusForbidden, FetchResponse{URL: displayURL, Agent: agent, Blocked: true, BlockReason: reason})
+			writeBlockedJSON(w,
+				blockInfoFor(blockreason.PromptInjection, "response_scan"),
+				http.StatusForbidden,
+				FetchResponse{URL: displayURL, Agent: agent, Blocked: true, BlockReason: reason})
 			return true, "", true
 		}
 	case config.ActionStrip:
