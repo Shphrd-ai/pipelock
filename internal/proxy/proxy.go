@@ -1604,7 +1604,31 @@ func (p *Proxy) currentEnvelopeEmitter() *envelope.Emitter {
 }
 
 func (p *Proxy) verifyInboundEnvelope(r *http.Request, cfg *config.Config) error {
-	return verifyInboundEnvelope(r, cfg, p.envelopeVerifierPtr.Load())
+	err := verifyInboundEnvelope(r, cfg, p.envelopeVerifierPtr.Load())
+	recordInboundEnvelopeVerify(p.metrics, cfg, err)
+	return err
+}
+
+func recordInboundEnvelopeVerify(m *metrics.Metrics, cfg *config.Config, err error) {
+	// Errors must be classified before the disabled fast-path: a nil cfg or a
+	// nil verifier still produces an error from verifyInboundEnvelope, and
+	// folding those into "disabled" hides fail-closed verifier failures in
+	// telemetry. Operators correlate the failed counter with the audit log
+	// to spot misconfigured deployments; the disabled label is for genuinely
+	// non-enabled verifiers only.
+	if err != nil {
+		if code, ok := envelope.VerificationFailureCodeOf(err); ok && code == envelope.VerificationFailureMissing {
+			m.RecordEnvelopeVerify(metrics.EnvelopeVerifyMissing)
+			return
+		}
+		m.RecordEnvelopeVerify(metrics.EnvelopeVerifyFailed)
+		return
+	}
+	if cfg == nil || !cfg.MediationEnvelope.VerifyInbound.Enabled {
+		m.RecordEnvelopeVerify(metrics.EnvelopeVerifyDisabled)
+		return
+	}
+	m.RecordEnvelopeVerify(metrics.EnvelopeVerifyVerified)
 }
 
 func inboundEnvelopeFailurePattern(err error) string {
@@ -1670,7 +1694,10 @@ func verifyInboundEnvelope(r *http.Request, cfg *config.Config, verifier *envelo
 	// — gets fully buffered up to max_body_bytes. That is a free
 	// amplification surface for unauthenticated callers.
 	if r != nil && r.Header.Get(envelope.HeaderName) == "" {
-		return fmt.Errorf("missing %s header", envelope.HeaderName)
+		return &envelope.VerificationError{
+			Code: envelope.VerificationFailureMissing,
+			Err:  fmt.Errorf("missing %s header", envelope.HeaderName),
+		}
 	}
 	body, err := bufferInboundEnvelopeBody(r, cfg.MediationEnvelope.MaxBodyBytes)
 	if err != nil {
