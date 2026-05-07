@@ -4,16 +4,51 @@
 package runtime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 
 	"github.com/luckyPipewrench/pipelock/internal/contract"
 	"github.com/luckyPipewrench/pipelock/internal/contract/store"
 	"github.com/luckyPipewrench/pipelock/internal/signing"
+)
+
+// activeFilename is the active-manifest filename inside StoreDir. It mirrors
+// the unexported constant in internal/contract/store; redeclared here so the
+// watcher can filter directory events without importing private store state.
+const activeFilename = "active.json"
+
+// reloadDebounceWindow coalesces an fsnotify burst (CREATE + RENAME + WRITE
+// emitted on a single atomic active.json swap) into one Reload. Matches the
+// existing config hot-reload window so operator expectations stay consistent.
+const reloadDebounceWindow = 100 * time.Millisecond
+
+// maxDebounceWait caps how long the debounce timer can be reset by a
+// continuous burst of events before Reload fires anyway. Without a cap,
+// a producer (operator script, runaway CI) writing active.json faster
+// than reloadDebounceWindow indefinitely starves the debounce timer:
+// every event resets the 100ms wait, and Reload never runs. Two seconds
+// is well above any legitimate atomic-promote burst (which completes in
+// milliseconds) and short enough that a runaway producer cannot delay a
+// real promote indefinitely.
+const maxDebounceWait = 2 * time.Second
+
+// Reload outcome labels passed to LoaderMetrics.IncReload. Operators
+// alert on these strings so the values are part of the public surface
+// even though the metric interface is internal.
+const (
+	outcomeAccepted = "accepted"
+	outcomeSameHash = "same_hash"
+	outcomeNoActive = "no_active"
+	outcomeRejected = "rejected"
+	outcomeError    = "error"
 )
 
 // LoaderOptions configures a Loader. Every field is required when the
@@ -53,17 +88,25 @@ type LoaderOptions struct {
 // and so production callers can wire whatever registry they keep.
 type LoaderMetrics interface {
 	// IncReload records the outcome of a single Reload attempt. Outcomes:
-	//   - "accepted"     — new manifest accepted; ActiveSet swapped
-	//   - "same_hash"    — reload returned the same manifest hash; no-op
-	//   - "no_active"    — store has no active.json; Current() stays nil
-	//   - "rejected"     — store rejected the manifest (signature, env,
+	//   - "accepted"     : new manifest accepted; ActiveSet swapped
+	//   - "same_hash"    : reload returned the same manifest hash; no-op
+	//   - "no_active"    : store has no active.json; Current() stays nil
+	//   - "rejected"     : store rejected the manifest (signature, env,
 	//                      generation downgrade, prior_manifest_hash CAS)
-	//   - "error"        — I/O or other transient error; previous
+	//   - "error"        : I/O or other transient error; previous
 	//                      ActiveSet preserved
 	IncReload(outcome string)
 	// SetGeneration records the currently-active manifest generation.
 	// Zero means no active manifest.
 	SetGeneration(generation uint64)
+	// IncWatcherError records a non-fatal error from the fsnotify
+	// channel. The most operationally significant case is an inotify
+	// queue overflow, which silently drops events. Watch responds to
+	// every watcher error by triggering a defensive Reload on the next
+	// debounce tick so a missed promote event still lands eventually,
+	// but the counter exists so operators can alert on the underlying
+	// kernel pressure.
+	IncWatcherError()
 }
 
 // noopMetrics is the default LoaderMetrics when the caller passes nil.
@@ -71,6 +114,7 @@ type noopMetrics struct{}
 
 func (noopMetrics) IncReload(string)     {}
 func (noopMetrics) SetGeneration(uint64) {}
+func (noopMetrics) IncWatcherError()     {}
 
 // Loader watches an active manifest file and serves the latest ActiveSet
 // to the proxy decision path.
@@ -93,6 +137,7 @@ type Loader struct {
 	store     store.Store
 	storeDir  string
 	storeOpts store.Options
+	reloadMu  sync.Mutex
 	current   atomic.Pointer[ActiveSet]
 	mode      Mode
 	metrics   LoaderMetrics
@@ -180,13 +225,23 @@ func (l *Loader) Reload() error {
 	if l == nil {
 		return errors.New("contract runtime: nil loader")
 	}
+	l.reloadMu.Lock()
+	defer l.reloadMu.Unlock()
+
 	prev := l.current.Load()
 	opts := l.storeOpts
+	var activeState store.State
 	if prev != nil {
-		activeState, err := l.validateActiveReadOnly()
+		var err error
+		activeState, err = l.validateActiveReadOnly()
 		if err == nil && activeState.ManifestHash == prev.ManifestHash() {
-			l.metrics.IncReload("same_hash")
+			l.metrics.IncReload(outcomeSameHash)
 			return nil
+		}
+		if err == nil && activeState.Envelope.Body.PriorManifestHash != prev.ManifestHash() {
+			if recovered, recoverErr := l.recoverAcceptedActive(activeState, prev); recoverErr == nil {
+				return l.acceptState(recovered)
+			}
 		}
 		opts.PreviousHash = prev.ManifestHash()
 		opts.PreviousGeneration = prev.Generation()
@@ -194,15 +249,25 @@ func (l *Loader) Reload() error {
 
 	state, err := l.store.Reload(opts)
 	if err != nil {
+		if prev != nil && errors.Is(err, store.ErrPriorManifest) {
+			if latestActive, activeErr := l.validateActiveReadOnly(); activeErr == nil {
+				if recovered, recoverErr := l.recoverAcceptedActive(latestActive, prev); recoverErr == nil {
+					return l.acceptState(recovered)
+				}
+			}
+			if recovered, recoverErr := l.recoverAcceptedActive(activeState, prev); recoverErr == nil {
+				return l.acceptState(recovered)
+			}
+		}
 		if errors.Is(err, store.ErrNoActiveManifest) {
 			if prev != nil {
-				l.metrics.IncReload("rejected")
+				l.metrics.IncReload(outcomeRejected)
 				return fmt.Errorf("contract runtime: active manifest disappeared after generation %d: %w", prev.Generation(), err)
 			}
 			// Store has no active.json — legitimate "nothing promoted"
 			// state during initial/never-active startup. Current() stays nil.
 			l.current.Store(nil)
-			l.metrics.IncReload("no_active")
+			l.metrics.IncReload(outcomeNoActive)
 			l.metrics.SetGeneration(0)
 			return nil
 		}
@@ -215,19 +280,202 @@ func (l *Loader) Reload() error {
 	// generation before returning state because generation monotonicity is
 	// part of the active-manifest CAS contract.
 	if prev != nil && state.ManifestHash == prev.ManifestHash() {
-		l.metrics.IncReload("same_hash")
+		l.metrics.IncReload(outcomeSameHash)
 		return nil
 	}
 
+	return l.acceptState(state)
+}
+
+func (l *Loader) acceptState(state store.State) error {
 	next, err := NewActiveSet(state)
 	if err != nil {
-		l.metrics.IncReload("rejected")
+		l.metrics.IncReload(outcomeRejected)
 		return fmt.Errorf("contract runtime: build active set: %w", err)
 	}
 	l.current.Store(next)
-	l.metrics.IncReload("accepted")
+	l.metrics.IncReload(outcomeAccepted)
 	l.metrics.SetGeneration(next.Generation())
 	return nil
+}
+
+func (l *Loader) recoverAcceptedActive(activeState store.State, prev *ActiveSet) (store.State, error) {
+	if prev == nil {
+		return store.State{}, errors.New("contract runtime: no previous active set")
+	}
+	if activeState.Envelope.Body.Generation <= prev.Generation() {
+		return store.State{}, fmt.Errorf("contract runtime: accepted active generation %d does not advance current generation %d",
+			activeState.Envelope.Body.Generation, prev.Generation())
+	}
+
+	opts := l.storeOpts
+	opts.PreviousHash = ""
+	opts.PreviousGeneration = 0
+	accepted, err := l.store.Accepted(activeState.ManifestHash, opts)
+	if err != nil {
+		return store.State{}, fmt.Errorf("contract runtime: active manifest is not accepted history: %w", err)
+	}
+	if accepted.ManifestHash != activeState.ManifestHash {
+		return store.State{}, fmt.Errorf("contract runtime: accepted active hash mismatch: got %s want %s", accepted.ManifestHash, activeState.ManifestHash)
+	}
+	if !l.acceptedChainReachesCurrent(accepted, prev, opts) {
+		return store.State{}, fmt.Errorf("contract runtime: accepted active chain does not reach current manifest %s", prev.ManifestHash())
+	}
+	return accepted, nil
+}
+
+func (l *Loader) acceptedChainReachesCurrent(state store.State, prev *ActiveSet, opts store.Options) bool {
+	for {
+		if state.ManifestHash == prev.ManifestHash() {
+			return true
+		}
+		if state.Envelope.Body.Generation <= prev.Generation() {
+			return false
+		}
+		prior := state.Envelope.Body.PriorManifestHash
+		if prior == "" || prior == "sha256:genesis" {
+			return false
+		}
+		next, err := l.store.Accepted(prior, opts)
+		if err != nil {
+			return false
+		}
+		state = next
+	}
+}
+
+// Watch runs an fsnotify watcher on the store directory until ctx is
+// cancelled. CREATE, RENAME, and WRITE events on active.json trigger a
+// debounced Reload (single window matches the config hot-reload window
+// so an atomic active.json swap that fires multiple events coalesces to
+// one Reload call).
+//
+// Watch is fail-soft for reload errors: a rejected reload (bad signature,
+// generation downgrade, env mismatch, prior-manifest CAS) leaves the
+// previous ActiveSet in place and the watcher keeps running so the next
+// promote attempt succeeds.
+//
+// Watch returns nil on graceful ctx cancel. It returns a non-nil error
+// only when the watched directory is removed (the loader cannot recover
+// from that without re-construction) or when fsnotify itself fails to
+// initialize.
+//
+// Caller is responsible for goroutine lifecycle. Watch blocks until
+// return; spawn it in a goroutine if the caller wants background
+// behaviour.
+func (l *Loader) Watch(ctx context.Context) error {
+	if l == nil {
+		return errors.New("contract runtime: nil loader")
+	}
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("contract runtime: create file watcher: %w", err)
+	}
+	defer func() { _ = watcher.Close() }()
+
+	if err := watcher.Add(l.storeDir); err != nil {
+		return fmt.Errorf("contract runtime: watch %s: %w", l.storeDir, err)
+	}
+
+	// debounce is reset on every relevant event. When it fires, a single
+	// Reload runs and debounce resets to nil so a quiescent loop does not
+	// keep selecting on a closed channel. burstStart is the timestamp of
+	// the first event in a still-active burst; once time.Since(burstStart)
+	// exceeds maxDebounceWait, the next event triggers an immediate
+	// Reload instead of resetting the timer, capping the worst-case
+	// reload latency at roughly maxDebounceWait under sustained writes.
+	var (
+		debounce   <-chan time.Time
+		burstStart time.Time
+	)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return nil
+			}
+			// Watched directory removed out from under us. fsnotify keeps
+			// the inotify slot allocated even after the inode is gone, but
+			// the loader has no path forward without operator intervention
+			// so we surface this to the caller.
+			if event.Name == l.storeDir && (event.Has(fsnotify.Remove) || event.Has(fsnotify.Rename)) {
+				return fmt.Errorf("contract runtime: store directory removed: %s", l.storeDir)
+			}
+			// Filter to active.json events. The store atomically replaces
+			// active.json on every accepted promote, which fires CREATE +
+			// RENAME on the new path and (sometimes) REMOVE on the old.
+			// Treat all three as a reload trigger; debounce coalesces the
+			// burst.
+			if filepath.Base(event.Name) != activeFilename {
+				continue
+			}
+			isReloadTrigger := event.Has(fsnotify.Write) ||
+				event.Has(fsnotify.Create) ||
+				event.Has(fsnotify.Rename) ||
+				event.Has(fsnotify.Remove)
+			if !isReloadTrigger {
+				continue
+			}
+			now := time.Now()
+			if debounce == nil {
+				burstStart = now
+			} else if now.Sub(burstStart) >= maxDebounceWait {
+				// Sustained burst exceeded the cap. Force a Reload now
+				// instead of resetting the debounce window again, so a
+				// runaway producer cannot starve a real promote.
+				debounce = nil
+				_ = l.Reload()
+				burstStart = time.Time{}
+				continue
+			}
+			debounce = time.After(reloadDebounceWindow)
+
+		case <-debounce:
+			debounce = nil
+			burstStart = time.Time{}
+			// Reload's own metrics record outcome (accepted, same_hash,
+			// rejected, error). Error return is informational; a rejected
+			// reload is fail-soft and the watcher keeps running so the
+			// next event is another opportunity.
+			_ = l.Reload()
+
+		case _, ok := <-watcher.Errors:
+			if !ok {
+				return nil
+			}
+			// fsnotify surfaces non-fatal errors here. The most
+			// operationally significant case is an inotify kernel queue
+			// overflow (ErrEventOverflow): events that were in the queue
+			// at overflow time are dropped. If the dropped event was a
+			// real promote, the watcher would silently miss it without
+			// a defensive trigger. Schedule a Reload on the next
+			// debounce tick so the same-hash short-circuit absorbs the
+			// no-change case and a real change still lands. The metrics
+			// counter lets operators alert on the underlying kernel
+			// pressure separately from the reload outcome.
+			l.metrics.IncWatcherError()
+			now := time.Now()
+			if debounce == nil {
+				burstStart = now
+			} else if now.Sub(burstStart) >= maxDebounceWait {
+				// Sustained watcher-error pressure (e.g., repeated
+				// inotify queue overflow) was resetting the debounce
+				// window without ever firing the defensive Reload.
+				// Force the flush when the burst exceeds the cap, so
+				// the recovery path lands under exactly the conditions
+				// it was added for.
+				debounce = nil
+				_ = l.Reload()
+				burstStart = time.Time{}
+				continue
+			}
+			debounce = time.After(reloadDebounceWindow)
+		}
+	}
 }
 
 // rejectionOutcome maps a store reload error to a metrics-friendly
@@ -244,17 +492,17 @@ func rejectionOutcome(err error) string {
 		errors.Is(err, store.ErrGeneration),
 		errors.Is(err, store.ErrPriorManifest),
 		errors.Is(err, store.ErrContractHistory):
-		return "rejected"
+		return outcomeRejected
 	case errors.Is(err, store.ErrDecode),
 		errors.Is(err, store.ErrWriteOnceConflict):
-		return "error"
+		return outcomeError
 	default:
-		return "error"
+		return outcomeError
 	}
 }
 
 func (l *Loader) validateActiveReadOnly() (store.State, error) {
-	activePath := filepath.Clean(filepath.Join(l.storeDir, "active.json"))
+	activePath := filepath.Clean(filepath.Join(l.storeDir, activeFilename))
 	raw, err := os.ReadFile(activePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
