@@ -47,6 +47,8 @@ type Metrics struct {
 
 	// DLP / address protection / file sentry (dlp.go).
 	bodyDLPHits        *prometheus.CounterVec
+	bodyInjectionHits  *prometheus.CounterVec
+	bodyRedactions     *prometheus.CounterVec
 	headerDLPHits      *prometheus.CounterVec
 	dlpWarnMatches     *prometheus.CounterVec
 	AddressFindings    *prometheus.CounterVec

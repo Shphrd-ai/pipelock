@@ -8,10 +8,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"sync/atomic"
 
 	"github.com/luckyPipewrench/pipelock/internal/config"
 	"github.com/luckyPipewrench/pipelock/internal/redact"
+	"github.com/luckyPipewrench/pipelock/internal/scanner"
 )
 
 // redactionRuntime snapshots every request-body redaction input that must stay
@@ -28,7 +30,11 @@ type redactionRuntime struct {
 }
 
 func (p *Proxy) buildRedactionRuntime(cfg *config.Config) (*redactionRuntime, error) {
-	matcher, err := p.buildRedactMatcher(cfg)
+	return p.buildRedactionRuntimeWithScanner(cfg, p.scannerPtr.Load())
+}
+
+func (p *Proxy) buildRedactionRuntimeWithScanner(cfg *config.Config, sc *scanner.Scanner) (*redactionRuntime, error) {
+	matcher, err := p.buildRedactMatcherWithScanner(cfg, sc)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +53,7 @@ func (p *Proxy) buildRedactionRuntime(cfg *config.Config) (*redactionRuntime, er
 		allowlistUnparseable:       allowlist,
 		allowlistUnparseableRoutes: routes,
 		providers:                  providers,
-		configKey:                  redactionConfigKey(cfg),
+		configKey:                  redactionConfigKeyForScanner(cfg, sc),
 		required:                   cfg.Redaction.Enabled,
 	}, nil
 }
@@ -64,7 +70,7 @@ func (p *Proxy) RedactionRuntimePtr() *atomic.Pointer[redactionRuntime] {
 // match the request-scoped config snapshot (during reload windows), callers get
 // a fail-closed sentinel instead of silently skipping redaction.
 func (p *Proxy) currentRedactionRuntimeFor(cfg *config.Config) *redactionRuntime {
-	return currentRedactionRuntimeForConfig(cfg, &p.redactionRuntimePtr)
+	return currentRedactionRuntimeForConfig(cfg, &p.redactionRuntimePtr, p.scannerPtr.Load())
 }
 
 // CurrentRedactionConfigFor returns the redaction matcher and limits that
@@ -78,10 +84,14 @@ func (p *Proxy) CurrentRedactionConfigFor(cfg *config.Config) (*redact.Matcher, 
 	return rt.matcher, rt.limits, rt.required
 }
 
-func currentRedactionRuntimeForConfig(cfg *config.Config, ptr *atomic.Pointer[redactionRuntime]) *redactionRuntime {
+func currentRedactionRuntimeForConfig(cfg *config.Config, ptr *atomic.Pointer[redactionRuntime], scanners ...*scanner.Scanner) *redactionRuntime {
+	expectedKey := redactionConfigKey(cfg)
+	if len(scanners) > 0 && scanners[0] != nil {
+		expectedKey = redactionConfigKeyForScanner(cfg, scanners[0])
+	}
 	if ptr != nil {
 		if rt := ptr.Load(); rt != nil && rt.matcher != nil {
-			if cfg != nil && rt.configKey == redactionConfigKey(cfg) {
+			if cfg != nil && rt.configKey == expectedKey {
 				return rt
 			}
 		}
@@ -102,7 +112,7 @@ func currentRedactionRuntimeForConfig(cfg *config.Config, ptr *atomic.Pointer[re
 		allowlistUnparseable:       append([]string(nil), cfg.Redaction.AllowlistUnparseable...),
 		allowlistUnparseableRoutes: append([]redact.UnparseableRouteSpec(nil), cfg.Redaction.AllowlistUnparseableRoutes...),
 		providers:                  nil,
-		configKey:                  redactionConfigKey(cfg),
+		configKey:                  expectedKey,
 		required:                   true,
 	}
 }
@@ -112,6 +122,46 @@ func redactionConfigKey(cfg *config.Config) string {
 		return ""
 	}
 	payload, err := json.Marshal(cfg.Redaction)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(payload)
+	return hex.EncodeToString(sum[:])
+}
+
+func redactionConfigKeyForScanner(cfg *config.Config, sc *scanner.Scanner) string {
+	base := redactionConfigKey(cfg)
+	scannerKey := scannerRedactionKey(sc)
+	if base == "" || scannerKey == "" {
+		return base
+	}
+	payload, err := json.Marshal(struct {
+		Config  string `json:"config"`
+		Scanner string `json:"scanner"`
+	}{
+		Config:  base,
+		Scanner: scannerKey,
+	})
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(payload)
+	return hex.EncodeToString(sum[:])
+}
+
+func scannerRedactionKey(sc *scanner.Scanner) string {
+	if sc == nil {
+		return ""
+	}
+	values := sc.RedactionSecretValues()
+	if len(values.Env) == 0 && len(values.File) == 0 {
+		return ""
+	}
+	values.Env = append([]string(nil), values.Env...)
+	values.File = append([]string(nil), values.File...)
+	sort.Strings(values.Env)
+	sort.Strings(values.File)
+	payload, err := json.Marshal(values)
 	if err != nil {
 		return ""
 	}

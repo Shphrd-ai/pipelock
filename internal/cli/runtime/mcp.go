@@ -664,6 +664,7 @@ signed action receipts for MCP decisions.`,
 					Redact:             cfg.FlightRecorder.Redact,
 					SignCheckpoints:    cfg.FlightRecorder.SignCheckpoints,
 					MaxEntriesPerFile:  cfg.FlightRecorder.MaxEntriesPerFile,
+					FileMode:           cfg.FlightRecorder.FileMode,
 					RawEscrow:          cfg.FlightRecorder.RawEscrow,
 					EscrowPublicKey:    cfg.FlightRecorder.EscrowPublicKey,
 				}
@@ -801,7 +802,8 @@ signed action receipts for MCP decisions.`,
 					})
 					if err := mcp.RunHTTPListenerProxy(ctx, mcpLn, upstreamURL, cmd.ErrOrStderr(), mcp.MCPProxyOpts{
 						Scanner: sc, Approver: approver,
-						InputCfg: inputCfg, ToolCfg: toolCfg, PolicyCfg: policyCfg,
+						InputCfg: inputCfg, RequestBodyCfg: &cfg.RequestBodyScanning,
+						ToolCfg: toolCfg, PolicyCfg: policyCfg,
 						KillSwitch: ks, ChainMatcher: chainMatcher,
 						CEE: cee, Store: store, AdaptiveCfgFn: adaptiveFn, Metrics: mcpMetrics,
 						ConfigHash: captureConfigHash, Profile: captureProfile,

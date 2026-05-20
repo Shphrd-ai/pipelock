@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/luckyPipewrench/pipelock/internal/audit"
+	"github.com/luckyPipewrench/pipelock/internal/blockreason"
 	"github.com/luckyPipewrench/pipelock/internal/config"
 	"github.com/luckyPipewrench/pipelock/internal/emit"
 	"github.com/luckyPipewrench/pipelock/internal/envelope"
@@ -232,6 +233,31 @@ func TestRunHTTPProxy_RedactsToolCallArguments(t *testing.T) {
 	}
 	if !strings.Contains(envelope.Params.Arguments.Prompt, mcpPlaceholderAWS) {
 		t.Fatalf("upstream request missing placeholder: %s", upstreamBody.String())
+	}
+}
+
+func TestScanHTTPInput_PreRedactionDLPBlocksToolCall(t *testing.T) {
+	secret := mcpRedactionSecret()
+	sc := testScannerForHTTP(t)
+	msg := []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"echo","arguments":{"prompt":"use ` + secret + ` to deploy"}}}`)
+	var logBuf bytes.Buffer
+
+	decision := scanHTTPInputDecision(msg, &logBuf, "", "", MCPProxyOpts{
+		Scanner:       sc,
+		InputCfg:      &InputScanConfig{Enabled: true, Action: config.ActionBlock, OnParseError: config.ActionBlock},
+		RedactMatcher: testHTTPRedactionMatcher(),
+		RedactLimits:  redact.DefaultLimits().ToLimits(),
+		RedactProfile: "code",
+	})
+
+	if decision.Blocked == nil {
+		t.Fatal("expected pre-redaction DLP block")
+	}
+	if !strings.Contains(logBuf.String(), "AWS Access ID") {
+		t.Fatalf("expected AWS Access ID in block log, got: %s", logBuf.String())
+	}
+	if string(decision.Blocked.ErrorData) == "" || !strings.Contains(string(decision.Blocked.ErrorData), string(blockreason.DLPMatch)) {
+		t.Fatalf("expected DLP block reason data, got: %s", string(decision.Blocked.ErrorData))
 	}
 }
 
@@ -1774,6 +1800,103 @@ func TestHTTPListener_HealthEndpoint(t *testing.T) {
 	}
 }
 
+func TestRunHTTPListenerProxy_SessionBindingBlocksNoBaseline(t *testing.T) {
+	var upstreamCalls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		upstreamCalls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"ok"}]}}`))
+	}))
+	defer upstream.Close()
+
+	sc := testScannerForHTTP(t)
+	toolCfg := &tools.ToolScanConfig{
+		Baseline:                tools.NewToolBaseline(),
+		Action:                  config.ActionBlock,
+		BindingUnknownAction:    config.ActionBlock,
+		BindingNoBaselineAction: config.ActionBlock,
+	}
+	baseURL, _, logBuf := startListenerProxy(t, upstream.URL, sc, &InputScanConfig{Enabled: true, Action: config.ActionBlock, OnParseError: config.ActionBlock}, toolCfg, nil)
+
+	resp, err := http.Post(baseURL+"/", "application/json", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"echo","arguments":{"text":"hi"}}}`)) //nolint:gosec,noctx // test
+	if err != nil {
+		t.Fatalf("POST listener proxy: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	payload, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("ReadAll(response): %v", err)
+	}
+	if !strings.Contains(string(payload), bindingReasonNoBaseline) {
+		t.Fatalf("expected no-baseline block, got: %s", payload)
+	}
+	if got := upstreamCalls.Load(); got != 0 {
+		t.Fatalf("upstream calls = %d, want 0", got)
+	}
+	if !strings.Contains(logBuf.String(), "before baseline established") {
+		t.Fatalf("expected binding diagnostic log, got: %s", logBuf.String())
+	}
+}
+
+func TestRunHTTPListenerProxy_SessionBindingBlocksUnknownToolAfterToolsList(t *testing.T) {
+	var toolCalls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("ReadAll(upstream request): %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(string(body), `"tools/list"`) {
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"echo","description":"Echo text","inputSchema":{"type":"object"}}]}}`))
+			return
+		}
+		toolCalls.Add(1)
+		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"ok"}]}}`))
+	}))
+	defer upstream.Close()
+
+	sc := testScannerForHTTP(t)
+	toolCfg := &tools.ToolScanConfig{
+		Baseline:                tools.NewToolBaseline(),
+		Action:                  config.ActionBlock,
+		BindingUnknownAction:    config.ActionBlock,
+		BindingNoBaselineAction: config.ActionBlock,
+	}
+	baseURL, _, logBuf := startListenerProxy(t, upstream.URL, sc, &InputScanConfig{Enabled: true, Action: config.ActionBlock, OnParseError: config.ActionBlock}, toolCfg, nil)
+
+	listResp, err := http.Post(baseURL+"/", "application/json", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`)) //nolint:gosec,noctx // test
+	if err != nil {
+		t.Fatalf("POST tools/list: %v", err)
+	}
+	listPayload, err := io.ReadAll(listResp.Body)
+	_ = listResp.Body.Close()
+	if err != nil {
+		t.Fatalf("ReadAll(tools/list response): %v", err)
+	}
+	if !strings.Contains(string(listPayload), `"name":"echo"`) {
+		t.Fatalf("expected tools/list to establish baseline, got: %s", listPayload)
+	}
+
+	callResp, err := http.Post(baseURL+"/", "application/json", strings.NewReader(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"unknown_tool","arguments":{"text":"hi"}}}`)) //nolint:gosec,noctx // test
+	if err != nil {
+		t.Fatalf("POST tools/call: %v", err)
+	}
+	defer func() { _ = callResp.Body.Close() }()
+	callPayload, err := io.ReadAll(callResp.Body)
+	if err != nil {
+		t.Fatalf("ReadAll(tools/call response): %v", err)
+	}
+	if !strings.Contains(string(callPayload), bindingReasonUnknownTool) {
+		t.Fatalf("expected unknown-tool block, got: %s", callPayload)
+	}
+	if got := toolCalls.Load(); got != 0 {
+		t.Fatalf("tool call upstream forwards = %d, want 0", got)
+	}
+	if !strings.Contains(logBuf.String(), "not in session baseline") {
+		t.Fatalf("expected binding diagnostic log, got: %s", logBuf.String())
+	}
+}
+
 func TestRunHTTPListenerProxy_BlockedResponse_EmitsReceipt(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -2235,6 +2358,105 @@ func TestHTTPListener_AuthHeaderDLP(t *testing.T) {
 	}
 	if atomic.LoadInt32(&serverCalled) != 0 {
 		t.Error("upstream should NOT be called when Authorization header has DLP match")
+	}
+}
+
+func TestHTTPListener_ConfiguredSensitiveHeaderDLP(t *testing.T) {
+	var serverCalled int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&serverCalled, 1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{}}`))
+	}))
+	defer upstream.Close()
+
+	sc := testScannerForHTTP(t)
+	reqBodyCfg := config.Defaults().RequestBodyScanning
+	reqBodyCfg.Enabled = true
+	reqBodyCfg.ScanHeaders = true
+	reqBodyCfg.HeaderMode = config.HeaderModeSensitive
+	reqBodyCfg.SensitiveHeaders = []string{"X-Api-Key"}
+
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	addr := ln.Addr().String()
+	var logBuf bytes.Buffer
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- RunHTTPListenerProxy(ctx, ln, upstream.URL, &logBuf, MCPProxyOpts{
+			Scanner: sc, RequestBodyCfg: &reqBodyCfg,
+		})
+	}()
+
+	baseURL := "http://" + addr
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		hReq, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, baseURL+"/health", nil)
+		resp, connErr := http.DefaultClient.Do(hReq)
+		if connErr == nil {
+			_ = resp.Body.Close()
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, baseURL+"/", strings.NewReader(jsonToolsList))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Api-Key", mcpSyntheticAWSAccessKey())
+
+	resp, httpErr := http.DefaultClient.Do(req)
+	if httpErr != nil {
+		t.Fatalf("POST: %v", httpErr)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var rpc struct {
+		Error struct{ Code int } `json:"error"`
+	}
+	if json.Unmarshal(respBody, &rpc) != nil || rpc.Error.Code != -32001 {
+		t.Errorf("expected error code -32001 (DLP block), got: %s", respBody)
+	}
+	if atomic.LoadInt32(&serverCalled) != 0 {
+		t.Error("upstream should NOT be called when X-Api-Key header has DLP match")
+	}
+	if !strings.Contains(logBuf.String(), "X-Api-Key header") {
+		t.Fatalf("expected X-Api-Key header in log, got: %s", logBuf.String())
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Error("timeout")
+	}
+}
+
+func TestMCPListenerHeaderDLP_WhitespaceSplitSensitiveHeader(t *testing.T) {
+	sc := testScannerForHTTP(t)
+	reqBodyCfg := config.Defaults().RequestBodyScanning
+	reqBodyCfg.Enabled = true
+	reqBodyCfg.ScanHeaders = true
+	reqBodyCfg.HeaderMode = config.HeaderModeAll
+	reqBodyCfg.SensitiveHeaders = []string{"X-Token"}
+
+	headers := http.Header{}
+	headers.Set("X-Token", "AKIA"+strings.Repeat("A", 4)+" "+strings.Repeat("B", 12))
+
+	result := scanMCPListenerHeadersForDLP(context.Background(), headers, sc, &reqBodyCfg)
+	if result == nil {
+		t.Fatal("expected whitespace-split sensitive header to be blocked")
+	}
+	if result.header != "X-Token" {
+		t.Fatalf("blocked header = %q, want X-Token", result.header)
+	}
+	if len(result.matches) == 0 || result.matches[0].PatternName != "AWS Access ID" {
+		t.Fatalf("expected AWS Access ID match, got %+v", result.matches)
 	}
 }
 

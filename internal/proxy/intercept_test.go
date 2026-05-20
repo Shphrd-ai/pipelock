@@ -65,8 +65,16 @@ func testInterceptSetup(t *testing.T) (*certgen.CertCache, *x509.CertPool, *conf
 
 func testInterceptRedactProxy(t *testing.T, cfg *config.Config) *Proxy {
 	t.Helper()
+	return testInterceptRedactProxyWithScanner(t, cfg, nil)
+}
+
+func testInterceptRedactProxyWithScanner(t *testing.T, cfg *config.Config, sc *scanner.Scanner) *Proxy {
+	t.Helper()
 	p := &Proxy{captureObs: capture.NopObserver{}}
-	rt, err := p.buildRedactionRuntime(cfg)
+	if sc != nil {
+		p.scannerPtr.Store(sc)
+	}
+	rt, err := p.buildRedactionRuntimeWithScanner(cfg, sc)
 	if err != nil {
 		t.Fatalf("build redaction runtime: %v", err)
 	}
@@ -1555,6 +1563,8 @@ func TestInterceptTunnel_HeaderDLPAuditMode(t *testing.T) {
 	cfg.RequestBodyScanning.Action = config.ActionWarn
 	cfg.RequestBodyScanning.HeaderMode = config.HeaderModeSensitive
 	cfg.RequestBodyScanning.SensitiveHeaders = []string{"Authorization"}
+	enforceOff := false
+	cfg.Enforce = &enforceOff
 	sc := scanner.New(cfg)
 	t.Cleanup(func() { sc.Close() })
 
@@ -1600,6 +1610,79 @@ func TestInterceptTunnel_BodyDLPAuditMode(t *testing.T) {
 	// Warn mode with enforce off: should forward, not block.
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("status = %d, want 200 (warn mode should forward)", resp.StatusCode)
+	}
+}
+
+func TestInterceptTunnel_BodyPromptInjectionHardBlocksNonProviderWarnMode(t *testing.T) {
+	var upstreamHit atomic.Bool
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		upstreamHit.Store(true)
+		_, _ = fmt.Fprint(w, "unexpected")
+	}))
+	defer upstream.Close()
+
+	cache, pool, cfg, _, logger, m := testInterceptSetup(t)
+	cfg.RequestBodyScanning.Enabled = true
+	cfg.RequestBodyScanning.Action = config.ActionWarn
+	cfg.RequestBodyScanning.MaxBodyBytes = 1024 * 1024
+	enforceOff := false
+	cfg.Enforce = &enforceOff
+	sc := scanner.New(cfg)
+	t.Cleanup(func() { sc.Close() })
+
+	addr := upstream.Listener.Addr().String()
+	body := trilingualPromptInjectionBody
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://"+addr+"/api", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp := interceptAndRequest(t, upstream, cache, pool, cfg, sc, logger, m, req)
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403 (body prompt injection should hard block non-provider destination)", resp.StatusCode)
+	}
+	if got := resp.Header.Get(blockreason.HeaderReason); got != string(blockreason.PromptInjection) {
+		t.Fatalf("block reason = %q, want %s", got, blockreason.PromptInjection)
+	}
+	if upstreamHit.Load() {
+		t.Fatal("upstream received body prompt injection, want blocked before forwarding")
+	}
+}
+
+func TestInterceptTunnel_BodyPromptInjectionProviderExemptWarnMode(t *testing.T) {
+	var upstreamHit atomic.Bool
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		upstreamHit.Store(true)
+		_, _ = fmt.Fprint(w, "ok")
+	}))
+	defer upstream.Close()
+
+	cache, pool, cfg, _, logger, m := testInterceptSetup(t)
+	cfg.RequestBodyScanning.Enabled = true
+	cfg.RequestBodyScanning.Action = config.ActionWarn
+	cfg.RequestBodyScanning.MaxBodyBytes = 1024 * 1024
+	enforceOff := false
+	cfg.Enforce = &enforceOff
+	host, _, err := net.SplitHostPort(upstream.Listener.Addr().String())
+	if err != nil {
+		t.Fatalf("split upstream addr: %v", err)
+	}
+	cfg.ResponseScanning.ExemptDomains = append(cfg.ResponseScanning.ExemptDomains, host)
+	sc := scanner.New(cfg)
+	t.Cleanup(func() { sc.Close() })
+
+	body := trilingualPromptInjectionBody
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, upstream.URL+"/api", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp := interceptAndRequest(t, upstream, cache, pool, cfg, sc, logger, m, req)
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (provider exemption should keep warn-mode body prompt injection non-blocking)", resp.StatusCode)
+	}
+	if !upstreamHit.Load() {
+		t.Fatal("upstream was not reached for provider-exempt warn-mode prompt body")
 	}
 }
 

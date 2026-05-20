@@ -14,6 +14,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -89,6 +90,113 @@ func (sw *sseMessageWriter) Wrote() bool {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
 	return sw.wrote
+}
+
+var defaultMCPListenerSensitiveHeaders = []string{
+	"Authorization",
+	"Cookie",
+	"X-Api-Key",
+	"X-Token",
+	"Proxy-Authorization",
+	"X-Goog-Api-Key",
+}
+
+type mcpListenerHeaderDLPResult struct {
+	header  string
+	matches []scanner.TextDLPMatch
+}
+
+func scanMCPListenerHeadersForDLP(
+	ctx context.Context,
+	headers http.Header,
+	sc *scanner.Scanner,
+	cfg *config.RequestBodyScanning,
+) *mcpListenerHeaderDLPResult {
+	if sc == nil {
+		return nil
+	}
+
+	headersToScan := mcpListenerHeadersToScan(headers, cfg)
+	allValues := make([]string, 0)
+	for name, values := range headersToScan {
+		if mcpListenerShouldScanHeaderNames(cfg) {
+			result := sc.ScanTextForDLP(ctx, name)
+			if !result.Clean {
+				return &mcpListenerHeaderDLPResult{header: name, matches: result.Matches}
+			}
+			allValues = append(allValues, name)
+		}
+
+		for _, value := range values {
+			if value == "" {
+				continue
+			}
+			allValues = append(allValues, value)
+			result := sc.ScanTextForDLP(ctx, value)
+			if !result.Clean {
+				return &mcpListenerHeaderDLPResult{header: name, matches: result.Matches}
+			}
+			if mcpListenerShouldScanHeaderNames(cfg) {
+				result = sc.ScanTextForDLP(ctx, name+value)
+				if !result.Clean {
+					return &mcpListenerHeaderDLPResult{header: name, matches: result.Matches}
+				}
+			}
+		}
+	}
+
+	if len(allValues) > 1 {
+		sort.Strings(allValues)
+		result := sc.ScanTextForDLP(ctx, strings.Join(allValues, "\n"))
+		if !result.Clean {
+			return &mcpListenerHeaderDLPResult{header: "(joined)", matches: result.Matches}
+		}
+	}
+	return nil
+}
+
+func mcpListenerHeadersToScan(headers http.Header, cfg *config.RequestBodyScanning) map[string][]string {
+	if cfg == nil || !cfg.Enabled || !cfg.ScanHeaders {
+		return mcpListenerExplicitHeaders(headers, []string{"Authorization"})
+	}
+	if cfg.HeaderMode == config.HeaderModeAll {
+		ignored := make(map[string]struct{}, len(cfg.IgnoreHeaders))
+		for _, name := range cfg.IgnoreHeaders {
+			ignored[http.CanonicalHeaderKey(name)] = struct{}{}
+		}
+		out := make(map[string][]string)
+		for name, values := range headers {
+			canonical := http.CanonicalHeaderKey(name)
+			if _, skip := ignored[canonical]; skip {
+				continue
+			}
+			out[canonical] = values
+		}
+		return out
+	}
+
+	sensitiveHeaders := cfg.SensitiveHeaders
+	if len(sensitiveHeaders) == 0 {
+		sensitiveHeaders = defaultMCPListenerSensitiveHeaders
+	}
+	return mcpListenerExplicitHeaders(headers, sensitiveHeaders)
+}
+
+func mcpListenerExplicitHeaders(headers http.Header, names []string) map[string][]string {
+	out := make(map[string][]string)
+	for _, name := range names {
+		canonical := http.CanonicalHeaderKey(name)
+		values, ok := headers[canonical]
+		if !ok || len(values) == 0 {
+			continue
+		}
+		out[canonical] = values
+	}
+	return out
+}
+
+func mcpListenerShouldScanHeaderNames(cfg *config.RequestBodyScanning) bool {
+	return cfg != nil && cfg.Enabled && cfg.ScanHeaders && cfg.HeaderMode == config.HeaderModeAll
 }
 
 // RunHTTPProxy bridges stdio (client) to an upstream HTTP MCP server with
@@ -402,10 +510,48 @@ func scanHTTPInputDecision(msg []byte, logW io.Writer, sessionKey, auditSessionK
 		return result
 	}
 
+	// Determine input scanning parameters before redaction so block-mode
+	// DLP can enforce on the original tool arguments. Warn mode still
+	// redacts before forwarding below.
+	action := config.ActionWarn
+	onParseError := config.ActionBlock
+	if inputCfg != nil && inputCfg.Enabled {
+		action = inputCfg.Action
+		onParseError = inputCfg.OnParseError
+	}
+	scanEnabled := inputCfg != nil && inputCfg.Enabled
+
+	// Build the scan context once so pre-redaction and post-redaction
+	// scans share the same DLPWarnContext.
+	inputScanCtx := opts.warnContext()
+	wc := scanner.DLPWarnContextFromCtx(inputScanCtx)
+	if wc.Transport == "" {
+		wc.Transport = transportMCPHTTP
+		inputScanCtx = scanner.WithDLPWarnContext(inputScanCtx, wc)
+	}
+
 	if pendingToolName := frame.ToolCallName; pendingToolName != "" {
 		toolName = pendingToolName
 		mcpMethod = methodToolsCall
 		actionID = receipt.NewActionID()
+	}
+	if scanEnabled && redactionCfg.Matcher != nil {
+		originalVerdict := ScanRequest(inputScanCtx, msg, sc, action, onParseError)
+		if !originalVerdict.Clean && action == config.ActionBlock {
+			receiptLayer, receiptPattern, receiptSeverity = contentScanAttribution(originalVerdict)
+			_, _ = fmt.Fprintf(logW, "pipelock: input: blocked (%s)\n", joinInputVerdictReasons(originalVerdict))
+			recordAdaptiveSignal(session.SignalBlock)
+			receiptVerdict = config.ActionBlock
+			result.Blocked = &BlockedRequest{
+				ID:             originalVerdict.ID,
+				IsNotification: isRPCNotification(originalVerdict.ID),
+				LogMessage:     "blocked",
+				ErrorCode:      -32001,
+				ErrorMessage:   "pipelock: request blocked by MCP input scanning",
+				ErrorData:      mcpBlockReasonData(mcpScannerBlockReason(originalVerdict, policy.Verdict{}, false)),
+			}
+			return result
+		}
 	}
 	rewrittenMsg, report, redactErr := applyMCPToolCallRedactionWithConfig(msg, redactionCfg)
 	if redactErr != nil {
@@ -433,24 +579,6 @@ func scanHTTPInputDecision(msg []byte, logW io.Writer, sessionKey, auditSessionK
 	// Redaction may have rewritten argument values; re-parse so
 	// downstream gates (DoW, taint) see the redacted args.
 	frame = ParseMCPFrame(msg)
-
-	// Determine input scanning parameters.
-	action := config.ActionWarn
-	onParseError := config.ActionBlock
-	if inputCfg != nil && inputCfg.Enabled {
-		action = inputCfg.Action
-		onParseError = inputCfg.OnParseError
-	}
-	scanEnabled := inputCfg != nil && inputCfg.Enabled
-
-	// Build the scan context once so the helper sees the same
-	// DLPWarnContext the inline content scan would have seen.
-	inputScanCtx := opts.warnContext()
-	wc := scanner.DLPWarnContextFromCtx(inputScanCtx)
-	if wc.Transport == "" {
-		wc.Transport = transportMCPHTTP
-		inputScanCtx = scanner.WithDLPWarnContext(inputScanCtx, wc)
-	}
 
 	// Evaluate every configured gate in one pass. The helper returns
 	// a composite verdict and the first gate that short-circuited,
@@ -600,11 +728,46 @@ func scanHTTPInputDecision(msg []byte, logW io.Writer, sessionKey, auditSessionK
 	}
 
 	taintEval = eval.TaintDecision
+	bindingAction := eval.BindingAction
+	bindingReason := eval.BindingReason
 	chainAction := eval.ChainAction
 	chainReason := eval.ChainReason
+	if bindingReason != "" {
+		switch bindingReason {
+		case bindingReasonMissingToolName:
+			_, _ = fmt.Fprintf(logW, "pipelock: tools/call missing params.name\n")
+		case bindingReasonNoBaseline:
+			_, _ = fmt.Fprintf(logW, "pipelock: tools/call %q before baseline established\n", toolName)
+		case bindingReasonUnknownTool:
+			_, _ = fmt.Fprintf(logW, "pipelock: tools/call %q not in session baseline\n", toolName)
+		default:
+			_, _ = fmt.Fprintf(logW, "pipelock: tools/call %q session binding violation: %s\n", toolName, bindingReason)
+		}
+		obs.ObserveToolPolicyVerdict(context.Background(), &capture.ToolPolicyRecord{
+			Subsurface:        "session_binding",
+			Transport:         opts.Transport,
+			SessionID:         captureSessionID(opts.Transport),
+			SessionIDOriginal: captureSessionIDOriginal(opts.Transport),
+			ConfigHash:        opts.captureConfigHash(),
+			Profile:           opts.captureProfile(),
+			ActionClass:       captureActionClass,
+			Request: capture.CaptureRequest{
+				ToolName:  toolName,
+				MCPMethod: methodToolsCall,
+			},
+			RawFindings: []capture.Finding{{
+				Kind:       capture.KindSessionBinding,
+				ToolName:   toolName,
+				PolicyRule: bindingReason,
+				Action:     bindingAction,
+			}},
+			EffectiveAction: bindingAction,
+			Outcome:         captureOutcome(bindingAction, false),
+		})
+	}
 
 	// All clean — proceed (with block_all and CEE checks).
-	if verdict.Clean && !policyVerdict.Matched && chainAction == "" {
+	if verdict.Clean && !policyVerdict.Matched && bindingAction == "" && chainAction == "" {
 		// block_all enforcement: deny ALL traffic (including clean) when the
 		// session is at an escalation level with block_all=true.
 		if rec != nil && decide.UpgradeAction("", rec.EscalationLevel(), adaptiveCfg) == config.ActionBlock {
@@ -704,6 +867,9 @@ func scanHTTPInputDecision(msg []byte, logW io.Writer, sessionKey, auditSessionK
 	for _, r := range policyVerdict.Rules {
 		reasons = append(reasons, "policy:"+r)
 	}
+	if bindingReason != "" {
+		reasons = append(reasons, bindingReason)
+	}
 	if chainReason != "" {
 		reasons = append(reasons, chainReason)
 	}
@@ -724,6 +890,9 @@ func scanHTTPInputDecision(msg []byte, logW io.Writer, sessionKey, auditSessionK
 	if policyVerdict.Matched {
 		effectiveAction = mergeAction(effectiveAction, policyVerdict.Action)
 	}
+	if bindingAction != "" {
+		effectiveAction = mergeAction(effectiveAction, bindingAction)
+	}
 	if chainAction != "" {
 		effectiveAction = mergeAction(effectiveAction, chainAction)
 	}
@@ -736,6 +905,10 @@ func scanHTTPInputDecision(msg []byte, logW io.Writer, sessionKey, auditSessionK
 	if verdict.Clean && policyVerdict.Matched {
 		errCode = -32002
 		errMsg = errPolicyBlocked
+	}
+	if bindingReason != "" && bindingAction == config.ActionBlock {
+		errCode = -32000
+		errMsg = "pipelock: " + bindingReason
 	}
 
 	// Escalation upgrade: may promote warn/ask to block for elevated sessions.
@@ -780,13 +953,17 @@ func scanHTTPInputDecision(msg []byte, logW io.Writer, sessionKey, auditSessionK
 		_, _ = fmt.Fprintf(logW, "pipelock: input: blocked (%s)\n", joinStrings(reasons))
 		recordAdaptiveSignal(session.SignalBlock)
 		receiptVerdict = effectiveAction
+		blockReason := mcpScannerBlockReason(verdict, policyVerdict, chainAction != "")
+		if bindingReason != "" && bindingAction == config.ActionBlock {
+			blockReason = blockreason.SessionBinding
+		}
 		result.Blocked = &BlockedRequest{
 			ID:             verdict.ID,
 			IsNotification: isNotification,
 			LogMessage:     "blocked",
 			ErrorCode:      errCode,
 			ErrorMessage:   errMsg,
-			ErrorData:      mcpBlockReasonData(mcpScannerBlockReason(verdict, policyVerdict, chainAction != "")),
+			ErrorData:      mcpBlockReasonData(blockReason),
 		}
 		return result
 	case config.ActionRedirect:
@@ -1426,36 +1603,33 @@ func RunHTTPListenerProxy(
 		httpWarnCtx := scanner.WithDLPWarnContext(r.Context(), warnCtx)
 		r = r.WithContext(httpWarnCtx)
 
-		// Scan Authorization header for DLP patterns. The body scanner
-		// doesn't see HTTP headers, so an agent could leak credentials
-		// via the Authorization header without triggering DLP.
-		if auth := r.Header.Get("Authorization"); auth != "" {
-			dlpResult := reqScanner.ScanTextForDLP(r.Context(), auth)
-			if !dlpResult.Clean {
-				pattern := patternUnknown
-				if len(dlpResult.Matches) > 0 {
-					pattern = dlpResult.Matches[0].PatternName
-				}
-				_, _ = fmt.Fprintf(safeLogW, "pipelock: DLP match in Authorization header: %s\n", pattern)
-				if adaptiveCfg != nil && adaptiveCfg.Enabled {
-					decide.RecordSignal(reqRec, session.SignalBlock, decide.EscalationParams{
-						Threshold:     adaptiveCfg.EscalationThreshold,
-						Logger:        opts.AuditLogger,
-						Metrics:       opts.Metrics,
-						ConsoleWriter: safeLogW,
-						Session:       auditSessionKey,
-					})
-				}
-				w.Header().Set("Content-Type", "application/json")
-				rpcID := frame.ID
-				resp, _ := json.Marshal(rpcError{
-					JSONRPC: jsonrpc.Version,
-					ID:      rpcID,
-					Error:   rpcErrorDetail{Code: -32001, Message: "pipelock: request blocked by MCP input scanning"},
-				})
-				_, _ = w.Write(resp)
-				return
+		// Scan configured sensitive listener headers for DLP patterns. The
+		// body scanner doesn't see HTTP headers, so an agent could leak
+		// credentials via MCP listener headers without triggering DLP.
+		if headerResult := scanMCPListenerHeadersForDLP(r.Context(), r.Header, reqScanner, opts.requestBodyCfg()); headerResult != nil {
+			pattern := patternUnknown
+			if len(headerResult.matches) > 0 {
+				pattern = headerResult.matches[0].PatternName
 			}
+			_, _ = fmt.Fprintf(safeLogW, "pipelock: DLP match in %s header: %s\n", headerResult.header, pattern)
+			if adaptiveCfg != nil && adaptiveCfg.Enabled {
+				decide.RecordSignal(reqRec, session.SignalBlock, decide.EscalationParams{
+					Threshold:     adaptiveCfg.EscalationThreshold,
+					Logger:        opts.AuditLogger,
+					Metrics:       opts.Metrics,
+					ConsoleWriter: safeLogW,
+					Session:       auditSessionKey,
+				})
+			}
+			w.Header().Set("Content-Type", "application/json")
+			rpcID := frame.ID
+			resp, _ := json.Marshal(rpcError{
+				JSONRPC: jsonrpc.Version,
+				ID:      rpcID,
+				Error:   rpcErrorDetail{Code: -32001, Message: "pipelock: request blocked by MCP input scanning"},
+			})
+			_, _ = w.Write(resp)
+			return
 		}
 
 		// A2A-Extensions header scanning: each comma-separated URI is

@@ -732,6 +732,8 @@ func newInterceptHandler(
 				AgentID:         ic.Agent,
 				Host:            r.URL.Hostname(),
 				Path:            r.URL.Path,
+				Target:          targetURL,
+				Suppress:        ic.Config.Suppress,
 			}
 			applyBodyScanRedaction(&bodyReq, redaction)
 			bodyBytes, result := scanRequestBody(r.Context(), bodyReq)
@@ -743,6 +745,10 @@ func newInterceptHandler(
 					bodyAction = result.Action
 					if bodyAction == "" {
 						bodyAction = ic.Config.RequestBodyScanning.Action
+					}
+					if shouldHardBlockBodyCriticalDLP(result, r.URL.Hostname(), ic.Config) ||
+						shouldHardBlockBodyPromptInjection(result, r.URL.Hostname(), ic.Config) {
+						bodyAction = config.ActionBlock
 					}
 				}
 				ic.Proxy.captureObs.ObserveDLPVerdict(r.Context(), &capture.DLPVerdictRecord{
@@ -763,6 +769,9 @@ func newInterceptHandler(
 				})
 			}
 			interceptRedactionReport = result.RedactionReport
+			if ic.Proxy != nil {
+				recordBodyRedactionMetrics(ic.Proxy.metrics, "connect", ic.Agent, result.RedactionReport)
+			}
 
 			if !result.Clean {
 				hasFinding = true
@@ -771,18 +780,26 @@ func newInterceptHandler(
 					action = ic.Config.RequestBodyScanning.Action
 				}
 
-				// Determine scanner label: address_protection vs body_dlp.
+				// Determine scanner label: address_protection / prompt injection / body_dlp.
 				scannerLabel := scannerLabelBodyDLP
 				if result.RedactionBlockReason != "" {
 					scannerLabel = scannerLabelRedaction
 				} else if len(result.AddressFindings) > 0 && len(result.DLPMatches) == 0 {
 					scannerLabel = scannerLabelAddressProtection
+				} else if len(result.InjectionMatches) > 0 && len(result.DLPMatches) == 0 {
+					scannerLabel = scannerLabelBodyPromptInjection
 				}
 
 				reason := result.Reason
 				if reason == "" {
-					patternNames := dlpMatchNames(result.DLPMatches)
-					reason = fmt.Sprintf("request body contains secret: %s", strings.Join(patternNames, ", "))
+					injectionNames := responseMatchNames(result.InjectionMatches)
+					switch {
+					case len(injectionNames) > 0:
+						reason = fmt.Sprintf("request body contains prompt injection: %s", strings.Join(injectionNames, ", "))
+					default:
+						patternNames := dlpMatchNames(result.DLPMatches)
+						reason = fmt.Sprintf("request body contains secret: %s", strings.Join(patternNames, ", "))
+					}
 				}
 
 				// DLP-only exemption: DLP pattern findings on adaptive-exempt
@@ -794,6 +811,11 @@ func newInterceptHandler(
 				dlpExempt := scannerLabel == scannerLabelBodyDLP &&
 					len(result.DLPMatches) > 0 &&
 					isAdaptiveExempt(r.URL.Hostname(), ic.Config.AdaptiveEnforcement.ExemptDomains)
+				promptInjectionHardBlock := shouldHardBlockBodyPromptInjection(result, r.URL.Hostname(), ic.Config)
+				dlpHardBlock := shouldHardBlockBodyCriticalDLP(result, r.URL.Hostname(), ic.Config)
+				if promptInjectionHardBlock || dlpHardBlock {
+					action = config.ActionBlock
+				}
 
 				// Adaptive enforcement: upgrade the body action.
 				// Skip upgrade for DLP-exempt destinations — prevents
@@ -817,7 +839,7 @@ func newInterceptHandler(
 				// and redaction gate failures must block regardless of enforce
 				// mode. ActionAsk also has no HITL terminal in intercepted
 				// tunnels, so it fails closed here.
-				if isFailClosedBodyResult(result, bodyBytes) || action == config.ActionAsk || (action == config.ActionBlock && ic.Config.EnforceEnabled()) {
+				if promptInjectionHardBlock || dlpHardBlock || isFailClosedBodyResult(result, bodyBytes) || action == config.ActionAsk || (action == config.ActionBlock && ic.Config.EnforceEnabled()) {
 					if !dlpExempt {
 						interceptRecordSignal(ic, session.SignalBlock)
 					}
@@ -947,6 +969,9 @@ func newInterceptHandler(
 				hdrAction := config.ActionAllow
 				if hdrHasFinding {
 					hdrAction = ic.Config.RequestBodyScanning.Action
+					if shouldHardBlockCriticalDLP(headerResult.DLPMatches, ic.Config.EnforceEnabled()) {
+						hdrAction = config.ActionBlock
+					}
 				}
 				ic.Proxy.captureObs.ObserveDLPVerdict(r.Context(), &capture.DLPVerdictRecord{
 					Subsurface:        "dlp_header_intercept",
@@ -968,8 +993,13 @@ func newInterceptHandler(
 			if headerResult != nil && !headerResult.Clean {
 				hasFinding = true
 				action := ic.Config.RequestBodyScanning.Action
+				headerHardBlock := shouldHardBlockCriticalDLP(headerResult.DLPMatches, ic.Config.EnforceEnabled())
+				if headerHardBlock {
+					action = config.ActionBlock
+				}
 				// ActionAsk: no HITL terminal in intercepted tunnels, fail closed.
-				if action == config.ActionAsk || (action == config.ActionBlock && ic.Config.EnforceEnabled()) {
+				if headerHardBlock || action == config.ActionAsk || (action == config.ActionBlock && ic.Config.EnforceEnabled()) {
+					interceptRecordSignal(ic, session.SignalBlock)
 					ic.Logger.LogBlocked(actx, "header_dlp", "request header contains secret")
 					ic.Metrics.RecordTLSRequestBlocked("header_dlp")
 					interceptEmitReceipt(ic, withInterceptRedaction(receipt.EmitOpts{

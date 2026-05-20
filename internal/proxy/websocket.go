@@ -404,7 +404,7 @@ func (p *Proxy) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// DLP-scan forwarded header values regardless of destination or enforce mode.
 	// In audit mode, findings are logged as anomalies but traffic is allowed.
-	if blocked, reason := p.dlpScanWSHeaders(r.Context(), fwdHeaders, sc); blocked {
+	if blocked, hardBlock, reason := p.dlpScanWSHeaders(r.Context(), fwdHeaders, sc, cfg.EnforceEnabled()); blocked {
 		// Capture observer: record WS header DLP verdict for policy replay.
 		p.captureObs.ObserveDLPVerdict(r.Context(), &capture.DLPVerdictRecord{
 			Subsurface:        "dlp_ws_header",
@@ -437,7 +437,7 @@ func (p *Proxy) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			Logger:     log,
 			DeferClean: false,
 		})
-		if cfg.EnforceEnabled() {
+		if hardBlock || cfg.EnforceEnabled() {
 			log.LogWSBlocked(targetURL, audit.DirectionClientToServer, audit.ScannerDLP, reason, clientIP, requestID)
 			p.metrics.RecordWSBlocked()
 			p.emitReceipt(receipt.EmitOpts{
@@ -811,7 +811,7 @@ func (p *Proxy) buildWSForwardHeaders(r *http.Request, parsed *url.URL, cfg *con
 // dlpScanWSHeaders runs DLP scanning on all forwarded header values before the
 // upstream handshake. Headers are scanned regardless of destination (no
 // allowlist skip) because agents can exfiltrate secrets in any header value.
-func (p *Proxy) dlpScanWSHeaders(ctx context.Context, headers http.Header, sc *scanner.Scanner) (blocked bool, reason string) {
+func (p *Proxy) dlpScanWSHeaders(ctx context.Context, headers http.Header, sc *scanner.Scanner, enforceEnabled bool) (blocked bool, hardBlock bool, reason string) {
 	// Scan all headers that buildWSForwardHeaders may forward. This covers
 	// auth headers, cookies, origin, subprotocol, and user-agent. An agent
 	// can exfiltrate data in any of these values.
@@ -829,10 +829,10 @@ func (p *Proxy) dlpScanWSHeaders(ctx context.Context, headers http.Header, sc *s
 			for i, m := range result.Matches {
 				names[i] = m.PatternName
 			}
-			return true, fmt.Sprintf("DLP match in %s header: %s", key, strings.Join(names, ", "))
+			return true, shouldHardBlockCriticalDLP(result.Matches, enforceEnabled), fmt.Sprintf("DLP match in %s header: %s", key, strings.Join(names, ", "))
 		}
 	}
-	return false, ""
+	return false, false, ""
 }
 
 // isHostAllowlisted checks if a hostname matches any pattern in the allowlist.
@@ -926,6 +926,8 @@ func (r *wsRelay) scanClientMessageBody(ctx context.Context, msg []byte) ([]byte
 		AgentID:     r.agent,
 		Host:        r.hostname,
 		Path:        r.path,
+		Target:      r.targetURL,
+		Suppress:    r.cfg.Suppress,
 	}
 	applyBodyScanRedaction(&bodyReq, r.redaction)
 	return scanRequestBody(ctx, bodyReq)
@@ -1067,7 +1069,8 @@ func (r *wsRelay) handleClientTextFindings(log *audit.Logger, dlpMatches []scann
 			names[i] = m.PatternName
 		}
 		wsBundleRules := dlpBundleRules(dlpMatches)
-		if r.cfg.EnforceEnabled() {
+		hardBlock := shouldHardBlockCriticalDLP(dlpMatches, r.cfg.EnforceEnabled())
+		if hardBlock || r.cfg.EnforceEnabled() {
 			r.recordSignal(session.SignalBlock, log)
 			reason := fmt.Sprintf("DLP match: %s", strings.Join(names, ", "))
 			log.LogWSBlocked(r.targetURL, audit.DirectionClientToServer, audit.ScannerDLP, reason, r.clientIP, r.requestID)
@@ -1323,6 +1326,12 @@ func (r *wsRelay) handleClientMessageBodyResult(log *audit.Logger, bodyBytes []b
 		receiptLayer = scannerLabelAddressProtection
 		closeReason = "address poisoning detected"
 	}
+	if len(result.InjectionMatches) > 0 && len(result.DLPMatches) == 0 && len(result.AddressFindings) == 0 {
+		scannerLabel = scannerLabelBodyPromptInjection
+		receiptLayer = scannerLabelBodyPromptInjection
+		closeReason = "prompt injection detected"
+		closeBlockReason = blockreason.PromptInjection
+	}
 	if result.RedactionBlockReason != "" {
 		scannerLabel = scannerLabelRedaction
 		receiptLayer = scannerLabelRedaction
@@ -1340,6 +1349,9 @@ func (r *wsRelay) handleClientMessageBodyResult(log *audit.Logger, bodyBytes []b
 	if reason == "" && len(result.AddressFindings) > 0 {
 		reason = fmt.Sprintf("address poisoning: %s", result.AddressFindings[0].Explanation)
 	}
+	if reason == "" && len(result.InjectionMatches) > 0 {
+		reason = fmt.Sprintf("request body contains prompt injection: %s", strings.Join(responseMatchNames(result.InjectionMatches), ", "))
+	}
 	if reason == "" && result.RedactionBlockReason != "" {
 		reason = "redaction blocked request: " + string(result.RedactionBlockReason)
 	}
@@ -1347,7 +1359,8 @@ func (r *wsRelay) handleClientMessageBodyResult(log *audit.Logger, bodyBytes []b
 		reason = "request body contains secret patterns"
 	}
 
-	if isFailClosedBodyResult(result, bodyBytes) {
+	promptInjectionHardBlock := shouldHardBlockBodyPromptInjection(result, r.hostname, r.cfg)
+	if promptInjectionHardBlock || isFailClosedBodyResult(result, bodyBytes) {
 		r.recordSignal(session.SignalBlock, log)
 		log.LogWSBlocked(r.targetURL, audit.DirectionClientToServer, scannerLabel, reason, r.clientIP, r.requestID)
 		r.proxy.metrics.RecordWSScanHit(scannerLabel)
@@ -1373,11 +1386,18 @@ func (r *wsRelay) handleClientMessageBodyResult(log *audit.Logger, bodyBytes []b
 
 	action := result.Action
 	if action == "" {
+		action = r.cfg.RequestBodyScanning.Action
+	}
+	if action == "" {
 		if r.cfg.EnforceEnabled() {
 			action = config.ActionBlock
 		} else {
 			action = config.ActionWarn
 		}
+	}
+	hardBlock := shouldHardBlockBodyCriticalDLP(result, r.hostname, r.cfg) || promptInjectionHardBlock
+	if hardBlock {
+		action = config.ActionBlock
 	}
 
 	originalAction := action
@@ -1393,7 +1413,7 @@ func (r *wsRelay) handleClientMessageBodyResult(log *audit.Logger, bodyBytes []b
 
 	switch action {
 	case config.ActionBlock:
-		if !r.cfg.EnforceEnabled() && action == originalAction && len(result.AddressFindings) > 0 {
+		if !hardBlock && !r.cfg.EnforceEnabled() && action == originalAction && len(result.AddressFindings) > 0 {
 			r.recordSignal(session.SignalNearMiss, log)
 			names := make([]string, len(result.AddressFindings))
 			for i, f := range result.AddressFindings {
@@ -1680,9 +1700,12 @@ func (r *wsRelay) clientToUpstream(ctx context.Context, cancel context.CancelFun
 			}
 		}
 
-		if redactionEnabled {
+		if r.cfg.RequestBodyScanning.Enabled && r.scanText {
 			buf, bodyResult := r.scanClientMessageBody(ctx, msg)
 			wsMergeRedactionReport(&r.redactionLog, bodyResult.RedactionReport)
+			if r.proxy != nil {
+				recordBodyRedactionMetrics(r.proxy.metrics, "websocket", r.agent, bodyResult.RedactionReport)
+			}
 			if r.handleClientMessageBodyResult(log, buf, bodyResult) {
 				blocked = true
 				return

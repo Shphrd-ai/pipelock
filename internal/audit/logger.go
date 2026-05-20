@@ -37,6 +37,7 @@ import (
 var contentScanners = map[string]struct{}{
 	"dlp":                   {},
 	"body_dlp":              {},
+	"body_prompt_injection": {},
 	"header_dlp":            {},
 	"mcp_input_scanning":    {},
 	"response_scan":         {},
@@ -271,31 +272,32 @@ type EventType string
 
 // Event type constants for structured audit log entries.
 const (
-	EventAllowed            EventType = "allowed"
-	EventBlocked            EventType = "blocked"
-	EventError              EventType = "error"
-	EventAnomaly            EventType = "anomaly"
-	EventResponseScan       EventType = "response_scan"
-	EventRedirect           EventType = "redirect"
-	EventTunnelOpen         EventType = "tunnel_open"
-	EventTunnelClose        EventType = "tunnel_close"
-	EventForwardHTTP        EventType = "forward_http"
-	EventConfigReload       EventType = "config_reload"
-	EventWSOpen             EventType = "ws_open"
-	EventWSClose            EventType = "ws_close"
-	EventWSBlocked          EventType = "ws_blocked"
-	EventWSScan             EventType = "ws_scan"
-	EventSessionAnomaly     EventType = "session_anomaly"
-	EventAdaptiveEscalation EventType = "adaptive_escalation"
-	EventMCPUnknownTool     EventType = "mcp_unknown_tool"
-	EventKillSwitchDeny     EventType = "kill_switch_deny"
-	EventSNIMismatch        EventType = "sni_mismatch"
-	EventBodyDLP            EventType = "body_dlp"
-	EventHeaderDLP          EventType = "header_dlp"
-	EventChainDetection     EventType = "chain_detection"
-	EventAddressProtection  EventType = "address_protection"
-	EventAgentListener      EventType = "agent_listener"
-	EventFileSentryDLP      EventType = "file_sentry_dlp"
+	EventAllowed             EventType = "allowed"
+	EventBlocked             EventType = "blocked"
+	EventError               EventType = "error"
+	EventAnomaly             EventType = "anomaly"
+	EventResponseScan        EventType = "response_scan"
+	EventRedirect            EventType = "redirect"
+	EventTunnelOpen          EventType = "tunnel_open"
+	EventTunnelClose         EventType = "tunnel_close"
+	EventForwardHTTP         EventType = "forward_http"
+	EventConfigReload        EventType = "config_reload"
+	EventWSOpen              EventType = "ws_open"
+	EventWSClose             EventType = "ws_close"
+	EventWSBlocked           EventType = "ws_blocked"
+	EventWSScan              EventType = "ws_scan"
+	EventSessionAnomaly      EventType = "session_anomaly"
+	EventAdaptiveEscalation  EventType = "adaptive_escalation"
+	EventMCPUnknownTool      EventType = "mcp_unknown_tool"
+	EventKillSwitchDeny      EventType = "kill_switch_deny"
+	EventSNIMismatch         EventType = "sni_mismatch"
+	EventBodyDLP             EventType = "body_dlp"
+	EventBodyPromptInjection EventType = "body_prompt_injection"
+	EventHeaderDLP           EventType = "header_dlp"
+	EventChainDetection      EventType = "chain_detection"
+	EventAddressProtection   EventType = "address_protection"
+	EventAgentListener       EventType = "agent_listener"
+	EventFileSentryDLP       EventType = "file_sentry_dlp"
 
 	EventCrossRequestEntropyExceeded EventType = "cross_request_entropy_exceeded"
 	EventCrossRequestDLPMatch        EventType = "cross_request_dlp_match"
@@ -1285,6 +1287,7 @@ func (l *Logger) LogBodyDLP(ctx LogContext, action string, matchCount int, patte
 // LogBodyScan logs a request body scan hit with a configurable event type.
 // Used to distinguish address_protection from body_dlp in audit output.
 func (l *Logger) LogBodyScan(ctx LogContext, eventType EventType, action string, matchCount int, findingNames []string) {
+	technique := TechniqueForScanner(string(eventType))
 	e := newLogEntry(l.zl.Warn(), eventType).
 		str("method", ctx.method).
 		optStr("url", ctx.url).
@@ -1295,7 +1298,8 @@ func (l *Logger) LogBodyScan(ctx LogContext, eventType EventType, action string,
 		optStr("request_id", ctx.requestID).
 		optStr("agent", ctx.agent).
 		intField("match_count", matchCount).
-		strs("findings", findingNames)
+		strs("findings", findingNames).
+		optStr("mitre_technique", technique)
 	e.msg("request body " + string(eventType) + " scan hit")
 
 	if l.emitter != nil {
