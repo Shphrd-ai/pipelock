@@ -21,9 +21,9 @@ import (
 // cross-implementation verifier (the Python reference, any third-party
 // consumer) expects the same hash for the same effective policy.
 //
-// If you INTENTIONALLY change canonical-hash semantics — a new policy
+// If you INTENTIONALLY change canonical-hash semantics - a new policy
 // field added to policySemanticView, a set-like slice graduated to
-// behavioral ordering, the default pattern corpus expanded — update
+// behavioral ordering, the default pattern corpus expanded - update
 // the constant to match the new value and note the bump in the PR
 // body. Do not silently regenerate: the whole point of this test is to
 // make the drift visible in review.
@@ -130,7 +130,8 @@ const (
 	// Bumped for fetch_proxy.monitoring.query_entropy_exclusions: per-host
 	// bypass for the query parameter entropy gate is a policy-semantic
 	// change. Empty by default but the field is part of the canonical view.
-	goldenHashDefaults = "0e2ec936eacfb25ff0a5051c3d0ff9cad76348a603ce5bb824a7f47d3dcc7b8b"
+	// Re-bumped for the file_sentry max_file_bytes field: see note above.
+	goldenHashDefaults = "7b648142b275680696e0d660440a4b456ba3f69e8bbd64d5c34d8050b5913711"
 
 	// goldenHashRichConfig pins the hash for goldenRichYAML loaded via
 	// config.Load, post-ApplyDefaults + Validate. Covers a broad,
@@ -200,7 +201,8 @@ const (
 	// Bumped for the request_policy.batch section (see goldenHashDefaults).
 	// Bumped for fetch_proxy.monitoring.query_entropy_exclusions: see the
 	// goldenHashDefaults note above.
-	goldenHashRichConfig = "4d4699a7f64c4fbff9436a8cabf51b5a8bbd47b6d878bd58af8a98c9c5830382"
+	// Re-bumped for the file_sentry max_file_bytes field: see goldenHashDefaults note.
+	goldenHashRichConfig = "dc7d6e0a9f20d83124f56b55bb5f8a93528988e98ef07c6ed419db5d60667c5d"
 )
 
 // goldenRichYAML is the canonical fixture for goldenHashRichConfig. It
@@ -714,7 +716,7 @@ agents:
 // cache before returning; these tests call computeCanonicalPolicyHash
 // explicitly so they exercise the uncached value on that loaded
 // snapshot. Failure here means the fixture itself is invalid, not a
-// hash drift — treat it as a test-infra bug, not a production
+// hash drift - treat it as a test-infra bug, not a production
 // regression.
 func loadGoldenConfig(t *testing.T, yamlSrc string) *Config {
 	t.Helper()
@@ -779,7 +781,7 @@ func TestCanonicalPolicyHash_GoldenInvariantUnderAllowlistOrder(t *testing.T) {
 // plumbing (listen addresses, logging, license, envelope key path,
 // flight recorder dir, agents map).
 //
-// If this test drifts, policySemanticView is under-zeroing — a noise
+// If this test drifts, policySemanticView is under-zeroing - a noise
 // field is leaking into ph, and every deployment that touches that
 // field would emit receipts with a different hash despite having
 // identical effective policy.

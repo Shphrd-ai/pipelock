@@ -93,16 +93,16 @@ func (s *Server) Reload(newCfg *config.Config) (err error) {
 		// receipt/audit chain) is built once at Start; reload swaps config and
 		// scanner but never rebuilds the recorder, so any flight_recorder change
 		// would leave the live config disagreeing with the running recorder.
-		// Signing-key rotation is the sharpest case — the receipt chain is
+		// Signing-key rotation is the sharpest case - the receipt chain is
 		// anchored to the current key, and rotating mid-chain breaks tail-
-		// signature verification on resume — but every field is restart-only for
+		// signature verification on resume - but every field is restart-only for
 		// the same build-once reason. Preserve the whole block and warn.
 		//
 		// This also keeps Conductor policy-bundle apply working: a signed bundle
 		// carries enforcement-only config (flight_recorder is not an allowlisted
 		// bundle section), so the bundle's loaded config omits flight_recorder.
-		// Preserving the follower's existing block means conductor.enabled — which
-		// requires a signed flight recorder — still validates after the apply.
+		// Preserving the follower's existing block means conductor.enabled - which
+		// requires a signed flight recorder - still validates after the apply.
 		if !reflect.DeepEqual(oldCfg.FlightRecorder, newCfg.FlightRecorder) {
 			if oldCfg.FlightRecorder.SigningKeyPath != newCfg.FlightRecorder.SigningKeyPath {
 				_, _ = fmt.Fprintf(s.opts.Stderr, "WARNING: config reload: flight_recorder.signing_key_path changed from %q to %q — receipt chain cannot rotate at runtime, ignoring (restart required)\n",
@@ -132,12 +132,16 @@ func (s *Server) Reload(newCfg *config.Config) (err error) {
 			return nil
 		}
 
-		// Block reverse proxy listener/upstream changes via reload.
-		// The listener binds at startup and the upstream is pinned in
-		// the handler. Requires restart.
-		if oldCfg.ReverseProxy.Listen != newCfg.ReverseProxy.Listen ||
-			oldCfg.ReverseProxy.Enabled != newCfg.ReverseProxy.Enabled ||
-			oldCfg.ReverseProxy.Upstream != newCfg.ReverseProxy.Upstream {
+		// Block ALL reverse proxy changes via reload. The listener binds at
+		// startup, the upstream is pinned in the handler, and the submit-profile
+		// SSRF-safe dialer is installed on the transport at init - none of these
+		// rebind at runtime. A field-by-field check missed profile, allowed
+		// methods/paths, trusted_upstream, body cap, and timeout; flipping
+		// profile on reload would activate the submit gate while the dial path
+		// stayed startup-frozen (a real security weakening). Compare the whole
+		// struct so any change is preserved until restart, matching the
+		// restart-required warning in reloadwarn.go.
+		if !reflect.DeepEqual(oldCfg.ReverseProxy, newCfg.ReverseProxy) {
 			_, _ = fmt.Fprintf(s.opts.Stderr, "WARNING: config reload: reverse_proxy settings changed — requires restart, ignoring\n")
 			newCfg.ReverseProxy = oldCfg.ReverseProxy
 		}

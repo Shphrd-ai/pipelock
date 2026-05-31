@@ -131,6 +131,15 @@ fetch_proxy:
       - "api.telegram.org"
 ```
 
+**Query entropy exclusions** skip only the query-string entropy gate for specific domains. Subdomain entropy, path entropy, DLP, SSRF, rate limits, and data budgets still apply. This is intended for endpoints whose query parameters legitimately carry high-entropy opaque values, such as S3 pre-signed URLs. Supports the same exact-host and `*.example.com` wildcard matching rules.
+
+```yaml
+fetch_proxy:
+  monitoring:
+    query_entropy_exclusions:
+      - "examplebucket.s3.amazonaws.com"
+```
+
 ## Forward Proxy
 
 Standard HTTP CONNECT tunneling. Agents set `HTTPS_PROXY=http://127.0.0.1:8888`, and HTTP clients that honor proxy settings flow through pipelock. Pair this with containment, sandboxing, or deployment policy when non-cooperative tools are in scope.
@@ -209,7 +218,7 @@ pipelock tls show-ca
 
 **Passthrough domains:** Domains in `passthrough_domains` are spliced (bidirectional byte copy) without interception, preserving end-to-end TLS. Use this for domains where certificate pinning prevents interception or where you trust the destination. Supports exact match and wildcard prefix (`*.example.com` matches `sub.example.com` and the apex `example.com`).
 
-**Best practice -- package registries and LLM providers:** Always add package registries (npm, pypi, Go proxy) and LLM API endpoints to `passthrough_domains`, not just `exempt_domains`. Using `exempt_domains` alone still MITM-s the connection, which breaks large downloads (response size limit), causes TLS handshake errors with clients that reject the generated certificate, and wastes CPU on cert generation for traffic you don't intend to scan. Passthrough skips interception entirely.
+**Best practice -- package registries and LLM providers:** Always add package registries (npm, pypi, Go proxy) and LLM API endpoints to `passthrough_domains`, not just `exempt_domains`. Using `exempt_domains` alone is a response-scanning decision, not a TLS-routing decision: the connection is still MITM-ed, clients that reject the generated certificate can still fail the TLS handshake, and pipelock still spends CPU generating certificates for traffic you do not intend to inspect. Passthrough skips interception entirely.
 
 ```yaml
 passthrough_domains:
@@ -345,6 +354,152 @@ redaction:
 - Rewrites only operate on complete JSON payloads. Non-JSON HTTP bodies and non-JSON complete WebSocket messages are blocked unless the destination host is on `allowlist_unparseable` or the request matches `allowlist_unparseable_routes`.
 - Outbound WebSocket fragments are blocked while redaction is enabled. The proxy cannot safely rewrite partial JSON messages.
 - Successful rewrites add a `redaction` summary to the signed action receipt only when one or more values were replaced; untouched requests keep the legacy receipt bytes unchanged.
+
+Hash redaction classes require a self-labeled prefix such as `sha256:<64 hex chars>` or `sha-256=<64 hex chars>`. Bare fixed-width hex strings are left alone so opaque OAuth client secrets and session tokens are not corrupted. AWS SigV4 pre-signed URLs also keep the access-key ID inside a structurally valid `X-Amz-Credential` parameter unchanged; the same access-key shape is still redacted everywhere else.
+
+## Request Policy
+
+Allow-by-default deny/warn safety rails on outbound HTTP API operations. A request forwards unless a rule matches; there is deliberately no section-level `default_action` knob, so the section can never be configured into default-deny. Request policy is not a DLP scanner and not a behavioral allowlist. It composes with both. It runs **before** the learn-lock contract gate so a contract allow can never suppress an operation-policy block, and it is independent of `request_body_scanning` (it reads a body itself only when a route-matched operation predicate or batch endpoint needs one).
+
+Rules match on route (host, effective HTTP method, normalized path, content type) and, optionally, on an extracted GraphQL operation predicate.
+
+```yaml
+request_policy:
+  enabled: true
+  on_parse_error: block         # block (default) | warn | allow
+  on_opaque_operation: block    # block (default) | warn | allow
+  rules:
+    - name: "block-graphql-account-mutations"
+      action: block
+      reason: "account-state mutations require human review"
+      route:
+        hosts: ["api.example.com", "*.example.net"]
+        methods: ["POST"]
+        path_prefixes: ["/graphql"]
+        content_types: ["application/json"]
+      graphql:
+        operation_types: ["mutation"]
+        root_field_patterns: ["^delete", "^transfer"]
+    - name: "warn-on-admin-deletes"
+      action: warn
+      shadow: true
+      reason: "shadow rollout of admin DELETE guard"
+      route:
+        hosts: ["api.example.com"]
+        methods: ["DELETE"]
+        path_patterns: ['^/admin/']
+  batch:
+    - route:
+        hosts: ["api.example.com"]
+        methods: ["POST"]
+        path_prefixes: ["/$batch"]
+      requests_field: "requests"
+      method_field: "method"
+      url_field: "url"
+      body_field: "body"
+      max_sub_requests: 64
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `enabled` | `false` | Enable request policy. When disabled the matcher allows everything. |
+| `on_parse_error` | `"block"` | Action when an operation predicate's route matches but the body fails to parse: `block`, `warn`, or `allow`. Fail-closed default. |
+| `on_opaque_operation` | `"block"` | Action when an operation predicate's route matches but the operation is opaque (for example a GraphQL Automatic Persisted Query that ships only a hash): `block`, `warn`, or `allow`. Fail-closed default. |
+| `rules` | `[]` | Operation safety-rail list. |
+| `batch` | `[]` | JSON batch endpoints whose sub-requests are evaluated recursively. |
+
+**Rule fields:**
+- `name:` bounded, metric-label-safe rule identifier.
+- `action:` `block` or `warn`. Per-rule only. There is no section-level default.
+- `shadow:` when `true`, log the would-be action and forward anyway. A shadow match never enforces, and an enforced match always wins over a shadow match of equal strictness.
+- `reason:` operator-facing explanation surfaced on the block. Never logged with request content.
+- `route:` which requests the rule applies to (see below).
+- `graphql:` optional GraphQL operation predicate (see below).
+
+When a rule sets both `route` and `graphql`, **both must match**: the route selects the request, then the predicate is evaluated against the operations extracted from its body.
+
+**Route fields** (`route`): an empty constraint matches any value for that dimension; a request matches the route only when every non-empty constraint is satisfied. Within a single dimension (multiple hosts, or `path_prefixes` plus `path_patterns`) matching is OR.
+
+| Field | Description |
+|-------|-------------|
+| `hosts` | Exact host or `*.suffix` wildcard. A `*.example.com` pattern matches the apex `example.com` and any subdomain. Normalized (lowercased, port and trailing dot stripped). |
+| `methods` | HTTP verbs, normalized to uppercase. Matched against the **effective** method (see method-override note below). |
+| `path_prefixes` | Literal prefixes of the normalized path. |
+| `path_patterns` | RE2 patterns against the normalized path. Path case is preserved during normalization (IDs are case-sensitive); use a `path_pattern` for case-insensitive matching. |
+| `content_types` | Media types with parameters (charset, boundary) stripped, lowercased. |
+
+Paths are normalized before matching: bounded repeated percent-decoding (so a multi-encoded `..%252e` segment cannot hide from dot-segment removal), per-segment `;parameter` stripping, and dot-segment / double-slash collapsing.
+
+**Method-override handling:** a request that tunnels a different method through `X-HTTP-Method-Override`, `X-Method-Override`, or `X-HTTP-Method` is evaluated against **both** the base method and the overridden method, and the stricter result wins. This stops a `POST` with `X-HTTP-Method-Override: DELETE` from dodging a `DELETE`-scoped rule, and equally stops a real `POST` from being downgraded by an override the upstream ignores.
+
+**GraphQL predicate fields** (`graphql`): applied after the route matches. A request matches when **any** extracted operation satisfies the predicate. Every operation in a document or batch is evaluated, never just the first. At least one of the two fields must be set.
+
+| Field | Description |
+|-------|-------------|
+| `operation_types` | `query`, `mutation`, and/or `subscription`. When set, the operation kind must be in this list. |
+| `root_field_patterns` | RE2 patterns against the operation's resolved root field names. Aliases are resolved to the real field and top-level fragment spreads / inline fragments are expanded, so a deny rule matches the field that actually executes, not a cosmetic alias or a field hidden inside a fragment. |
+
+GraphQL operations are extracted from `application/json` bodies (single object or batched array) and from GraphQL-over-GET query strings (`?query=...&operationName=...`). A body that is not valid GraphQL-over-HTTP JSON, or that contains a query that fails to parse, fails closed via `on_parse_error`. A request element carrying no inline query (an APQ hash, an empty/missing `query`) is opaque and fails closed via `on_opaque_operation`. Duplicate fragment names, fragment cycles, unresolved spreads, and expansion-budget exhaustion all make the document unclassifiable and fail closed.
+
+> **Scope GraphQL rules by path, not content type.** A GraphQL-over-GET request carries no body and therefore no `Content-Type`, so a rule whose route sets `content_types: ["application/json"]` silently never matches the GET form, even though the engine still extracts the operation from the `?query=` string. Constrain GraphQL rules with `path_prefixes` / `path_patterns` for the GraphQL endpoint, or leave `content_types` empty, so one rule covers both the POST-body and GET-query transports.
+
+### Discriminator predicate
+
+As an alternative to the GraphQL predicate, a rule can carry a `discriminator` predicate that matches a single top-level JSON body field against RE2 value patterns. This handles non-GraphQL JSON APIs that signal the operation through a discriminator key (an action, type, or command field).
+
+```yaml
+  rules:
+    - name: "block-account-close-commands"
+      action: block
+      reason: "account-close commands require human review"
+      route:
+        hosts: ["api.example.com"]
+        methods: ["POST"]
+        path_prefixes: ["/rpc"]
+        content_types: ["application/json"]
+      discriminator:
+        field: "action"
+        value_patterns: ["^account\\.close$", "^account\\.delete$"]
+```
+
+| Field | Description |
+|-------|-------------|
+| `field` | The top-level JSON object key carrying the operation discriminator. A dotted name is treated as a single literal key today; nested paths are a future extension. |
+| `value_patterns` | RE2 patterns matched against the string value at `field`. The predicate matches when any pattern matches. At least one pattern is required (a discriminator with no patterns can never match). |
+
+Semantics, all fail-closed:
+
+- A string value at `field` is matched against `value_patterns`; the predicate matches when any pattern matches.
+- An absent `field` does not match. The allow-by-default rail forwards unless another rule matches.
+- A present but non-string value, a top-level body that is not a JSON object, or a duplicated target key is opaque and fails closed via `on_opaque_operation`.
+- A body that is not valid JSON fails closed via `on_parse_error`.
+
+A rule may set both `graphql` and `discriminator`; when it does, both predicates must match (in addition to the route). The discriminator predicate is evaluated on every HTTP transport and per WebSocket text frame, the same surfaces as the GraphQL predicate, and it folds into the canonical policy hash.
+
+### Batch endpoints
+
+A JSON batch endpoint wraps multiple sub-requests in one outer request, each carrying its own method, URL, and body. When an outer request route-matches a `batch` entry, request policy parses the envelope and evaluates **every** sub-request against the full rule set: host inherited from the outer request, plus the sub-request's effective method, normalized path, and any GraphQL operation in its body or URL query. The strictest decision across all sub-requests wins, so a dangerous operation cannot evade a rule by being wrapped in a batch.
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `route` | n/a | Which requests are treated as a batch envelope (same route fields as a rule). |
+| `requests_field` | `"requests"` | JSON field holding the sub-request array. |
+| `method_field` | `"method"` | Sub-request method field. |
+| `url_field` | `"url"` | Sub-request URL/path field. |
+| `body_field` | `"body"` | Sub-request body field. |
+| `max_sub_requests` | `64` | Cap on sub-requests evaluated per batch. Over the cap, the envelope fails closed via `on_parse_error`. |
+
+The envelope field names default to the common OData-style JSON batch shape (`requests[].{method,url,body}`); override them for a differently shaped envelope. A sub-request whose method or URL field is missing or not a string fails closed (it must not silently evaluate as `method="" path="/"`). Nested batches are expanded up to a fixed depth; beyond that depth a sub-request that itself targets a batch endpoint fails closed regardless of configuration. An unread, oversize, or unparseable envelope fails closed via `on_parse_error`.
+
+### Transport coverage
+
+Request policy is enforced on the fetch proxy, forward proxy, CONNECT, TLS interception, reverse proxy, and redirect hops. On every HTTP transport it runs before the contract gate. WebSocket is covered on two surfaces: the upgrade handshake is matched route-only (host, `GET` method, path, content type), and once the socket is open each complete, UTF-8-validated client text frame is evaluated per frame as an operation body over the handshake route (the upgrade is a `GET`, so the effective method is `GET`). The per-frame body-predicate gate is checked against the live matcher on each frame rather than cached at upgrade, so a hot-reloaded rule applies to already-open sockets, and benign routes still pay no JSON-parse cost. Fragmented frames and binary frames are not evaluated as operation bodies (documented limit).
+
+When a route-matched operation predicate or batch endpoint needs a body that cannot be inspected, the request is blocked outright, independent of the `on_parse_error` / `on_opaque_operation` settings (those apply only to a fully-read body that fails to parse). A body counts as uninspectable when it is unread, exceeds `request_body_scanning.max_body_bytes` (default 5 MiB), or hits a read error. The bounded read has already consumed the body stream, so the request can no longer be forwarded intact.
+
+### Enforcement, audit, and receipts
+
+A matched rule records a decision metric and an audit event with bounded, operator-defined labels only, never body or matched content. An enforced (non-shadow) `block` returns HTTP 403 with the `request_policy_deny` block reason and, when a receipt emitter is configured, a correlated receipt. `warn` and `shadow` matches are logged and counted, then forwarded.
 
 ## WebSocket Proxy
 
@@ -617,6 +772,10 @@ response_scanning:
 - **ask:** pause and prompt the operator for approval (requires TTY)
 
 **Exempt domains:** LLM provider APIs (OpenAI, Anthropic, etc.) return instruction-like text as part of normal operation, which can trigger false positives. Use `exempt_domains` to skip injection scanning for trusted providers. DLP scanning on the outbound request still runs — only the response injection scan is skipped. Applies to fetch proxy, forward proxy, CONNECT (TLS intercept), WebSocket, and reverse proxy. Does not affect MCP response scanning (tool results use a separate trust model).
+
+For forward-proxy and TLS-intercepted traffic, an exempt host's response streams through untouched when `response_scanning.enabled` is true: no buffering, response scan-cap block, media metadata strip, Browser Shield rewrite, or injection scan is applied to that trusted response. Request-side DLP, redaction, SSRF, authority checks, and budget accounting still run. If a host needs full byte-preserving passthrough without MITM, prefer `tls_interception.passthrough_domains`.
+
+Non-exempt responses that must be buffered for response scanning, Browser Shield, or media policy block fail-closed if they exceed the configured scan cap (`fetch_proxy.max_response_mb` or `tls_interception.max_response_bytes`). Data-budget truncation is separate and remains an explicit budget policy.
 
 ### Generic SSE streaming (`response_scanning.sse_streaming`)
 
@@ -1029,6 +1188,7 @@ tool_chain_detection:
   max_gap: 3
   tool_categories: {}           # map tool names to categories
   pattern_overrides: {}         # per-pattern action overrides
+  sensitivity_labels: {}        # override lethal-trifecta source/sink labels
   custom_patterns: []
 ```
 
@@ -1041,9 +1201,10 @@ tool_chain_detection:
 | `max_gap` | `3` | Max innocent calls between pattern steps |
 | `tool_categories` | `{}` | Map tool names to built-in categories |
 | `pattern_overrides` | `{}` | Per-pattern action override |
+| `sensitivity_labels` | `{}` | Override keyword-based lethal-trifecta classification. Valid labels are `untrusted_source`, `sensitive_source`, and `external_sink`; values are exact tool names or glob patterns. |
 | `custom_patterns` | `[]` | Custom attack sequences |
 
-Ships with 10 built-in patterns covering reconnaissance, credential theft, data staging, persistence, and exfiltration chains.
+Ships with 10 built-in patterns covering reconnaissance, credential theft, data staging, persistence, and exfiltration chains. The built-in lethal-trifecta detector watches for `untrusted_source -> sensitive_source -> external_sink` sequences. Use `sensitivity_labels` when your tool names do not carry enough semantic signal for the keyword fallback, and use `pattern_overrides.lethal-trifecta` to change that detector's action.
 
 ## Cross-Request Exfiltration Detection
 
@@ -1514,6 +1675,7 @@ license_key: "pipelock_lic_v1_eyJ..."
 ```yaml
 license_key: "pipelock_lic_v1_eyJ..."        # inline token (lowest priority)
 license_file: "/etc/pipelock/license.token"  # file path (medium priority)
+license_crl_file: "/etc/pipelock/license.crl" # signed revocation list
 license_public_key: "a1b2c3d4..."            # hex-encoded Ed25519 public key (dev builds only)
 ```
 
@@ -1539,6 +1701,8 @@ license_file: /etc/pipelock/license/token
 ### Key Verification
 
 Official release builds embed the signing public key at compile time via ldflags. The embedded key takes priority over `license_public_key` and cannot be overridden by config, preventing self-signing bypasses. The `license_public_key` config field is only used in development builds where no key is embedded.
+
+`license_crl_file` points at a signed license revocation list. It is read and verified at startup and on config reload; a revoked active license is disabled immediately. The CRL file should be mounted from trusted operator-controlled storage, not written by the agent.
 
 ### CLI Commands
 
@@ -1627,7 +1791,7 @@ scan_api:
 | `kinds.prompt_injection` | `true` | Enable `prompt_injection` scan kind. |
 | `kinds.tool_call` | `true` | Enable `tool_call` scan kind. |
 
-All kinds are enabled by default. Set any to `false` to disable. Full API reference: [docs/scan-api.md](scan-api.md).
+All kinds are enabled by default. Set any to `false` to disable. `tool_call` DLP and prompt-injection scanning run on demand through this API regardless of the inline MCP proxy's `mcp_input_scanning.enabled` setting; that toggle controls live MCP proxy traffic, not explicit Scan API requests. Full API reference: [docs/scan-api.md](scan-api.md).
 
 ## Address Protection
 
@@ -1682,6 +1846,7 @@ file_sentry:
     - path: "/var/agent-secrets"  # required:true; startup fails if unavailable
       required: true
   scan_content: true
+  max_file_bytes: 0             # 0 = built-in 10 MiB default
   ignore_patterns:
     - "node_modules/**"
     - ".git/**"
@@ -1694,6 +1859,7 @@ file_sentry:
 | `enabled` | `false` | Enable filesystem monitoring. Opt-in. |
 | `watch_paths` | `[]` | Directories to monitor recursively. Relative paths are resolved against the config file directory (not CWD). Required when enabled. Entries may be bare strings or `{path, required}` mappings. Bare strings default to `required: false`. |
 | `scan_content` | `true` | Run DLP scanner on modified file content. |
+| `max_file_bytes` | `0` | Max watched-file bytes to read for content scanning. `0` uses the built-in 10 MiB default; negative values are rejected. |
 | `ignore_patterns` | `[]` | Glob patterns for files and directories to skip. |
 | `action` | `warn` | Enforcement response when an agent-attributed write matches a DLP pattern. `warn` logs the finding + records a metric (current default). `block` additionally cancels the proxy context so the MCP child terminates, preventing the agent from continuing after a detected leak. Non-agent writes (editor saves, build output) never trigger the block path. |
 
@@ -1703,7 +1869,7 @@ Findings are reported as stderr warnings and Prometheus metrics (`pipelock_file_
 
 `action: block` is the fail-closed enforcement boundary. The cancel fires from the consumer goroutine after the log line and metric emission, which means there is unavoidable latency between the kernel write and the proxy teardown: the file has already been written to disk by the time the scan completes. Block prevents the agent from continuing to act on the leak, it does not prevent the write itself. For write-time interception the operator must layer Landlock or a sandbox at the deployment level.
 
-Files larger than 10MB are skipped. Write events are debounced (50ms quiet window) to avoid scanning partial writes.
+Files larger than `max_file_bytes` are skipped to bound memory use, but the skip is surfaced through the watcher's error path instead of being silently dropped. Stat/read failures are surfaced the same way. Write events are debounced (50ms quiet window) to avoid scanning partial writes.
 
 ## Community Rules
 
@@ -2339,9 +2505,9 @@ All boolean fields use nil-means-security-default semantics: omitting a field fr
 
 ### Metadata stripping
 
-For JPEG images: strips APP1 (EXIF, XMP), APP2 (ICC profile, FlashPix), and APP13 (IPTC, Photoshop) marker segments. APP0 (JFIF header) is preserved. Pixel data is never decoded or re-encoded.
+For JPEG images: strips APP1 (EXIF, XMP), APP2 (ICC profile, FlashPix), and APP13 (IPTC, Photoshop) marker segments. APP0 (JFIF header) is preserved. Pixel data is never decoded or re-encoded. Bytes after the canonical EOI marker are truncated and the cleaned image is forwarded instead of failing closed.
 
-For PNG images: strips tEXt, iTXt, zTXt (text metadata), and eXIf (EXIF) chunks. All other chunks (IHDR, IDAT, PLTE, tRNS, IEND) pass through with their original CRCs.
+For PNG images: strips tEXt, iTXt, zTXt (text metadata), and eXIf (EXIF) chunks. All other chunks (IHDR, IDAT, PLTE, tRNS, IEND) pass through with their original CRCs. Bytes after the canonical IEND chunk are truncated and the cleaned image is forwarded instead of failing closed.
 
 ### SVG active content hardening
 

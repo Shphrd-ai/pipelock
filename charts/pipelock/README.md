@@ -20,8 +20,10 @@ The chart is configured by passing values to `helm install -f values.yaml`. The 
 |---|---|---|
 | `image.repository` | `ghcr.io/luckypipewrench/pipelock` | Image repository |
 | `image.tag` | `""` | Tag used when `image.digest` is empty. Falls through to `.Chart.AppVersion` if also empty. |
-| `image.digest` | v2.5.0 multi-arch manifest digest | When set, the chart renders `repository@digest` for pinning |
+| `image.digest` | `""` | Optional multi-arch manifest digest. When set, the chart renders `repository@digest` for pinning |
 | `image.pullPolicy` | `IfNotPresent` | Image pull policy |
+
+> **Upgrading from chart 0.2.0:** the default `image.digest` was cleared, so the chart now follows `.Chart.AppVersion` (v2.6.0) by default instead of a pinned digest. Set `image.digest` explicitly in your values if you need an immutable image reference.
 
 ### Ports
 
@@ -34,7 +36,7 @@ The chart is configured by passing values to `helm install -f values.yaml`. The 
 
 ### Health probes
 
-Liveness and readiness probes hit `/health`, which v2.5 backs with a subsystem watchdog. The endpoint returns 503 when scanner, config, kill switch, session, or watchdog liveness fails — Kubernetes will restart the pod automatically.
+Liveness and readiness probes hit `/health`, backed by the subsystem watchdog. The endpoint returns 503 when scanner, config, kill switch, session, or watchdog liveness fails — Kubernetes will restart the pod automatically.
 
 | Key | Default | Description |
 |---|---|---|

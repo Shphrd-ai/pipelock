@@ -1,6 +1,6 @@
 # Pipelock Conductor and Audit Sink Design
 
-**Status:** Draft, pre-implementation gate
+**Status:** Design preview, not GA in v2.6
 **Version:** 0.1.0
 **Date:** 2026-05-23
 
@@ -12,7 +12,8 @@ plane that ingests signed evidence from those instances.
 Conductor server commands and follower wiring are present only in enterprise
 builds. Core builds still parse `conductor` config so reload guards can preserve
 restart-only state, but `conductor.enabled: true` fails closed without the
-enterprise build tag.
+enterprise build tag. User-facing GA documentation is intentionally deferred
+until v2.7.
 
 The architecture shape is:
 
@@ -113,6 +114,10 @@ Requirements:
 - Every key has `key_id`, `purpose`, `created_at`, `not_before`, `not_after`,
   and `revoked_at`.
 - Follower trust rosters pin public keys and accepted purposes.
+- The trust roster and pinned root fingerprint are read once at follower
+  startup and are NOT re-read on config hot-reload; rotating the roster or
+  changing the pinned root requires a follower restart (deliberate: the
+  pinned root is the trust anchor and must not be swappable at runtime).
 - Key rotation is published as a signed trust-root or intermediate update.
 - Followers reject unknown key IDs, wrong-purpose signatures, expired keys, and
   revoked keys.

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -119,7 +120,7 @@ func TestWatcher_CleanFileNoFinding(t *testing.T) {
 	case f := <-w.Findings():
 		t.Errorf("expected no finding for clean file, got %+v", f)
 	case <-time.After(300 * time.Millisecond):
-		// Good — no finding emitted.
+		// Good - no finding emitted.
 	}
 }
 
@@ -166,7 +167,7 @@ func TestWatcher_IgnoredPatterns(t *testing.T) {
 	case f := <-w.Findings():
 		t.Errorf("expected no finding for ignored path, got %+v", f)
 	case <-time.After(300 * time.Millisecond):
-		// Good — ignored path was not scanned.
+		// Good - ignored path was not scanned.
 	}
 }
 
@@ -252,7 +253,7 @@ func TestWatcher_ScanContentDisabled(t *testing.T) {
 
 	armAndStart(t, w, ctx)
 
-	// Write a secret — should NOT be scanned because scan_content is false.
+	// Write a secret - should NOT be scanned because scan_content is false.
 	secret := "sk-ant-" + "api03-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 	if err := os.WriteFile(filepath.Join(dir, "data.json"), []byte(secret), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
@@ -338,7 +339,226 @@ func TestWatcher_OversizedFileSkipped(t *testing.T) {
 	case finding := <-w.Findings():
 		t.Errorf("expected no finding for oversized file, got %+v", finding)
 	case <-time.After(300 * time.Millisecond):
-		// Good — oversized file was skipped.
+		// Good - oversized file was skipped.
+	}
+}
+
+// TestWatcher_OversizedSkipIsVisibleAndCapConfigurable proves two things the
+// silent `return` behavior lacked: (1) an oversized file left unscanned surfaces
+// through the onError callback instead of vanishing, and (2) file_sentry
+// max_file_bytes overrides the default cap so an operator can tune it. A file
+// over the configured 64-byte cap must skip-with-notice; a file under it scans.
+func TestWatcher_OversizedSkipIsVisibleAndCapConfigurable(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &config.FileSentry{
+		Enabled:      true,
+		WatchPaths:   []config.WatchPath{{Path: dir}},
+		ScanContent:  ptrBool(true),
+		MaxFileBytes: 64,
+	}
+
+	defaults := config.Defaults()
+	defaults.Internal = nil
+	defaults.SSRF.IPAllowlist = []string{"127.0.0.0/8", "::1/128"}
+	sc := scanner.New(defaults)
+	defer sc.Close()
+
+	var skipErr atomic.Pointer[string]
+	w, err := NewWatcher(cfg, sc, nil, func(e error) {
+		s := e.Error()
+		skipErr.Store(&s)
+	})
+	if err != nil {
+		t.Fatalf("NewWatcher: %v", err)
+	}
+	defer func() { _ = w.Close() }()
+
+	// Direct scanFile call keeps the assertion deterministic (no debounce race).
+	fsw := w.(*fsWatcher)
+
+	// Over the 64-byte cap: skipped, but the skip is reported via onError.
+	bigPath := filepath.Join(dir, "big.txt")
+	if err := os.WriteFile(bigPath, []byte(strings.Repeat("a", 200)), 0o600); err != nil {
+		t.Fatalf("WriteFile big: %v", err)
+	}
+	fsw.scanFile(context.Background(), bigPath, false)
+	got := skipErr.Load()
+	if got == nil {
+		t.Fatal("expected onError skip notification for oversized file, got none")
+	}
+	if !strings.Contains(*got, "oversized") {
+		t.Errorf("skip error should mention oversize, got: %s", *got)
+	}
+
+	// Under the cap: a secret is still detected, proving the configured cap
+	// (not the 10 MiB default) is what gates scanning.
+	skipErr.Store(nil)
+	smallPath := filepath.Join(dir, "small.txt")
+	secret := "sk-ant-" + "api03-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+	if err := os.WriteFile(smallPath, []byte(secret), 0o600); err != nil {
+		t.Fatalf("WriteFile small: %v", err)
+	}
+	fsw.scanFile(context.Background(), smallPath, false)
+	select {
+	case f := <-w.Findings():
+		if f.Path != smallPath {
+			t.Errorf("expected finding for %q, got %q", smallPath, f.Path)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected finding for under-cap file with secret, got none")
+	}
+}
+
+func TestWatcher_OpenFailureIsVisible(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &config.FileSentry{
+		Enabled:      true,
+		WatchPaths:   []config.WatchPath{{Path: dir}},
+		ScanContent:  ptrBool(true),
+		MaxFileBytes: 64,
+	}
+
+	defaults := config.Defaults()
+	defaults.Internal = nil
+	defaults.SSRF.IPAllowlist = []string{"127.0.0.0/8", "::1/128"}
+	sc := scanner.New(defaults)
+	defer sc.Close()
+
+	var openErr atomic.Pointer[string]
+	w, err := NewWatcher(cfg, sc, nil, func(e error) {
+		s := e.Error()
+		openErr.Store(&s)
+	})
+	if err != nil {
+		t.Fatalf("NewWatcher: %v", err)
+	}
+	defer func() { _ = w.Close() }()
+
+	missingPath := filepath.Join(dir, "missing.txt")
+	w.(*fsWatcher).scanFile(context.Background(), missingPath, false)
+
+	got := openErr.Load()
+	if got == nil {
+		t.Fatal("expected onError notification for open failure, got none")
+	}
+	if !strings.Contains(*got, "open failed") || !strings.Contains(*got, "left unscanned") {
+		t.Errorf("open error should mention open failure and unscanned file, got: %s", *got)
+	}
+}
+
+func TestWatcher_FlushScanReportsSkippedFiles(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &config.FileSentry{
+		Enabled:      true,
+		WatchPaths:   []config.WatchPath{{Path: dir}},
+		ScanContent:  ptrBool(true),
+		MaxFileBytes: 64,
+	}
+
+	defaults := config.Defaults()
+	defaults.Internal = nil
+	defaults.SSRF.IPAllowlist = []string{"127.0.0.0/8", "::1/128"}
+	sc := scanner.New(defaults)
+	defer sc.Close()
+
+	var errs []string
+	w, err := NewWatcher(cfg, sc, nil, func(e error) {
+		errs = append(errs, e.Error())
+	})
+	if err != nil {
+		t.Fatalf("NewWatcher: %v", err)
+	}
+	defer func() { _ = w.Close() }()
+	fsw := w.(*fsWatcher)
+
+	fsw.flushScan(filepath.Join(dir, "missing.txt"), false)
+	if len(errs) != 1 || !strings.Contains(errs[0], "open failed") {
+		t.Fatalf("expected open failure from flush scan, got %v", errs)
+	}
+
+	errs = nil
+	emptyPath := filepath.Join(dir, "empty.txt")
+	if err := os.WriteFile(emptyPath, nil, 0o600); err != nil {
+		t.Fatalf("WriteFile empty: %v", err)
+	}
+	fsw.flushScan(emptyPath, false)
+	if len(errs) != 0 {
+		t.Fatalf("expected empty file to skip without error, got %v", errs)
+	}
+
+	bigPath := filepath.Join(dir, "big.txt")
+	if err := os.WriteFile(bigPath, []byte(strings.Repeat("a", 128)), 0o600); err != nil {
+		t.Fatalf("WriteFile big: %v", err)
+	}
+	fsw.flushScan(bigPath, false)
+	if len(errs) != 1 || !strings.Contains(errs[0], "oversized") {
+		t.Fatalf("expected oversized error from flush scan, got %v", errs)
+	}
+
+	errs = nil
+	cleanPath := filepath.Join(dir, "clean.txt")
+	if err := os.WriteFile(cleanPath, []byte("plain project notes"), 0o600); err != nil {
+		t.Fatalf("WriteFile clean: %v", err)
+	}
+	fsw.flushScan(cleanPath, false)
+	if len(errs) != 0 {
+		t.Fatalf("expected clean file to scan without error, got %v", errs)
+	}
+	select {
+	case f := <-w.Findings():
+		t.Fatalf("expected no finding for clean flush scan, got %+v", f)
+	default:
+	}
+
+	secretPath := filepath.Join(dir, "secret.txt")
+	secret := "sk-ant-" + "api03-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+	if err := os.WriteFile(secretPath, []byte(secret), 0o600); err != nil {
+		t.Fatalf("WriteFile secret: %v", err)
+	}
+	fsw.flushScan(secretPath, true)
+	select {
+	case f := <-w.Findings():
+		if f.Path != secretPath || !f.IsAgent {
+			t.Fatalf("flush finding = %+v, want path %q with IsAgent", f, secretPath)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected finding from flush scan")
+	}
+}
+
+func TestWatcher_ScanFileDropsWhenFindingChannelFull(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &config.FileSentry{
+		Enabled:     true,
+		WatchPaths:  []config.WatchPath{{Path: dir}},
+		ScanContent: ptrBool(true),
+	}
+
+	defaults := config.Defaults()
+	defaults.Internal = nil
+	defaults.SSRF.IPAllowlist = []string{"127.0.0.0/8", "::1/128"}
+	sc := scanner.New(defaults)
+	defer sc.Close()
+
+	w, err := NewWatcher(cfg, sc, nil, nil)
+	if err != nil {
+		t.Fatalf("NewWatcher: %v", err)
+	}
+	defer func() { _ = w.Close() }()
+	fsw := w.(*fsWatcher)
+
+	for i := 0; i < cap(fsw.findings); i++ {
+		fsw.findings <- Finding{Path: fmt.Sprintf("preload-%d", i)}
+	}
+
+	secretPath := filepath.Join(dir, "secret.txt")
+	secret := "sk-ant-" + "api03-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+	if err := os.WriteFile(secretPath, []byte(secret), 0o600); err != nil {
+		t.Fatalf("WriteFile secret: %v", err)
+	}
+	fsw.scanFile(context.Background(), secretPath, false)
+	if got := len(fsw.findings); got != cap(fsw.findings) {
+		t.Fatalf("findings len = %d, want channel to remain full at %d", got, cap(fsw.findings))
 	}
 }
 
@@ -487,7 +707,7 @@ func TestWatcher_DebounceTimerRace(t *testing.T) {
 	case f := <-w.Findings():
 		t.Errorf("unexpected extra finding (timer race?): %+v", f)
 	case <-time.After(200 * time.Millisecond):
-		// Good — only one finding.
+		// Good - only one finding.
 	}
 }
 
@@ -721,7 +941,7 @@ func TestWatcher_CloseFlushesLastWrite(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() { _ = w.Start(ctx) }()
 
-	// Write a secret — this starts a debounce timer.
+	// Write a secret - this starts a debounce timer.
 	secret := "sk-ant-" + "api03-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 	if writeErr := os.WriteFile(filepath.Join(dir, "last-write.json"), []byte(secret), 0o600); writeErr != nil {
 		t.Fatalf("WriteFile: %v", writeErr)
@@ -782,7 +1002,7 @@ func TestWatcher_CloseFlushScanDisabled(t *testing.T) {
 	cancel()
 	_ = w.Close()
 
-	// Channel is closed — reading returns zero values. Check that no
+	// Channel is closed - reading returns zero values. Check that no
 	// real finding (with a pattern name) was emitted.
 	select {
 	case f, ok := <-w.Findings():
@@ -918,7 +1138,7 @@ func TestWatcher_FindingsChannelFull(t *testing.T) {
 
 	// Poll until at least one finding arrives, proving debounce completed
 	// without deadlock. The channel is bounded (findingsChanSize), so
-	// overflow writes are dropped — but at least some should arrive.
+	// overflow writes are dropped - but at least some should arrive.
 	deadline := time.After(5 * time.Second)
 	drained := 0
 	for drained == 0 {
@@ -1010,7 +1230,7 @@ func TestWatcher_StartReturnsOnClose(t *testing.T) {
 		t.Fatalf("Arm: %v", armErr)
 	}
 
-	// Close the watcher then Start — the channels are closed so Start exits.
+	// Close the watcher then Start - the channels are closed so Start exits.
 	_ = w.Close()
 
 	ctx := context.Background()
@@ -1092,7 +1312,7 @@ func TestWatcher_ArmNonexistentPathSoftFail(t *testing.T) {
 
 // TestWatcher_ArmMixedPathsArmsTheArmable verifies that an Arm() with a
 // healthy path AND a non-required missing path arms the healthy one and
-// records the missing one as degraded — neither failing the whole proxy
+// records the missing one as degraded - neither failing the whole proxy
 // nor silently swallowing the missing path.
 func TestWatcher_ArmMixedPathsArmsTheArmable(t *testing.T) {
 	healthy := t.TempDir()
@@ -1271,7 +1491,7 @@ func TestWatcher_FileRemovalNoFinding(t *testing.T) {
 		t.Fatal("timeout waiting for write finding")
 	}
 
-	// Now remove the file — should NOT produce a finding.
+	// Now remove the file - should NOT produce a finding.
 	_ = os.Remove(path)
 
 	select {
