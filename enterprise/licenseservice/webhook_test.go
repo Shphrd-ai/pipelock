@@ -215,6 +215,7 @@ func TestTierToFeatures(t *testing.T) {
 		{"pro", tierPro, []string{license.FeatureAgents}},
 		{"founding pro", tierFoundingPro, []string{license.FeatureAgents}},
 		{"enterprise", tierEnterprise, []string{license.FeatureAgents, license.FeatureFleet}},
+		{"enterprise eval", tierEnterpriseEval, []string{license.FeatureAgents, license.FeatureFleet}},
 		{"trial", tierTrial, []string{license.FeatureAgents}},
 		{"assess", tierAssess, []string{license.FeatureAssess}},
 		{"unknown returns nil (fail-closed)", "unknown", nil},
@@ -1759,6 +1760,7 @@ func TestTokenLifetimeForTier(t *testing.T) {
 		{"pro gets 45 days", tierPro, tokenLifetime},
 		{"founding pro gets 45 days", tierFoundingPro, tokenLifetime},
 		{"enterprise gets 45 days", tierEnterprise, tokenLifetime},
+		{"enterprise eval gets 60 days", tierEnterpriseEval, evalTokenLifetime},
 	}
 
 	for _, tt := range tests {
@@ -1978,6 +1980,63 @@ func TestHandleOrderEvent_OneTimeTrial(t *testing.T) {
 	}
 	if entAfter.LastDeliveryStatus != testDeliveryStatusSent {
 		t.Errorf("delivery status = %q, want %q", entAfter.LastDeliveryStatus, testDeliveryStatusSent)
+	}
+}
+
+func TestHandleOrderEvent_EnterpriseEvalDoesNotMintOnOrderCreated(t *testing.T) {
+	ts := newTestSetup(t)
+	ctx := t.Context()
+
+	var emailCount atomic.Int32
+	emailSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		emailCount.Add(1)
+		w.Header().Set("Content-Type", testContentTypeJSON)
+		_, _ = w.Write([]byte(`{"id":"msg_eval_unexpected"}`))
+	}))
+	t.Cleanup(emailSrv.Close)
+
+	ts.handler.email = &EmailSender{
+		apiKey:    "re_" + "test_key",
+		fromEmail: "test@pipelock.dev",
+		client:    emailSrv.Client(),
+		apiURL:    emailSrv.URL,
+	}
+
+	const orderID = "order_eval_created"
+	orderData, err := json.Marshal(map[string]interface{}{
+		"id":             orderID,
+		"billing_reason": "purchase",
+		"customer": map[string]interface{}{
+			"email":    testCustomerEmail,
+			"metadata": map[string]string{"org": "evalcorp"},
+		},
+		"product": map[string]interface{}{
+			"id":       "prod_eval",
+			"name":     "Pipelock Enterprise Eval",
+			"metadata": map[string]string{"pipelock_tier": tierEnterpriseEval},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal order data: %v", err)
+	}
+
+	event := &PolarWebhookEvent{
+		Type: EventOrderCreated,
+		Data: json.RawMessage(orderData),
+	}
+	if err := ts.handler.HandleOrderEvent(ctx, event); err != nil {
+		t.Fatalf("HandleOrderEvent: %v", err)
+	}
+
+	ent, err := ts.db.GetBySubscriptionID(ctx, orderID)
+	if err != nil {
+		t.Fatalf("GetBySubscriptionID: %v", err)
+	}
+	if ent != nil {
+		t.Fatalf("enterprise eval order.created created entitlement: %+v", ent)
+	}
+	if got := emailCount.Load(); got != 0 {
+		t.Fatalf("enterprise eval order.created sent %d emails, want 0", got)
 	}
 }
 
