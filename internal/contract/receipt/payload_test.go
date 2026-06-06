@@ -136,6 +136,30 @@ func TestValidateProxyDecisionWithSpans_RejectsUnknownField(t *testing.T) {
 	}
 }
 
+func TestValidateProxyDecisionWithSpans_StrictDecodePreservesError(t *testing.T) {
+	t.Parallel()
+	raw := json.RawMessage(`{
+		"action_type":"block",
+		"target":"https://example.com/[redacted-value]",
+		"verdict":"block",
+		"transport":"forward",
+		"policy_sources":["dlp"],
+		"winning_source":"scanner",
+		"source_spans":[],
+		"unexpected":"field"
+	}`)
+	err := callValidator(t, receipt.PayloadProxyDecisionWithSpans, raw)
+	if err == nil {
+		t.Fatal("unknown top-level field accepted")
+	}
+	if errors.Is(err, receipt.ErrPayloadMissingField) {
+		t.Fatalf("strict decode error was mislabeled as missing field: %v", err)
+	}
+	if !strings.Contains(err.Error(), `json: unknown field "unexpected"`) {
+		t.Fatalf("strict decode detail not preserved: %v", err)
+	}
+}
+
 // Structural validation can only reject a wrong algorithm label. Proving that
 // a hmac-sha256:<hex> value was actually keyed belongs in the recheck path,
 // where the verifier has the HMAC key and the signed event_id.

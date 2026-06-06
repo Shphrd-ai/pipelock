@@ -152,7 +152,7 @@ func validateProxyDecision(raw json.RawMessage) error {
 func validateProxyDecisionWithSpans(raw json.RawMessage) error {
 	var p PayloadProxyDecisionWithSpansStruct
 	if err := decodeStrict(raw, &p); err != nil {
-		return fmt.Errorf("%w: action_type (unmarshal: %w)", ErrPayloadMissingField, err)
+		return fmt.Errorf("proxy_decision_with_spans strict decode: %w", err)
 	}
 	if err := validateProxyDecisionBase(proxyDecisionBase{
 		ActionType:    p.ActionType,
