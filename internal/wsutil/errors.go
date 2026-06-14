@@ -17,14 +17,12 @@ func IsExpectedCloseErr(err error) bool {
 	if errors.Is(err, io.EOF) {
 		return true
 	}
+	s := err.Error()
 	// Platform-specific teardown errnos (e.g. the Windows Winsock equivalents
 	// of the Unix strings below) are matched via errors.Is in a build-tagged
 	// helper so detection does not depend on locale-sensitive error text.
-	if isPlatformClosedErr(err) {
-		return true
-	}
-	s := err.Error()
-	return strings.Contains(s, "use of closed network connection") ||
+	return isPlatformClosedErr(err) ||
+		strings.Contains(s, "use of closed network connection") ||
 		strings.Contains(s, "connection reset by peer") ||
 		strings.Contains(s, "broken pipe")
 }
