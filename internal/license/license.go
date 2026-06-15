@@ -94,25 +94,13 @@ func verifyAt(token string, publicKey ed25519.PublicKey, now time.Time) (License
 	if len(publicKey) != ed25519.PublicKeySize {
 		return License{}, errors.New("invalid public key")
 	}
-	if !strings.HasPrefix(token, tokenPrefix) {
-		return License{}, errors.New("invalid license format: missing prefix")
-	}
-	encoded := strings.TrimPrefix(token, tokenPrefix)
-	// Reject oversized tokens before allocating memory for base64 decode.
-	if len(encoded) > maxTokenBytes {
-		return License{}, errors.New("license token exceeds maximum size")
-	}
-	raw, err := base64.RawURLEncoding.DecodeString(encoded)
+	payload, sig, err := splitToken(token)
 	if err != nil {
-		return License{}, fmt.Errorf("decode license: %w", err)
+		return License{}, err
 	}
-	// Minimum: 2 bytes of JSON + 64 bytes of signature.
-	if len(raw) <= ed25519.SignatureSize {
-		return License{}, errors.New("license token too short")
-	}
-	payload := raw[:len(raw)-ed25519.SignatureSize]
-	sig := raw[len(raw)-ed25519.SignatureSize:]
 
+	// Verify the signature BEFORE parsing: never unmarshal untrusted payload
+	// bytes until the root/intermediate signature over them has checked out.
 	if !ed25519.Verify(publicKey, payload, sig) {
 		return License{}, errors.New("invalid license signature")
 	}
@@ -147,30 +135,46 @@ func (l License) HasFeature(feature string) bool {
 	return false
 }
 
-// Decode extracts the license payload from a token WITHOUT verifying the
-// signature. Use for inspection only, never for authorization decisions.
-func Decode(token string) (License, error) {
-	if !strings.HasPrefix(token, tokenPrefix) {
-		return License{}, errors.New("invalid license format: missing prefix")
-	}
-	encoded := strings.TrimPrefix(token, tokenPrefix)
-	if len(encoded) > maxTokenBytes {
-		return License{}, errors.New("license token exceeds maximum size")
-	}
-	raw, err := base64.RawURLEncoding.DecodeString(encoded)
+// DecodeUnverified extracts the license payload from a token WITHOUT verifying
+// the signature. Use for inspection only, never for authorization decisions —
+// every authorization path uses Verify / VerifyWithCRL / VerifyTokenWithOptions,
+// which return a License only when the signature checks out. The Unverified
+// suffix makes accidental misuse in a trust path obvious at the call site.
+func DecodeUnverified(token string) (License, error) {
+	payload, _, err := splitToken(token)
 	if err != nil {
-		return License{}, fmt.Errorf("decode license: %w", err)
+		return License{}, err
 	}
-	if len(raw) <= ed25519.SignatureSize {
-		return License{}, errors.New("license token too short")
-	}
-	payload := raw[:len(raw)-ed25519.SignatureSize]
-
 	var l License
 	if err := json.Unmarshal(payload, &l); err != nil {
 		return License{}, fmt.Errorf("parse license payload: %w", err)
 	}
 	return l, nil
+}
+
+// splitToken validates the token envelope (prefix, size cap, base64) and splits
+// the decoded bytes into the signed payload and its trailing Ed25519 signature.
+// It does NOT verify the signature or parse the payload, so verifyAt can check
+// the signature BEFORE unmarshalling untrusted JSON while DecodeUnverified can
+// inspect without verifying. Shared by both so the wire format lives in one place.
+func splitToken(token string) (payload, sig []byte, err error) {
+	if !strings.HasPrefix(token, tokenPrefix) {
+		return nil, nil, errors.New("invalid license format: missing prefix")
+	}
+	encoded := strings.TrimPrefix(token, tokenPrefix)
+	// Reject oversized tokens before allocating memory for base64 decode.
+	if len(encoded) > maxTokenBytes {
+		return nil, nil, errors.New("license token exceeds maximum size")
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, nil, fmt.Errorf("decode license: %w", err)
+	}
+	// Minimum: 2 bytes of JSON + 64 bytes of signature.
+	if len(raw) <= ed25519.SignatureSize {
+		return nil, nil, errors.New("license token too short")
+	}
+	return raw[:len(raw)-ed25519.SignatureSize], raw[len(raw)-ed25519.SignatureSize:], nil
 }
 
 // PublicKeyHex is set at build time via ldflags:
