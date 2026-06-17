@@ -80,6 +80,16 @@ func TestNewActionID_UUIDv7(t *testing.T) {
 	}
 }
 
+func TestDecisionPhaseConstants(t *testing.T) {
+	t.Parallel()
+	if DecisionPhaseDefer != "defer" {
+		t.Fatalf("DecisionPhaseDefer = %q", DecisionPhaseDefer)
+	}
+	if DecisionPhaseResolution != "resolution" {
+		t.Fatalf("DecisionPhaseResolution = %q", DecisionPhaseResolution)
+	}
+}
+
 func TestNewActionID_Monotonic(t *testing.T) {
 	t.Parallel()
 	ids := make([]string, 100)
@@ -274,6 +284,7 @@ func TestNormalizeVerdict(t *testing.T) {
 		{name: "ask", input: config.ActionAsk, want: "ask"},
 		{name: "strip", input: config.ActionStrip, want: "strip"},
 		{name: "forward", input: config.ActionForward, want: "forward"},
+		{name: "defer", input: config.ActionDefer, want: "defer"},
 		{name: "unknown_passthrough", input: "custom_verdict", want: "custom_verdict"},
 		{name: "empty_passthrough", input: "", want: ""},
 	}
