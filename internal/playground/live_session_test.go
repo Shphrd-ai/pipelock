@@ -5,6 +5,8 @@ package playground_test
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/hex"
 	"errors"
 	"testing"
 
@@ -106,6 +108,12 @@ func TestLiveSession_DevFlow_StreamsDecisions(t *testing.T) {
 	if !rep.OK {
 		t.Fatalf("dev run must verify offline end-to-end: %+v", rep)
 	}
+	// The trust-root key the downloaded bundle is verified against must be a real
+	// 32-byte ed25519 public key, rendered as hex (not merely a 64-char string).
+	pub := sess.OrchestratorPubHex()
+	if raw, decErr := hex.DecodeString(pub); decErr != nil || len(raw) != ed25519.PublicKeySize {
+		t.Errorf("OrchestratorPubHex = %q, want a 32-byte ed25519 key as hex (decoded %d bytes, err=%v)", pub, len(raw), decErr)
+	}
 
 	sess.Close()
 	sess.Close() // idempotent
@@ -134,6 +142,11 @@ func TestLiveSession_DevFlow_StreamsDecisions(t *testing.T) {
 				if len(ev.Envelope) == 0 {
 					t.Error("blocked decision has no signed envelope")
 				}
+			}
+			// This is the deterministic-agent path (no model provider), so every
+			// decision is on a visitor-controllable lab target: untrusted/enforced.
+			if ev.DestinationClass != "untrusted" {
+				t.Errorf("decision destination_class = %q, want untrusted", ev.DestinationClass)
 			}
 		case playground.LiveEventVerified:
 			sawVerified = len(ev.Checks) > 0
