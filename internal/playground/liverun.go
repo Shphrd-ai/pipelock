@@ -188,7 +188,10 @@ func StartLiveRun(ctx context.Context, opts LiveRunOpts) (*LiveRun, error) {
 
 	// --- Canary ---
 	lr.canaryID = "playground-canary"
-	lr.canaryValue = liveCanaryValue(opts.RunNonce)
+	lr.canaryValue, err = liveCanaryValue()
+	if err != nil {
+		return nil, fmt.Errorf("generate canary: %w", err)
+	}
 
 	// --- Look up the scenario ---
 	if s, ok := lookupPlaygroundScenario(opts.ScenarioID); ok {

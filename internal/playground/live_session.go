@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -172,11 +173,12 @@ type LLMAgentConfig struct {
 // LiveSession drives a deterministic agent through a real contained Pipelock
 // proxy from visitor chat input, streaming each signed decision as it happens.
 type LiveSession struct {
-	lr        *LiveRun
-	agent     LiveAgent
-	runner    modelTurnRunner // non-nil => model-backed subprocess drives turns
-	client    *http.Client
-	contained bool
+	lr         *LiveRun
+	agent      LiveAgent
+	runner     modelTurnRunner // non-nil => model-backed subprocess drives turns
+	client     *http.Client
+	contained  bool
+	scratchDir string // per-session shell/filesystem scratch; wiped on Close
 	// modelHost is the model provider host (empty for the deterministic agent).
 	// onReceipt uses it to label decisions trusted_model vs untrusted.
 	modelHost string
@@ -267,6 +269,22 @@ func StartLiveSession(ctx context.Context, cfg LiveSessionConfig) (*LiveSession,
 	}
 
 	if cfg.LLMAgent != nil {
+		// Per-session scratch: the agent's working directory and the home for a
+		// seeded ~/.aws/credentials. The dead secret lives here and in env so the
+		// agent discovers it naturally; it is wiped on Close so nothing carries
+		// between visitors.
+		scratch, sErr := os.MkdirTemp("", "playground-live-scratch-*")
+		if sErr != nil {
+			lr.Close()
+			return nil, fmt.Errorf("create session scratch: %w", sErr)
+		}
+		s.scratchDir = scratch
+		secretKey, kErr := liveSecretAccessKey()
+		if kErr != nil {
+			lr.Close()
+			_ = os.RemoveAll(scratch)
+			return nil, fmt.Errorf("generate secret access key: %w", kErr)
+		}
 		runner, rErr := newSubprocessTurnRunner(ctx, subprocessRunnerOpts{
 			Bin:          cfg.LLMAgent.Bin,
 			ProxyURL:     "http://" + lr.proxyLn.Addr().String(),
@@ -274,13 +292,20 @@ func StartLiveSession(ctx context.Context, cfg LiveSessionConfig) (*LiveSession,
 			Model:        cfg.LLMAgent.Model,
 			SecretFile:   cfg.LLMAgent.SecretFile,
 			SafeURL:      lr.liveSafeURL(),
-			Canary:       lr.canaryValue,
-			Actor:        liveRunActor,
-			MaxSteps:     cfg.LLMAgent.MaxSteps,
-			Timeout:      cfg.LLMAgent.Timeout,
+			ScratchDir:   scratch,
+			// run_command (arbitrary shell) is handed out ONLY when the host
+			// kernel-contains the agent's egress. In an uncontained dev session a
+			// shell would have real unmediated egress, so it stays off (fail-closed).
+			AllowExec:          s.contained,
+			AWSAccessKeyID:     lr.canaryValue,
+			AWSSecretAccessKey: secretKey,
+			Actor:              liveRunActor,
+			MaxSteps:           cfg.LLMAgent.MaxSteps,
+			Timeout:            cfg.LLMAgent.Timeout,
 		})
 		if rErr != nil {
 			lr.Close()
+			_ = os.RemoveAll(scratch)
 			return nil, fmt.Errorf("start model agent: %w", rErr)
 		}
 		s.runner = runner
@@ -606,6 +631,11 @@ func (s *LiveSession) Close() {
 	}
 	if s.lr != nil {
 		s.lr.Close()
+	}
+	// Wipe the per-session scratch (agent working dir + seeded credentials) so
+	// nothing, including the dead secret, carries between visitors.
+	if s.scratchDir != "" {
+		_ = os.RemoveAll(s.scratchDir)
 	}
 }
 

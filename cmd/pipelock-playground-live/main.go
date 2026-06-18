@@ -110,7 +110,7 @@ func newServeCmd() *cobra.Command {
 	fl.StringVar(&f.orchestratorKey, "orchestrator-key", "", "path to the published demo signing key (required outside --dev; empty = ephemeral per-run key in --dev)")
 	fl.StringVar(&f.toyAgentBin, "toyagent-bin", "", "toy-agent binary path (needed for the contained host-containment witness)")
 	fl.StringVar(&f.webToolBin, "webtool-bin", "", "web-tool binary path (needed for the contained host-containment witness)")
-	fl.DurationVar(&f.sessionTTL, "session-ttl", 90*time.Second, "per-session wall-clock cap")
+	fl.DurationVar(&f.sessionTTL, "session-ttl", 600*time.Second, "per-session wall-clock cap")
 	fl.IntVar(&f.maxInputBytes, "max-input-bytes", 2048, "per-message input size cap")
 	fl.Float64Var(&f.ipRate, "ip-rate", 0.5, "per-IP sustained request rate (tokens/sec)")
 	fl.Float64Var(&f.ipBurst, "ip-burst", 5, "per-IP burst")

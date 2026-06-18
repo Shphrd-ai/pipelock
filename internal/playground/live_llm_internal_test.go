@@ -839,9 +839,11 @@ func TestSubprocessTurnRunner_Protocol(t *testing.T) {
 		t.Skip("builds + spawns a helper subprocess")
 	}
 	dir := t.TempDir()
+	scratch := t.TempDir()
 	argsOut := filepath.Join(dir, "args.txt")
-	// Records argv + the canary env on first read, then emits one reply and a
-	// turn_done per input line.
+	deadKey := "AKIA" + "EXAMPLEDEADKEY00"
+	// Records argv + the dead-secret env + HOME on first read, then emits one reply
+	// and a turn_done per input line.
 	src := fmt.Sprintf(`package main
 import ("bufio";"fmt";"os";"strings")
 func main() {
@@ -850,25 +852,28 @@ func main() {
 	sc.Buffer(make([]byte, 0, 4096), 1<<20)
 	for sc.Scan() {
 		if !recorded {
-			_ = os.WriteFile(%q, []byte("ARGS:"+strings.Join(os.Args[1:], " ")+"\nCANARY:"+os.Getenv(%q)+"\n"), 0o600)
+			_ = os.WriteFile(%q, []byte("ARGS:"+strings.Join(os.Args[1:], " ")+"\nAWSID:"+os.Getenv("AWS_ACCESS_KEY_ID")+"\nHOME:"+os.Getenv("HOME")+"\nSECRETENV:"+os.Getenv("PIPELOCK_PLAYGROUND_SECRET_ENV")+"\n"), 0o600)
 			recorded = true
 		}
 		fmt.Println(`+"`"+`{"kind":"reply","text":"hi from helper"}`+"`"+`)
 		fmt.Println(`+"`"+`{"kind":"turn_done"}`+"`"+`)
 	}
 }
-`, argsOut, envPlaygroundCanary)
+`, argsOut)
 	bin := buildLLMHelper(t, src)
 
 	runner, err := newSubprocessTurnRunner(t.Context(), subprocessRunnerOpts{
-		Bin:          bin,
-		ProxyURL:     "http://127.0.0.1:1/",
-		ModelBaseURL: "http://model.api.test/v1",
-		Model:        "test-model",
-		SecretFile:   filepath.Join(dir, "key"),
-		Canary:       "CANARYVAL",
-		MaxSteps:     4,
-		Timeout:      2 * time.Second,
+		Bin:                bin,
+		ProxyURL:           "http://127.0.0.1:1/",
+		ModelBaseURL:       "http://model.api.test/v1",
+		Model:              "test-model",
+		SecretFile:         filepath.Join(dir, "key"),
+		ScratchDir:         scratch,
+		AllowExec:          true,
+		AWSAccessKeyID:     deadKey,
+		AWSSecretAccessKey: "deadsecret0000000000000000000000000000AB",
+		MaxSteps:           4,
+		Timeout:            2 * time.Second,
 	})
 	if err != nil {
 		t.Fatalf("newSubprocessTurnRunner: %v", err)
@@ -889,11 +894,27 @@ func main() {
 		t.Fatalf("read args: %v", err)
 	}
 	rec := string(recorded)
-	if !strings.Contains(rec, "--proxy-url") || !strings.Contains(rec, "--model-base-url") {
-		t.Errorf("argv missing expected flags: %q", rec)
+	for _, want := range []string{"--proxy-url", "--model-base-url", "--scratch-dir", "--allow-exec"} {
+		if !strings.Contains(rec, want) {
+			t.Errorf("argv missing %q: %q", want, rec)
+		}
 	}
-	if !strings.Contains(rec, "CANARY:CANARYVAL") {
-		t.Errorf("canary env not passed: %q", rec)
+	if !strings.Contains(rec, "AWSID:"+deadKey) {
+		t.Errorf("dead AWS key env not passed: %q", rec)
+	}
+	if !strings.Contains(rec, "HOME:"+scratch) {
+		t.Errorf("HOME not set to scratch: %q", rec)
+	}
+	if !strings.Contains(rec, "SECRETENV:AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY") {
+		t.Errorf("secret-env hint not passed: %q", rec)
+	}
+	// The credentials file is seeded under the scratch HOME with the dead values.
+	creds, err := os.ReadFile(filepath.Clean(filepath.Join(scratch, ".aws", "credentials")))
+	if err != nil {
+		t.Fatalf("read seeded credentials: %v", err)
+	}
+	if !strings.Contains(string(creds), deadKey) || !strings.Contains(string(creds), "deadsecret0000000000000000000000000000AB") {
+		t.Errorf("seeded credentials missing dead values: %q", string(creds))
 	}
 
 	if err := runner.Close(); err != nil {
@@ -974,6 +995,81 @@ func main() {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("Close did not cancel and reap the stuck subprocess")
+	}
+}
+
+// TestStartLiveSession_LLMScratchLifecycleAndNoExecUncontained drives a real dev
+// (uncontained) model-backed session and checks: a per-session scratch dir is
+// created and seeded with the dead AWS credentials, run_command is NOT enabled
+// uncontained (no --allow-exec), and Close wipes the scratch dir.
+func TestStartLiveSession_LLMScratchLifecycleAndNoExecUncontained(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds + spawns a helper subprocess")
+	}
+	dir := t.TempDir()
+	argsOut := filepath.Join(dir, "argv.txt")
+	src := fmt.Sprintf(`package main
+import ("bufio";"fmt";"os";"strings")
+func main() {
+	_ = os.WriteFile(%q, []byte(strings.Join(os.Args[1:], " ")), 0o600)
+	sc := bufio.NewScanner(os.Stdin)
+	for sc.Scan() {
+		fmt.Println(`+"`"+`{"kind":"reply","text":"ok"}`+"`"+`)
+		fmt.Println(`+"`"+`{"kind":"turn_done"}`+"`"+`)
+	}
+}
+`, argsOut)
+	bin := buildLLMHelper(t, src)
+	keyFile := filepath.Join(dir, "model.key")
+	if err := os.WriteFile(keyFile, []byte("dummy-key"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	sess, err := StartLiveSession(t.Context(), LiveSessionConfig{
+		RunNonce:           "scratch-test",
+		RequireContainment: false, // dev => AllowExec must be false (no shell)
+		LLMAgent: &LLMAgentConfig{
+			Bin:          bin,
+			ModelBaseURL: "http://model.api.test/v1",
+			Model:        "x",
+			SecretFile:   keyFile,
+		},
+	})
+	if err != nil {
+		t.Fatalf("StartLiveSession: %v", err)
+	}
+	// Drain events so the session never blocks pushing the status event.
+	go func() {
+		for range sess.Events() {
+		}
+	}()
+
+	scratch := sess.scratchDir
+	if scratch == "" {
+		t.Fatal("session did not create a scratch dir")
+	}
+	if _, err := os.Stat(filepath.Join(scratch, ".aws", "credentials")); err != nil {
+		t.Fatalf("seeded credentials missing in scratch: %v", err)
+	}
+
+	// Drive one turn so the helper records its argv (synchronizes on turn_done).
+	if err := sess.Send(t.Context(), "hello"); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	argv, err := os.ReadFile(filepath.Clean(argsOut))
+	if err != nil {
+		t.Fatalf("read argv: %v", err)
+	}
+	if strings.Contains(string(argv), "--allow-exec") {
+		t.Errorf("uncontained session must NOT enable run_command; argv=%q", argv)
+	}
+	if !strings.Contains(string(argv), "--scratch-dir") {
+		t.Errorf("argv missing --scratch-dir: %q", argv)
+	}
+
+	sess.Close()
+	if _, err := os.Stat(scratch); !os.IsNotExist(err) {
+		t.Fatalf("scratch dir not wiped on Close: err=%v", err)
 	}
 }
 

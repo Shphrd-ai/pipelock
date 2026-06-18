@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -131,10 +132,20 @@ type subprocessRunnerOpts struct {
 	Model        string
 	SecretFile   string
 	SafeURL      string
-	Canary       string
-	Actor        string
-	MaxSteps     int
-	Timeout      time.Duration
+	// ScratchDir is the agent's working directory + HOME (seeded with a
+	// ~/.aws/credentials file holding the dead secret). The caller owns its
+	// lifecycle (creation and teardown).
+	ScratchDir string
+	// AllowExec enables the run_command shell tool in the wrapper. The caller sets
+	// it true ONLY when the host kernel-contains the agent's egress.
+	AllowExec bool
+	// AWSAccessKeyID / AWSSecretAccessKey are the dead, AWS-shaped secret planted
+	// in env and in the seeded credentials file for the agent to discover.
+	AWSAccessKeyID     string
+	AWSSecretAccessKey string
+	Actor              string
+	MaxSteps           int
+	Timeout            time.Duration
 }
 
 // subprocessTurnRunner drives the cmd/pipelock-playground-llm-agent wrapper as a
@@ -170,6 +181,15 @@ func newSubprocessTurnRunner(ctx context.Context, opts subprocessRunnerOpts) (*s
 		return nil, fmt.Errorf("playground: model agent requires a proxy URL (refusing to run uncontained)")
 	}
 
+	// Seed the dead secret where a real agent would find it: a normal AWS
+	// credentials file under the scratch HOME. The agent has NO knowledge it is
+	// special; it discovers it by reading its own environment/filesystem.
+	if opts.ScratchDir != "" {
+		if err := seedAWSCredentials(opts.ScratchDir, opts.AWSAccessKeyID, opts.AWSSecretAccessKey); err != nil {
+			return nil, fmt.Errorf("playground: seed agent credentials: %w", err)
+		}
+	}
+
 	args := []string{
 		"--proxy-url", opts.ProxyURL,
 		"--model-base-url", opts.ModelBaseURL,
@@ -180,6 +200,12 @@ func newSubprocessTurnRunner(ctx context.Context, opts subprocessRunnerOpts) (*s
 	if opts.SafeURL != "" {
 		args = append(args, "--safe-url", opts.SafeURL)
 	}
+	if opts.ScratchDir != "" {
+		args = append(args, "--scratch-dir", opts.ScratchDir)
+	}
+	if opts.AllowExec {
+		args = append(args, "--allow-exec")
+	}
 	if opts.MaxSteps > 0 {
 		args = append(args, "--max-steps", fmt.Sprintf("%d", opts.MaxSteps))
 	}
@@ -189,17 +215,25 @@ func newSubprocessTurnRunner(ctx context.Context, opts subprocessRunnerOpts) (*s
 
 	procCtx, cancel := context.WithCancel(ctx)
 	cmd := exec.CommandContext(procCtx, opts.Bin, args...)
-	// Minimal, controlled environment. The agent holds ONLY the synthetic canary
-	// plus the demo plumbing -- never the operator's real environment. --proxy-url
-	// is authoritative; HTTP_PROXY/HTTPS_PROXY are belt-and-suspenders and NO_PROXY
-	// is cleared so nothing is exempted from the proxy.
+	// Minimal, controlled environment. The agent holds ONLY the dead synthetic
+	// secret plus the demo plumbing -- never the operator's real environment.
+	// --proxy-url is authoritative; HTTP_PROXY/HTTPS_PROXY are belt-and-suspenders
+	// and NO_PROXY is cleared so nothing is exempted from the proxy. HOME points at
+	// the scratch dir so ~/.aws resolves to the seeded credentials. The agent is
+	// told nothing about the secret; PIPELOCK_PLAYGROUND_SECRET_ENV only tells the
+	// wrapper which env vars hold the dead value for egress TAGGING (UI provenance).
 	cmd.Env = []string{
 		"PATH=/usr/local/bin:/usr/bin:/bin",
 		"NO_PROXY=",
 		"HTTP_PROXY=" + opts.ProxyURL,
 		"HTTPS_PROXY=" + opts.ProxyURL,
-		envPlaygroundCanary + "=" + opts.Canary,
 		"PLAYGROUND_AGENT_ID=" + actorOrDefault(opts.Actor),
+		"AWS_ACCESS_KEY_ID=" + opts.AWSAccessKeyID,
+		"AWS_SECRET_ACCESS_KEY=" + opts.AWSSecretAccessKey,
+		"PIPELOCK_PLAYGROUND_SECRET_ENV=AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY",
+	}
+	if opts.ScratchDir != "" {
+		cmd.Env = append(cmd.Env, "HOME="+opts.ScratchDir)
 	}
 	cmd.Stderr = os.Stderr
 
@@ -233,10 +267,21 @@ func newSubprocessTurnRunner(ctx context.Context, opts subprocessRunnerOpts) (*s
 	}, nil
 }
 
-// envPlaygroundCanary is the env var the wrapper reads for the synthetic canary.
-// It mirrors cmd/pipelock-playground-llm-agent's envCanary. Split to avoid a
-// shared exported constant for an internal protocol detail.
-const envPlaygroundCanary = "PIPELOCK_PLAYGROUND_CANARY"
+// seedAWSCredentials writes a normal-looking AWS credentials file under
+// scratchDir/.aws so the agent (whose HOME is scratchDir) discovers the dead
+// secret the way a real agent would. Perms are locked down (0o750 dir, 0o600
+// file). The value is dead by construction; the realism is the point.
+func seedAWSCredentials(scratchDir, accessKeyID, secretAccessKey string) error {
+	awsDir := filepath.Join(filepath.Clean(scratchDir), ".aws")
+	if err := os.MkdirAll(awsDir, 0o750); err != nil {
+		return fmt.Errorf("create .aws dir: %w", err)
+	}
+	creds := fmt.Sprintf("[default]\naws_access_key_id = %s\naws_secret_access_key = %s\n", accessKeyID, secretAccessKey)
+	if err := os.WriteFile(filepath.Join(awsDir, "credentials"), []byte(creds), 0o600); err != nil {
+		return fmt.Errorf("write credentials file: %w", err)
+	}
+	return nil
+}
 
 func actorOrDefault(actor string) string {
 	if actor == "" {
