@@ -45,6 +45,14 @@ type ServerConfig struct {
 	CodeRate RateConfig
 	// MaxConcurrent caps simultaneous live sessions (global). Never unlimited.
 	MaxConcurrent int
+	// DailyTurnBudget is the hard global ceiling on total visitor turns (model
+	// calls) per UTC day -- the spend kill switch. 0 = unlimited (dev/local only;
+	// public exposure MUST set a positive value). When the day's budget is spent,
+	// further messages are refused until the next UTC day.
+	DailyTurnBudget int
+	// MaxMessagesPerSession caps how many messages one session may send (each is a
+	// real model call). 0 = the conservative default applied in NewServer.
+	MaxMessagesPerSession int
 	// RequireContainment is passed to each session. Public exposure MUST be true.
 	RequireContainment bool
 	// Containment proves kernel containment per session. Required (non-nil) when
@@ -77,19 +85,58 @@ type liveEntry struct {
 
 	streamMu sync.Mutex
 	streamOn bool
+
+	msgMu    sync.Mutex
+	msgCount int
+}
+
+// tryMessage atomically admits one message against the per-session cap. cap <= 0
+// means unlimited. It returns false (without counting) once the session has used
+// its budget, so the check has no TOCTOU under concurrent messages.
+func (e *liveEntry) tryMessage(limit int) bool {
+	if limit <= 0 {
+		return true
+	}
+	e.msgMu.Lock()
+	defer e.msgMu.Unlock()
+	if e.msgCount >= limit {
+		return false
+	}
+	e.msgCount++
+	return true
+}
+
+// refundMessage returns one reserved message slot. It is intentionally narrow:
+// only call it when no turn could have started.
+func (e *liveEntry) refundMessage(limit int) {
+	if limit <= 0 {
+		return
+	}
+	e.msgMu.Lock()
+	defer e.msgMu.Unlock()
+	if e.msgCount > 0 {
+		e.msgCount--
+	}
 }
 
 // Server is the live-chat HTTP/SSE front door.
 type Server struct {
-	cfg      ServerConfig
-	limits   Limits
-	ipRate   *RateLimiter
-	codeRate *RateLimiter
-	conc     *ConcurrencyLimiter
+	cfg              ServerConfig
+	limits           Limits
+	ipRate           *RateLimiter
+	codeRate         *RateLimiter
+	conc             *ConcurrencyLimiter
+	budget           *DailyBudget
+	maxMsgPerSession int
 
 	mu       sync.Mutex
 	sessions map[string]*liveEntry
 }
+
+// defaultMaxMessagesPerSession bounds one session's model calls when the operator
+// does not set MaxMessagesPerSession. Matches the playground cost plan's 40-message
+// session cap.
+const defaultMaxMessagesPerSession = 40
 
 // NewServer builds the server. It returns an error (fail-closed at startup) when
 // the gate is missing, or containment is required but no verifier is supplied.
@@ -100,13 +147,25 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	if cfg.RequireContainment && cfg.Containment == nil {
 		return nil, errors.New("livechat: RequireContainment set but no ContainmentVerifier supplied")
 	}
+	if cfg.DailyTurnBudget < 0 {
+		return nil, errors.New("livechat: DailyTurnBudget must be >= 0")
+	}
+	if cfg.MaxMessagesPerSession < 0 {
+		return nil, errors.New("livechat: MaxMessagesPerSession must be >= 0")
+	}
+	maxMsg := cfg.MaxMessagesPerSession
+	if maxMsg == 0 {
+		maxMsg = defaultMaxMessagesPerSession
+	}
 	return &Server{
-		cfg:      cfg,
-		limits:   cfg.Limits.Clamp(),
-		ipRate:   NewRateLimiter(cfg.IPRate),
-		codeRate: NewRateLimiter(cfg.CodeRate),
-		conc:     NewConcurrencyLimiter(cfg.MaxConcurrent),
-		sessions: make(map[string]*liveEntry),
+		cfg:              cfg,
+		limits:           cfg.Limits.Clamp(),
+		ipRate:           NewRateLimiter(cfg.IPRate),
+		codeRate:         NewRateLimiter(cfg.CodeRate),
+		conc:             NewConcurrencyLimiter(cfg.MaxConcurrent),
+		budget:           NewDailyBudget(cfg.DailyTurnBudget),
+		maxMsgPerSession: maxMsg,
+		sessions:         make(map[string]*liveEntry),
 	}, nil
 }
 
@@ -120,12 +179,22 @@ func (s *Server) Handler() http.Handler {
 	return mux
 }
 
-func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	s.setCORS(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodGet {
+		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":        s.cfg.Gate.Open(),
-		"in_use":    s.conc.InUse(),
-		"capacity":  s.conc.Cap(),
-		"contained": s.cfg.RequireContainment,
+		"ok":               s.cfg.Gate.Open() && s.budget.Open(),
+		"in_use":           s.conc.InUse(),
+		"capacity":         s.conc.Cap(),
+		"contained":        s.cfg.RequireContainment,
+		"budget_remaining": s.budget.Remaining(),
 	})
 }
 
@@ -163,6 +232,10 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Code == "" {
 		writeErr(w, http.StatusUnauthorized, "invite code required")
+		return
+	}
+	if !s.budget.Open() {
+		writeErr(w, http.StatusServiceUnavailable, "daily limit reached, the demo is paused until tomorrow")
 		return
 	}
 
@@ -360,7 +433,22 @@ func (s *Server) handleMessage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "session not found")
 		return
 	}
+	// Per-session message cap: each message is a real model call.
+	if !entry.tryMessage(s.maxMsgPerSession) {
+		writeErr(w, http.StatusTooManyRequests, "session message limit reached")
+		return
+	}
+	// Global daily spend kill switch: hard ceiling on total turns per UTC day.
+	if !s.budget.Charge() {
+		entry.refundMessage(s.maxMsgPerSession)
+		writeErr(w, http.StatusServiceUnavailable, "daily limit reached, the demo is paused until tomorrow")
+		return
+	}
 	if err := entry.sess.Send(r.Context(), body.Message); err != nil {
+		if errors.Is(err, playground.ErrSessionClosed) {
+			entry.refundMessage(s.maxMsgPerSession)
+			s.budget.Refund()
+		}
 		writeErr(w, http.StatusInternalServerError, "send failed")
 		return
 	}

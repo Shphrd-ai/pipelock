@@ -54,32 +54,34 @@ func newRootCmd() *cobra.Command {
 }
 
 type serveFlags struct {
-	listen             string
-	codes              []string
-	maxPerCode         int
-	concurrency        int
-	requireContainment bool
-	dev                bool
-	orchestratorKey    string
-	toyAgentBin        string
-	webToolBin         string
-	sessionTTL         time.Duration
-	maxInputBytes      int
-	ipRate             float64
-	ipBurst            float64
-	codeRate           float64
-	codeBurst          float64
-	allowOrigin        string
-	trustForwardedFor  bool
-	secretB64          string
-	secretFile         string
-	staticDir          string
-	llmAgentBin        string
-	modelBaseURL       string
-	model              string
-	modelSecretFile    string
-	modelMaxSteps      int
-	modelTimeout       time.Duration
+	listen                string
+	codes                 []string
+	maxPerCode            int
+	concurrency           int
+	requireContainment    bool
+	dev                   bool
+	orchestratorKey       string
+	toyAgentBin           string
+	webToolBin            string
+	sessionTTL            time.Duration
+	maxInputBytes         int
+	ipRate                float64
+	ipBurst               float64
+	codeRate              float64
+	codeBurst             float64
+	allowOrigin           string
+	trustForwardedFor     bool
+	secretB64             string
+	secretFile            string
+	staticDir             string
+	llmAgentBin           string
+	modelBaseURL          string
+	model                 string
+	modelSecretFile       string
+	modelMaxSteps         int
+	modelTimeout          time.Duration
+	dailyTurnBudget       int
+	maxMessagesPerSession int
 }
 
 // defaultMaxPerCode is the safe default lifetime session budget per invite code.
@@ -123,6 +125,8 @@ func newServeCmd() *cobra.Command {
 	fl.StringVar(&f.modelSecretFile, "model-secret-file", "", "path to a file holding the model API key (kept out of argv); required to enable the model-backed agent")
 	fl.IntVar(&f.modelMaxSteps, "model-max-steps", 0, "max model/tool steps per turn (0 = default)")
 	fl.DurationVar(&f.modelTimeout, "model-timeout", 0, "per model/tool request timeout (0 = default)")
+	fl.IntVar(&f.dailyTurnBudget, "daily-turn-budget", 0, "hard global ceiling on total visitor turns (model calls) per UTC day, the spend kill switch (0 = unlimited; set a positive value for public exposure)")
+	fl.IntVar(&f.maxMessagesPerSession, "max-messages-per-session", 0, "max messages one session may send (0 = default of 40)")
 	return cmd
 }
 
@@ -137,6 +141,9 @@ func runServe(cmd *cobra.Command, f *serveFlags) error {
 		Addr:              f.listen,
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    16 << 10,
 	}
 	return httpSrv.ListenAndServe()
 }
@@ -181,21 +188,26 @@ func buildServer(out io.Writer, f *serveFlags) (*livechat.Server, http.Handler, 
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := validateServeSafety(f, llmAgent != nil); err != nil {
+		return nil, nil, err
+	}
 
 	srv, err := livechat.NewServer(livechat.ServerConfig{
-		Gate:                gate,
-		Limits:              livechat.Limits{MaxInputBytes: f.maxInputBytes, SessionTTL: f.sessionTTL},
-		IPRate:              livechat.RateConfig{RefillPerSec: f.ipRate, Burst: f.ipBurst},
-		CodeRate:            livechat.RateConfig{RefillPerSec: f.codeRate, Burst: f.codeBurst},
-		MaxConcurrent:       f.concurrency,
-		RequireContainment:  requireContainment,
-		Containment:         verifier,
-		OrchestratorKeyPath: f.orchestratorKey,
-		ToyAgentBin:         f.toyAgentBin,
-		WebToolBin:          f.webToolBin,
-		TrustForwardedFor:   f.trustForwardedFor,
-		AllowOrigin:         f.allowOrigin,
-		LLMAgent:            llmAgent,
+		Gate:                  gate,
+		Limits:                livechat.Limits{MaxInputBytes: f.maxInputBytes, SessionTTL: f.sessionTTL},
+		IPRate:                livechat.RateConfig{RefillPerSec: f.ipRate, Burst: f.ipBurst},
+		CodeRate:              livechat.RateConfig{RefillPerSec: f.codeRate, Burst: f.codeBurst},
+		MaxConcurrent:         f.concurrency,
+		RequireContainment:    requireContainment,
+		Containment:           verifier,
+		OrchestratorKeyPath:   f.orchestratorKey,
+		ToyAgentBin:           f.toyAgentBin,
+		WebToolBin:            f.webToolBin,
+		TrustForwardedFor:     f.trustForwardedFor,
+		AllowOrigin:           f.allowOrigin,
+		LLMAgent:              llmAgent,
+		DailyTurnBudget:       f.dailyTurnBudget,
+		MaxMessagesPerSession: f.maxMessagesPerSession,
 	})
 	if err != nil {
 		return nil, nil, err
@@ -222,6 +234,25 @@ func buildServer(out io.Writer, f *serveFlags) (*livechat.Server, http.Handler, 
 		_, _ = fmt.Fprintf(out, "serving viewer from %s at /\n", f.staticDir)
 	}
 	return srv, handler, nil
+}
+
+func validateServeSafety(f *serveFlags, modelBacked bool) error {
+	if f.maxPerCode < 0 {
+		return errors.New("--max-per-code must be >= 0")
+	}
+	if f.dailyTurnBudget < 0 {
+		return errors.New("--daily-turn-budget must be >= 0")
+	}
+	if f.maxMessagesPerSession < 0 {
+		return errors.New("--max-messages-per-session must be >= 0")
+	}
+	if !f.dev && !f.requireContainment {
+		return errors.New("non-dev serve requires containment; use --dev for local uncontained testing")
+	}
+	if modelBacked && !f.dev && f.dailyTurnBudget <= 0 {
+		return errors.New("model-backed public serve requires --daily-turn-budget > 0 (or --dev for local testing)")
+	}
+	return nil
 }
 
 // buildLLMAgentConfig assembles the model-backed agent config from the model
@@ -291,6 +322,9 @@ func resolveSecret(b64, file string) ([]byte, error) {
 func resolveCodes(out interface{ Write([]byte) (int, error) }, f *serveFlags) ([]livechat.CodeSpec, error) {
 	specs := make([]livechat.CodeSpec, 0, len(f.codes))
 	for _, c := range f.codes {
+		if strings.TrimSpace(c) == "" {
+			return nil, errors.New("invite code cannot be empty or whitespace")
+		}
 		specs = append(specs, livechat.CodeSpec{Code: c, MaxSessions: f.maxPerCode})
 	}
 	if len(specs) == 0 {
