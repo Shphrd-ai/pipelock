@@ -143,9 +143,16 @@ type subprocessRunnerOpts struct {
 	// in env and in the seeded credentials file for the agent to discover.
 	AWSAccessKeyID     string
 	AWSSecretAccessKey string
-	Actor              string
-	MaxSteps           int
-	Timeout            time.Duration
+	// Contained launches the agent subprocess as AgentUser (the kernel-owner-match
+	// user) and chowns the scratch tree to it, so the agent's direct egress --
+	// including run_command children -- is dropped by the host owner-match rules.
+	// It requires root; when set without root the runner fails closed rather than
+	// launching an uncontained agent. AllowExec must only be true when Contained is.
+	Contained bool
+	AgentUser string
+	Actor     string
+	MaxSteps  int
+	Timeout   time.Duration
 }
 
 // subprocessTurnRunner drives the cmd/pipelock-playground-llm-agent wrapper as a
@@ -236,6 +243,17 @@ func newSubprocessTurnRunner(ctx context.Context, opts subprocessRunnerOpts) (*s
 		cmd.Env = append(cmd.Env, "HOME="+opts.ScratchDir)
 	}
 	cmd.Stderr = os.Stderr
+
+	// Contained launch: run the subprocess as the owner-match agent user and hand
+	// it the scratch tree, BEFORE Start (SysProcAttr must be set first). Fail
+	// closed: if containment cannot be established (not root, unknown user), do
+	// NOT fall back to an uncontained launch in a session that claims containment.
+	if opts.Contained {
+		if err := applyAgentContainment(cmd, opts.ScratchDir, opts.AgentUser); err != nil {
+			cancel()
+			return nil, fmt.Errorf("playground: contain model agent: %w", err)
+		}
+	}
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

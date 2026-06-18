@@ -296,7 +296,12 @@ func StartLiveSession(ctx context.Context, cfg LiveSessionConfig) (*LiveSession,
 			// run_command (arbitrary shell) is handed out ONLY when the host
 			// kernel-contains the agent's egress. In an uncontained dev session a
 			// shell would have real unmediated egress, so it stays off (fail-closed).
-			AllowExec:          s.contained,
+			AllowExec: s.contained,
+			// Contained launches the subprocess as the owner-match agent user so the
+			// shell's egress is actually dropped by the kernel; without it the
+			// AllowExec shell would run as the operator and bypass the owner-match.
+			Contained:          s.contained,
+			AgentUser:          lr.opts.AgentUser,
 			AWSAccessKeyID:     lr.canaryValue,
 			AWSSecretAccessKey: secretKey,
 			Actor:              liveRunActor,
