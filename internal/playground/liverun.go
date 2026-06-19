@@ -51,6 +51,17 @@ const (
 // canaryEnvVar is the env var the toy agent/webtool reads.
 const canaryEnvVar = "PLAYGROUND_CANARY_VALUE"
 
+// DefaultContainedProxyPort is the fixed loopback port a contained run should
+// bind the in-process proxy to. It mirrors the `pipelock contain install
+// --proxy-port` default (internal/cli/contain), so the stock owner-match rule
+// (allow agent uid -> 127.0.0.1:8888, drop everything else) lets the contained
+// agent reach exactly this proxy and nothing else on loopback. It is the
+// command layer's default for contained serves; the library never auto-applies
+// it (ProxyPort 0 is always ephemeral). Keep in sync with that contain default;
+// an operator who changes one must change both, and the HostContainmentWitness
+// fails closed if they diverge.
+const DefaultContainedProxyPort = 8888
+
 // LiveRunOpts configures a live playground run.
 type LiveRunOpts struct {
 	// Contained selects kernel-containment mode (requires sudo). When true, the
@@ -68,6 +79,16 @@ type LiveRunOpts struct {
 	// AgentUser is the OS user used for contained-mode toy-agent execution.
 	// Empty means pipelock-agent.
 	AgentUser string
+	// ProxyPort is the FIXED loopback port the in-process proxy binds. It must
+	// match the single port the kernel owner-match rule allows the contained agent
+	// uid to reach (`pipelock contain install --proxy-port`, default 8888) -- a
+	// random ephemeral port can never align with that single-port rule. 0 selects
+	// an ephemeral port (dev/test/uncontained only); the library does NOT
+	// substitute a default for 0, so a contained run passes the fixed port
+	// explicitly (the command layer defaults it to DefaultContainedProxyPort). The
+	// bound port is signed into the HostContainmentWitness and the contained agent
+	// must reach EXACTLY it, so a port that does not match the nft rule fails closed.
+	ProxyPort int
 	// OrchestratorKeyPath, when non-empty, loads the run's orchestrator
 	// (trust-root) signing key from disk instead of generating an ephemeral one.
 	OrchestratorKeyPath string
@@ -132,6 +153,21 @@ type LiveRun struct {
 	canaryValue string
 
 	egressProbe func(targets []string, asAgent bool) ([]ProbeResult, error)
+}
+
+// proxyBindAddrFor returns the loopback bind address for the in-process proxy.
+// A non-zero port binds that exact fixed port (production contained runs pass
+// the port matching their kernel owner-match rule). Port 0 binds an ephemeral
+// port (dev/test/uncontained, where no owner-match rule constrains the agent).
+// The library never substitutes a default for 0: a contained run that wants the
+// stock port passes it explicitly, and the HostContainmentWitness fails closed
+// if the bound port does not match the nft rule the agent is restricted to.
+// Out-of-range ports fail.
+func proxyBindAddrFor(port int) (string, error) {
+	if port < 0 || port > 65535 {
+		return "", fmt.Errorf("proxy port %d out of range (0-65535)", port)
+	}
+	return fmt.Sprintf("127.0.0.1:%d", port), nil
 }
 
 // StartLiveRun boots a complete live demo environment: lab targets, a real
@@ -315,10 +351,19 @@ func StartLiveRun(ctx context.Context, opts LiveRunOpts) (*LiveRun, error) {
 		return nil, fmt.Errorf("proxy: %w", err)
 	}
 
-	// Start proxy listening on loopback :0
-	lr.proxyLn, err = (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:0")
+	// Start the in-process proxy on a FIXED loopback port so it aligns with the
+	// single-port kernel owner-match rule the contained agent is restricted to
+	// (C1). A contained run with no explicit port uses the stock containment
+	// default; an ephemeral port (0) is for dev/test/uncontained only, where no
+	// owner-match rule constrains the agent. The bound port is signed into the
+	// host-containment witness and the contained agent must reach exactly it.
+	proxyBindAddr, err := proxyBindAddrFor(opts.ProxyPort)
 	if err != nil {
-		return nil, fmt.Errorf("proxy listen: %w", err)
+		return nil, err
+	}
+	lr.proxyLn, err = (&net.ListenConfig{}).Listen(ctx, "tcp", proxyBindAddr)
+	if err != nil {
+		return nil, fmt.Errorf("proxy listen on %s: %w", proxyBindAddr, err)
 	}
 	lr.proxySrv = &http.Server{
 		Handler:           lr.proxyObj.Handler(),
@@ -496,9 +541,19 @@ func (lr *LiveRun) buildHostContainmentWitness() (HostContainmentWitness, error)
 		return HostContainmentWitness{}, fmt.Errorf("operator control probe: %w", err)
 	}
 
-	// Contained-agent probes: control target first, then the real suite.
+	if lr.proxyLn == nil {
+		return HostContainmentWitness{}, fmt.Errorf("proxy listener not initialized")
+	}
+	proxyTarget := lr.proxyLn.Addr().String()
+
+	// Contained-agent probes, in order: the proxy port (its ONE permitted egress,
+	// must be reachable -> Open), the control target (a DIFFERENT loopback port,
+	// must be blocked -> the non-proxy-loopback negative), then the real
+	// direct-egress suite (all must be blocked). Probing the proxy as the agent is
+	// what catches an operator port mismatch: a proxy bound to a port the nft rule
+	// does not allow comes back Blocked and the witness fails closed.
 	realTargets := DirectEgressTargets()
-	agentTargets := append([]string{ctrlTarget}, realTargets...)
+	agentTargets := append([]string{proxyTarget, ctrlTarget}, realTargets...)
 	agProbes, err := runProbe(agentTargets, true)
 	if err != nil {
 		return HostContainmentWitness{}, fmt.Errorf("contained agent probe: %w", err)
@@ -511,8 +566,10 @@ func (lr *LiveRun) buildHostContainmentWitness() (HostContainmentWitness, error)
 		AgentUID:             containedAgentUID(lr.opts.AgentUser),
 		ControlTarget:        ctrlTarget,
 		ControlOperatorProbe: opProbes[0],
-		ControlAgentProbe:    agProbes[0],
-		AgentProbes:          agProbes[1:],
+		ControlAgentProbe:    agProbes[1],
+		ProxyTarget:          proxyTarget,
+		ProxyAgentProbe:      agProbes[0],
+		AgentProbes:          agProbes[2:],
 		ProbedAt:             time.Now().UTC(),
 	}
 	return SignHostContainmentWitness(lr.orchestratorPriv, w), nil

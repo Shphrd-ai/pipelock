@@ -126,6 +126,12 @@ type LiveSessionConfig struct {
 	// Containment proves kernel containment. Required (non-nil) when
 	// RequireContainment is true; ignored otherwise.
 	Containment ContainmentVerifier
+	// ProxyPort is the fixed loopback port the in-process proxy binds, which must
+	// match the single port the kernel owner-match rule allows the contained agent
+	// to reach. 0 selects ephemeral (dev/test). Production contained callers
+	// should pass DefaultContainedProxyPort or the custom contain-install port.
+	// See LiveRunOpts.ProxyPort.
+	ProxyPort int
 	// OrchestratorKeyPath loads the published demo signing key (so the run is
 	// verifiable against the published key). Empty => ephemeral per-run key.
 	OrchestratorKeyPath string
@@ -238,6 +244,7 @@ func StartLiveSession(ctx context.Context, cfg LiveSessionConfig) (*LiveSession,
 		OrchestratorKeyPath: cfg.OrchestratorKeyPath,
 		ToyAgentBin:         cfg.ToyAgentBin,
 		WebToolBin:          cfg.WebToolBin,
+		ProxyPort:           cfg.ProxyPort,
 		OnReceipt:           s.onReceipt,
 	}
 	if cfg.LLMAgent != nil {

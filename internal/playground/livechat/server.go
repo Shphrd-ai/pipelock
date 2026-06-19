@@ -64,6 +64,14 @@ type ServerConfig struct {
 	OrchestratorKeyPath string
 	ToyAgentBin         string
 	WebToolBin          string
+	// ProxyPort is the fixed loopback port each session's in-process proxy binds.
+	// It must match the single port the kernel owner-match rule allows the
+	// contained agent uid to reach (`pipelock contain install --proxy-port`). 0 =
+	// ephemeral (dev/test); the command layer defaults contained serves to the
+	// stock port before constructing ServerConfig.
+	// With MaxConcurrent > 1 a single fixed port collides, so public contained
+	// exposure pins MaxConcurrent: 1 (or a future reserved port range).
+	ProxyPort int
 	// LLMAgent, when non-nil, drives every session with the model-backed agent
 	// subprocess instead of the deterministic IntentAgent. The same config is
 	// reused for each session (static model/binary/secret settings).
@@ -309,6 +317,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		OrchestratorKeyPath: s.cfg.OrchestratorKeyPath,
 		ToyAgentBin:         s.cfg.ToyAgentBin,
 		WebToolBin:          s.cfg.WebToolBin,
+		ProxyPort:           s.cfg.ProxyPort,
 		LLMAgent:            s.cfg.LLMAgent,
 	})
 	if err != nil {

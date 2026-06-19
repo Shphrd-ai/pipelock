@@ -229,6 +229,13 @@ func TestBuildHostContainmentWitnessSignsProbeEvidence(t *testing.T) {
 		},
 	}
 
+	proxyLn, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("proxy listener: %v", err)
+	}
+	defer func() { _ = proxyLn.Close() }()
+	lr.proxyLn = proxyLn
+
 	var controlTarget string
 	lr.egressProbe = func(targets []string, asAgent bool) ([]ProbeResult, error) {
 		if len(targets) == 0 {
@@ -241,11 +248,17 @@ func TestBuildHostContainmentWitnessSignsProbeEvidence(t *testing.T) {
 			controlTarget = targets[0]
 			return []ProbeResult{{Target: targets[0], Open: true, Blocked: false, Detail: "connected"}}, nil
 		}
-		if targets[0] != controlTarget {
-			return nil, fmt.Errorf("agent control target = %q, want %q", targets[0], controlTarget)
+		// Agent targets are [proxy, control, direct...]: the proxy is the one
+		// permitted egress (Open), everything else is blocked.
+		if len(targets) < 2 {
+			return nil, fmt.Errorf("agent target count = %d", len(targets))
+		}
+		if targets[1] != controlTarget {
+			return nil, fmt.Errorf("agent control target = %q, want %q", targets[1], controlTarget)
 		}
 		results := make([]ProbeResult, 0, len(targets))
-		for _, target := range targets {
+		results = append(results, ProbeResult{Target: targets[0], Open: true, Blocked: false, Detail: "connected"})
+		for _, target := range targets[1:] {
 			results = append(results, ProbeResult{Target: target, Open: false, Blocked: true, Detail: "blocked"})
 		}
 		return results, nil
@@ -291,6 +304,32 @@ func TestBuildHostContainmentWitnessFailsClosedOnProbeError(t *testing.T) {
 	_, err = lr.buildHostContainmentWitness()
 	if err == nil || !strings.Contains(err.Error(), "operator control probe") {
 		t.Fatalf("buildHostContainmentWitness error = %v, want operator probe failure", err)
+	}
+}
+
+func TestBuildHostContainmentWitnessFailsClosedOnNilProxyListener(t *testing.T) {
+	t.Parallel()
+
+	_, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	lr := &LiveRun{
+		ctx:              t.Context(),
+		orchestratorPriv: priv,
+		opts:             LiveRunOpts{RunNonce: "N1"},
+		// proxyLn deliberately nil: a contained witness build cannot record the
+		// agent's permitted-egress port and must fail closed, never sign a witness
+		// that omits the proxy contract.
+	}
+	lr.egressProbe = func(targets []string, asAgent bool) ([]ProbeResult, error) {
+		// Operator control probe succeeds; the nil proxy listener must then fail.
+		return []ProbeResult{{Target: targets[0], Open: true, Blocked: false, Detail: "connected"}}, nil
+	}
+
+	_, err = lr.buildHostContainmentWitness()
+	if err == nil || !strings.Contains(err.Error(), "proxy listener not initialized") {
+		t.Fatalf("buildHostContainmentWitness error = %v, want proxy listener not initialized", err)
 	}
 }
 

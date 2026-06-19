@@ -65,6 +65,7 @@ type serveFlags struct {
 	orchestratorKey       string
 	toyAgentBin           string
 	webToolBin            string
+	proxyPort             int
 	sessionTTL            time.Duration
 	maxInputBytes         int
 	ipRate                float64
@@ -110,6 +111,7 @@ func newServeCmd() *cobra.Command {
 	fl.StringVar(&f.orchestratorKey, "orchestrator-key", "", "path to the published demo signing key (required outside --dev; empty = ephemeral per-run key in --dev)")
 	fl.StringVar(&f.toyAgentBin, "toyagent-bin", "", "toy-agent binary path (needed for the contained host-containment witness)")
 	fl.StringVar(&f.webToolBin, "webtool-bin", "", "web-tool binary path (needed for the contained host-containment witness)")
+	fl.IntVar(&f.proxyPort, "proxy-port", 0, "fixed loopback port the in-process proxy binds; must match `pipelock contain install --proxy-port` (defaults to 8888 in contained mode). 0 = ephemeral, dev/test only")
 	fl.DurationVar(&f.sessionTTL, "session-ttl", 600*time.Second, "per-session wall-clock cap")
 	fl.IntVar(&f.maxInputBytes, "max-input-bytes", 2048, "per-message input size cap")
 	fl.Float64Var(&f.ipRate, "ip-rate", 0.5, "per-IP sustained request rate (tokens/sec)")
@@ -206,6 +208,16 @@ func buildServer(out io.Writer, f *serveFlags) (*livechat.Server, http.Handler, 
 		if err := validateModelAgentRuntime(llmAgent); err != nil {
 			return nil, nil, err
 		}
+		// Contained serve binds a fixed proxy port to match the kernel owner-match
+		// rule. Default it to the stock `pipelock contain install` port; an
+		// operator who installed containment on a custom port passes --proxy-port.
+		f.proxyPort = containedProxyPort(f.proxyPort)
+		if f.concurrency != 1 {
+			// One fixed proxy port can host one contained session at a time; the
+			// second concurrent session fails its bind and returns 503. Warn rather
+			// than block (the runtime is fail-safe), and point at the fix.
+			_, _ = fmt.Fprintf(out, "warning: contained serve binds one fixed proxy port (%d); concurrent sessions past the first fail to start. Set --concurrency 1 to avoid 503s.\n", f.proxyPort)
+		}
 	}
 
 	srv, err := livechat.NewServer(livechat.ServerConfig{
@@ -219,6 +231,7 @@ func buildServer(out io.Writer, f *serveFlags) (*livechat.Server, http.Handler, 
 		OrchestratorKeyPath:   f.orchestratorKey,
 		ToyAgentBin:           f.toyAgentBin,
 		WebToolBin:            f.webToolBin,
+		ProxyPort:             f.proxyPort,
 		TrustForwardedFor:     f.trustForwardedFor,
 		AllowOrigin:           f.allowOrigin,
 		LLMAgent:              llmAgent,
@@ -252,6 +265,17 @@ func buildServer(out io.Writer, f *serveFlags) (*livechat.Server, http.Handler, 
 	return srv, handler, nil
 }
 
+// containedProxyPort resolves the proxy port for a contained serve: an unset
+// port (0) becomes the stock containment proxy port so a default contained
+// install works without --proxy-port; an explicit port is kept as-is so an
+// operator on a custom `contain install --proxy-port` can match it.
+func containedProxyPort(port int) int {
+	if port == 0 {
+		return playground.DefaultContainedProxyPort
+	}
+	return port
+}
+
 func validateServeSafety(f *serveFlags, modelBacked bool) error {
 	if f.maxPerCode < 0 {
 		return errors.New("--max-per-code must be >= 0")
@@ -264,6 +288,9 @@ func validateServeSafety(f *serveFlags, modelBacked bool) error {
 	}
 	if !f.dev && !f.requireContainment {
 		return errors.New("non-dev serve requires containment; use --dev for local uncontained testing")
+	}
+	if f.proxyPort < 0 || f.proxyPort > 65535 {
+		return errors.New("--proxy-port must be 0-65535")
 	}
 	if !f.dev && strings.TrimSpace(f.orchestratorKey) == "" {
 		return errors.New("non-dev serve requires --orchestrator-key so bundles verify against the published demo key")

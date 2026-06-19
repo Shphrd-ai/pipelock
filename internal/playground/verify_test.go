@@ -191,7 +191,10 @@ func buildRunDir(t *testing.T, contained bool) (string, string, ed25519.PrivateK
 // the control target is operator-reachable and agent-blocked (the differential),
 // and every real direct-egress probe is blocked.
 func validHostContainmentWitness(nonce, manifestHash string) playground.HostContainmentWitness {
-	const ctrl = "127.0.0.1:54321"
+	const (
+		ctrl  = "127.0.0.1:54321"
+		proxy = "127.0.0.1:8888"
+	)
 	return playground.HostContainmentWitness{
 		RunNonce:             nonce,
 		LaunchManifestHash:   manifestHash,
@@ -200,6 +203,8 @@ func validHostContainmentWitness(nonce, manifestHash string) playground.HostCont
 		ControlTarget:        ctrl,
 		ControlOperatorProbe: playground.ProbeResult{Target: ctrl, Open: true, Blocked: false, Detail: "connected"},
 		ControlAgentProbe:    playground.ProbeResult{Target: ctrl, Open: false, Blocked: true, Detail: "blocked: timeout"},
+		ProxyTarget:          proxy,
+		ProxyAgentProbe:      playground.ProbeResult{Target: proxy, Open: true, Blocked: false, Detail: "connected"},
 		AgentProbes:          blockedDirectProbes(),
 		ProbedAt:             time.Unix(1_700_000_000, 0).UTC(),
 	}

@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
+	"net/netip"
 	"time"
 )
 
@@ -50,8 +51,26 @@ type HostContainmentWitness struct {
 	// ControlAgentProbe is the contained agent's probe of the SAME ControlTarget.
 	// It MUST be explicitly blocked (Open=false, Blocked=true). Together with
 	// ControlOperatorProbe being Open, this is the differential that isolates
-	// the kernel owner-match drop.
+	// the kernel owner-match drop. Because ControlTarget is a NON-proxy loopback
+	// port, this blocked probe is also the negative proof that the contained
+	// agent cannot reach arbitrary loopback services -- only the proxy.
 	ControlAgentProbe ProbeResult `json:"control_agent_probe"`
+
+	// ProxyTarget is the contained agent's SOLE permitted egress: the playground
+	// in-process proxy on a fixed reserved loopback port. The kernel owner-match
+	// rule allows the agent uid to reach EXACTLY this host:port and nothing else.
+	// It is recorded and signed so the bundle attests the precise port contract,
+	// closing the gap where a random proxy port could not align with the
+	// single-port owner-match allow rule.
+	ProxyTarget string `json:"proxy_target"`
+	// ProxyAgentProbe is the contained agent's probe of ProxyTarget. It MUST be
+	// Open: the agent CAN reach its one allowed egress. Paired with
+	// ControlAgentProbe (a DIFFERENT loopback port) being Blocked, this proves the
+	// agent reaches exactly the proxy and nothing else on loopback. It also
+	// catches an operator port mismatch -- the playground proxy bound to a port
+	// the nft rule does not allow leaves this probe Blocked, which fails the run
+	// closed instead of silently breaking the demo.
+	ProxyAgentProbe ProbeResult `json:"proxy_agent_probe"`
 
 	// AgentProbes are the contained agent's probes of the real direct-egress
 	// target suite (cloud metadata, RFC-1918, public DNS, public HTTPS). Every
@@ -116,22 +135,52 @@ func (w HostContainmentWitness) AllAgentBlocked() bool {
 // agent. This is what makes the block attributable to containment rather than to
 // an unroutable or down target.
 func (w HostContainmentWitness) DifferentialProven() bool {
-	if w.ControlTarget == "" {
+	if !isIPv4LoopbackHostPort(w.ControlTarget) {
 		return false
 	}
 	if w.ControlOperatorProbe.Target != w.ControlTarget || w.ControlAgentProbe.Target != w.ControlTarget {
 		return false
 	}
-	return w.ControlOperatorProbe.Open && !w.ControlAgentProbe.Open && w.ControlAgentProbe.Blocked
+	return w.ControlOperatorProbe.Open && !w.ControlOperatorProbe.Blocked &&
+		!w.ControlAgentProbe.Open && w.ControlAgentProbe.Blocked
+}
+
+// ProxyContractProven reports whether the contained agent's SOLE permitted
+// egress is the playground proxy and nothing else on loopback: ProxyTarget is
+// set, distinct from the (blocked) ControlTarget, and the agent's own probe of
+// it is Open. Paired with DifferentialProven (the same-uid differential that
+// isolates the kernel owner-match) and ControlAgentProbe being blocked, this is
+// the port contract: the agent reaches exactly the proxy port, a different
+// loopback port it does not. It also fails closed on an operator port mismatch
+// (playground proxy bound to a port the nft rule does not allow) -- that leaves
+// ProxyAgentProbe blocked, so this returns false and the run does not verify.
+func (w HostContainmentWitness) ProxyContractProven() bool {
+	if !isIPv4LoopbackHostPort(w.ProxyTarget) || w.ProxyTarget == w.ControlTarget {
+		return false
+	}
+	return w.ProxyAgentProbe.Target == w.ProxyTarget && w.ProxyAgentProbe.Open && !w.ProxyAgentProbe.Blocked
+}
+
+func isIPv4LoopbackHostPort(target string) bool {
+	addrPort, err := netip.ParseAddrPort(target)
+	if err != nil {
+		return false
+	}
+	if !addrPort.Addr().Is4() || !addrPort.Addr().IsLoopback() {
+		return false
+	}
+	return addrPort.Port() != 0
 }
 
 // Enforced is the fail-closed gate: containment is proven for this run ONLY when
-// the differential holds, the exact direct-egress suite was probed, and every
-// contained-agent probe was explicitly blocked. Any open, refused, or ambiguous
-// agent route, a missing or substituted target, a missing/unreachable control
-// target, or an empty probe suite fails closed.
+// the differential holds, the agent reaches exactly its proxy port (and a
+// different loopback port is blocked), the exact direct-egress suite was probed,
+// and every contained-agent probe was explicitly blocked. Any open, refused, or
+// ambiguous agent route, a missing or substituted target, a missing/unreachable
+// control target, a proxy the agent cannot reach (or a proxy/control collision),
+// or an empty probe suite fails closed.
 func (w HostContainmentWitness) Enforced() bool {
-	return w.DifferentialProven() && w.DirectSuiteProven() && w.AllAgentBlocked()
+	return w.DifferentialProven() && w.ProxyContractProven() && w.DirectSuiteProven() && w.AllAgentBlocked()
 }
 
 // SignHostContainmentWitness signs w with the orchestrator private key over its
