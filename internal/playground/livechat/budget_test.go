@@ -245,9 +245,9 @@ func TestLiveEntry_TryMessage(t *testing.T) {
 
 // --- HTTP integration: the caps refuse over budget without driving a turn ---
 
-func createLiveSession(t *testing.T, ts string, code string) string {
+func createLiveSession(t *testing.T, ts string) string {
 	t.Helper()
-	resp := postJSON(t, ts+RouteSession, createReq{Code: code})
+	resp := postJSON(t, ts+RouteSession, createReq{Code: "good"})
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("session create status = %d, want 200", resp.StatusCode)
@@ -271,7 +271,7 @@ func TestServer_DailyTurnBudget_KillSwitch(t *testing.T) {
 		t.Skip("boots a real proxy per session")
 	}
 	ts := newTestServer(t, ServerConfig{DailyTurnBudget: 1})
-	token := createLiveSession(t, ts.URL, "good")
+	token := createLiveSession(t, ts.URL)
 
 	if st := sendLiveMessage(t, ts.URL, token, "hello"); st != http.StatusAccepted {
 		t.Fatalf("first message status = %d, want 202", st)
@@ -312,7 +312,7 @@ func TestServer_PerCodeDailyBudget(t *testing.T) {
 		t.Skip("boots a real proxy per session")
 	}
 	ts := newTestServer(t, ServerConfig{PerCodeDailyBudget: 1})
-	token := createLiveSession(t, ts.URL, "good")
+	token := createLiveSession(t, ts.URL)
 
 	if st := sendLiveMessage(t, ts.URL, token, "hello"); st != http.StatusAccepted {
 		t.Fatalf("first message status = %d, want 202", st)
@@ -324,12 +324,29 @@ func TestServer_PerCodeDailyBudget(t *testing.T) {
 	}
 }
 
+func TestServer_PerIPDailyBudget(t *testing.T) {
+	if testing.Short() {
+		t.Skip("boots a real proxy per session")
+	}
+	ts := newTestServer(t, ServerConfig{PerIPDailyBudget: 1})
+	token := createLiveSession(t, ts.URL)
+
+	if st := sendLiveMessage(t, ts.URL, token, "hello"); st != http.StatusAccepted {
+		t.Fatalf("first message status = %d, want 202", st)
+	}
+	// The client IP's single round-trip budget is spent: the next message is
+	// refused for THIS address (without relying on the global budget).
+	if st := sendLiveMessage(t, ts.URL, token, "again"); st != http.StatusTooManyRequests {
+		t.Errorf("over per-ip-budget message status = %d, want 429", st)
+	}
+}
+
 func TestServer_PerSessionMessageCap(t *testing.T) {
 	if testing.Short() {
 		t.Skip("boots a real proxy per session")
 	}
 	ts := newTestServer(t, ServerConfig{MaxMessagesPerSession: 1})
-	token := createLiveSession(t, ts.URL, "good")
+	token := createLiveSession(t, ts.URL)
 
 	if st := sendLiveMessage(t, ts.URL, token, "hello"); st != http.StatusAccepted {
 		t.Fatalf("first message status = %d, want 202", st)

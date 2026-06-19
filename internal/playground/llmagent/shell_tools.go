@@ -132,8 +132,9 @@ func runCommandInvoke(ctx context.Context, scratchDir string, timeout time.Durat
 	if scratchDir != "" {
 		cmd.Dir = scratchDir
 	}
-	// Kill the whole process group on timeout, not just /bin/sh: a command that
-	// forks or backgrounds work must not outlive the bounded run_command.
+	// Kill the command's process group on timeout, not just /bin/sh: ordinary
+	// forked/backgrounded children stay in that group and cannot outlive the
+	// bounded run_command.
 	boundToProcessGroup(cmd)
 	var buf bytes.Buffer
 	cmd.Stdout = &buf

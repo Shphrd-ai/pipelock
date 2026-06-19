@@ -88,8 +88,20 @@ func TestServer_NewServer_FailsClosed(t *testing.T) {
 	if _, err := NewServer(ServerConfig{Gate: g, DailyTurnBudget: 3, LLMAgent: llm}); err == nil {
 		t.Error("NewServer accepted a daily budget below one message's worst-case model round trips; want error")
 	}
+	if _, err := NewServer(ServerConfig{Gate: g, PerIPDailyBudget: 3, LLMAgent: llm}); err == nil {
+		t.Error("NewServer accepted a per-IP budget below one message's worst-case model round trips; want error")
+	}
+	if _, err := NewServer(ServerConfig{Gate: g, PerCodeDailyBudget: 3, LLMAgent: llm}); err == nil {
+		t.Error("NewServer accepted a per-code budget below one message's worst-case model round trips; want error")
+	}
 	if _, err := NewServer(ServerConfig{Gate: g, DailyTurnBudget: 4, LLMAgent: llm}); err != nil {
 		t.Errorf("NewServer rejected a budget equal to per-message round trips: %v", err)
+	}
+	if _, err := NewServer(ServerConfig{Gate: g, PerIPDailyBudget: 4, LLMAgent: llm}); err != nil {
+		t.Errorf("NewServer rejected a per-IP budget equal to per-message round trips: %v", err)
+	}
+	if _, err := NewServer(ServerConfig{Gate: g, PerCodeDailyBudget: 4, LLMAgent: llm}); err != nil {
+		t.Errorf("NewServer rejected a per-code budget equal to per-message round trips: %v", err)
 	}
 }
 

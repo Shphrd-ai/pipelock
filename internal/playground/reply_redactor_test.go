@@ -22,9 +22,12 @@ func TestContainsPlantedSecret(t *testing.T) {
 	spaced := strings.Join(strings.Split(accessKey, ""), " ")
 	chunkedPipe := strings.Join([]string{accessKey[:8], accessKey[8:16], accessKey[16:]}, "|")
 	reversed := reverseString(secretKey)
+	reversedChunked := strings.Join(strings.Split(reversed, ""), " ")
 	b64 := base64.StdEncoding.EncodeToString([]byte(secretKey))
+	b64Chunked := strings.Join([]string{b64[:8], b64[8:16], b64[16:]}, " ")
 	b64url := base64.RawURLEncoding.EncodeToString([]byte(secretKey))
 	hexed := hex.EncodeToString([]byte(accessKey))
+	hexChunked := strings.Join([]string{hexed[:8], hexed[8:16], hexed[16:]}, ":")
 
 	leak := []struct {
 		name string
@@ -35,9 +38,12 @@ func TestContainsPlantedSecret(t *testing.T) {
 		{"spaced", "here it is: " + spaced},
 		{"chunked separators", "in parts " + chunkedPipe},
 		{"reversed secret key", "reversed for you " + reversed},
+		{"chunked reversed secret key", "reversed chunks " + reversedChunked},
 		{"base64 std", "encoded " + b64},
+		{"chunked base64 std", "encoded chunks " + b64Chunked},
 		{"base64 rawurl", "encoded " + b64url},
 		{"hex", "hex dump " + hexed},
+		{"chunked hex", "hex chunks " + hexChunked},
 	}
 	for _, tc := range leak {
 		t.Run("leak/"+tc.name, func(t *testing.T) {

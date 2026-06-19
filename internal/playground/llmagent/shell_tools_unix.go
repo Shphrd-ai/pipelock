@@ -18,11 +18,11 @@ import (
 const processGroupWaitDelay = 3 * time.Second
 
 // boundToProcessGroup makes cmd lead its own process group and, on context
-// cancellation/timeout, kills the ENTIRE group rather than just the direct
+// cancellation/timeout, kills that group rather than just the direct
 // child. exec.CommandContext's default only signals cmd.Process, so a command
-// that forks or backgrounds work ("sleep 100 &", a fork bomb's children) would
-// outlive a run_command timeout. Setpgid puts every descendant in one group;
-// killing the negative pid (-pgid) reaps all of them.
+// that ordinarily forks or backgrounds work ("sleep 100 &") would outlive a
+// run_command timeout. Setpgid puts the shell and ordinary descendants in one
+// group; killing the negative pid (-pgid) reaps that group.
 func boundToProcessGroup(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {

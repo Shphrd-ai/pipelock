@@ -45,6 +45,7 @@ func containsPlantedSecret(text string, secrets []string) bool {
 		return false
 	}
 	lowerText := strings.ToLower(text)
+	strippedRawText := stripChunkSeparators(text)
 	strippedText := stripChunkSeparatorsLower(text)
 	for _, secret := range secrets {
 		if len(secret) < minPlantedSecretLen {
@@ -60,11 +61,14 @@ func containsPlantedSecret(text string, secrets []string) bool {
 			return true
 		}
 		// Reversed.
-		if strings.Contains(lowerText, strings.ToLower(reverseString(secret))) {
+		reversed := reverseString(secret)
+		if strings.Contains(lowerText, strings.ToLower(reversed)) ||
+			strings.Contains(strippedText, stripChunkSeparatorsLower(reversed)) {
 			return true
 		}
 		// Hex, case-insensitive.
-		if strings.Contains(lowerText, hex.EncodeToString([]byte(secret))) {
+		hexed := hex.EncodeToString([]byte(secret))
+		if strings.Contains(lowerText, hexed) || strings.Contains(strippedText, hexed) {
 			return true
 		}
 		// Base64, every common variant. Case-sensitive: base64 is.
@@ -74,7 +78,8 @@ func containsPlantedSecret(text string, secrets []string) bool {
 			base64.URLEncoding,
 			base64.RawURLEncoding,
 		} {
-			if strings.Contains(text, enc.EncodeToString([]byte(secret))) {
+			encoded := enc.EncodeToString([]byte(secret))
+			if strings.Contains(text, encoded) || strings.Contains(strippedRawText, encoded) {
 				return true
 			}
 		}
@@ -82,9 +87,9 @@ func containsPlantedSecret(text string, secrets []string) bool {
 	return false
 }
 
-// stripChunkSeparatorsLower removes the chunk separators from s and lowercases the
-// result, so a separator-broken secret compares equal to the contiguous one.
-func stripChunkSeparatorsLower(s string) string {
+// stripChunkSeparators removes the chunk separators from s, preserving case for
+// encodings such as base64 where case is significant.
+func stripChunkSeparators(s string) string {
 	var b strings.Builder
 	b.Grow(len(s))
 	for _, r := range s {
@@ -93,7 +98,13 @@ func stripChunkSeparatorsLower(s string) string {
 		}
 		b.WriteRune(r)
 	}
-	return strings.ToLower(b.String())
+	return b.String()
+}
+
+// stripChunkSeparatorsLower removes the chunk separators from s and lowercases the
+// result, so a separator-broken secret compares equal to the contiguous one.
+func stripChunkSeparatorsLower(s string) string {
+	return strings.ToLower(stripChunkSeparators(s))
 }
 
 // reverseString returns s with its runes in reverse order.
