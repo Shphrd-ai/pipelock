@@ -96,6 +96,23 @@ func TestAllAgentBlocked_HappyAndEmpty(t *testing.T) {
 	}
 }
 
+func TestStatusEvent(t *testing.T) {
+	t.Parallel()
+
+	modelBacked := statusEvent(LiveStateContained, "run-1", true)
+	if modelBacked.Type != LiveEventStatus || modelBacked.State != LiveStateContained || modelBacked.RunID != "run-1" {
+		t.Fatalf("unexpected status event: %+v", modelBacked)
+	}
+	if modelBacked.Disclaimer != ThirdPartyModelDisclaimer {
+		t.Errorf("model-backed status must carry the third-party disclaimer, got %q", modelBacked.Disclaimer)
+	}
+
+	deterministic := statusEvent(LiveStateDev, "run-2", false)
+	if deterministic.Disclaimer != "" {
+		t.Errorf("deterministic status must omit the disclaimer, got %q", deterministic.Disclaimer)
+	}
+}
+
 func TestProxyBindAddrFor(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
