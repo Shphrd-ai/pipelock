@@ -1,0 +1,37 @@
+// Copyright 2026 Josh Waldrep
+// SPDX-License-Identifier: Apache-2.0
+
+//go:build !windows
+
+package llmagent
+
+import (
+	"os/exec"
+	"syscall"
+	"time"
+)
+
+// processGroupWaitDelay bounds how long Wait blocks after the group is killed in
+// case a descendant still holds an inherited pipe open. After it elapses the I/O
+// streams are force-closed and Wait returns, so a backgrounded child cannot hang
+// the tool call.
+const processGroupWaitDelay = 3 * time.Second
+
+// boundToProcessGroup makes cmd lead its own process group and, on context
+// cancellation/timeout, kills the ENTIRE group rather than just the direct
+// child. exec.CommandContext's default only signals cmd.Process, so a command
+// that forks or backgrounds work ("sleep 100 &", a fork bomb's children) would
+// outlive a run_command timeout. Setpgid puts every descendant in one group;
+// killing the negative pid (-pgid) reaps all of them.
+func boundToProcessGroup(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return nil
+		}
+		// With Setpgid the leader's pid equals its pgid, so -pid addresses the
+		// whole group. Ignore ESRCH (already gone).
+		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
+	cmd.WaitDelay = processGroupWaitDelay
+}
