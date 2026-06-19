@@ -188,6 +188,11 @@ type LiveSession struct {
 	// modelHost is the model provider host (empty for the deterministic agent).
 	// onReceipt uses it to label decisions trusted_model vs untrusted.
 	modelHost string
+	// plantedSecrets are the exact dead-but-real-shaped secrets seeded into the
+	// agent's environment (access key id, secret access key). scanAgentReply uses
+	// them to redact common transforms (reversed, base64, hex, chunked) from the
+	// browser-bound reply, which the generic DLP would miss.
+	plantedSecrets []string
 
 	sendMu sync.Mutex // serializes Send so the event stream is ordered
 	done   bool       // set by Finalize under sendMu; rejects later sends
@@ -260,6 +265,11 @@ func StartLiveSession(ctx context.Context, cfg LiveSessionConfig) (*LiveSession,
 		return nil, fmt.Errorf("start live run: %w", err)
 	}
 	s.lr = lr
+	// The access key id (canary) is planted in every mode; the secret access key
+	// is added below when a model-backed subprocess is configured.
+	if lr.canaryValue != "" {
+		s.plantedSecrets = append(s.plantedSecrets, lr.canaryValue)
+	}
 
 	proxyURL, err := url.Parse("http://" + lr.proxyLn.Addr().String())
 	if err != nil {
@@ -292,6 +302,7 @@ func StartLiveSession(ctx context.Context, cfg LiveSessionConfig) (*LiveSession,
 			_ = os.RemoveAll(scratch)
 			return nil, fmt.Errorf("generate secret access key: %w", kErr)
 		}
+		s.plantedSecrets = append(s.plantedSecrets, secretKey)
 		runner, rErr := newSubprocessTurnRunner(ctx, subprocessRunnerOpts{
 			Bin:          cfg.LLMAgent.Bin,
 			ProxyURL:     "http://" + lr.proxyLn.Addr().String(),
@@ -404,7 +415,18 @@ const agentReplyDLPMessage = "agent reply contained a secret; session stopped"
 // reused. Quiet scan: this is our own output, not adversarial input, so it skips
 // warn-telemetry.
 func (s *LiveSession) scanAgentReply(ctx context.Context, ev LiveEvent) (LiveEvent, bool) {
-	if s.lr == nil || s.lr.sc == nil || strings.TrimSpace(ev.Text) == "" {
+	if strings.TrimSpace(ev.Text) == "" {
+		return ev, false
+	}
+	// Demo-side exact-planted-secret redactor: the generic DLP catches the raw
+	// secret shape, but a visitor can ask the model to print the planted key
+	// reversed, base64/hex-encoded, or chunked, which the shape patterns miss.
+	// This is browser-safety, not a network-egress proof (the receipts are that).
+	if containsPlantedSecret(ev.Text, s.plantedSecrets) {
+		ev.Text = redactedReplyNotice
+		return ev, true
+	}
+	if s.lr == nil || s.lr.sc == nil {
 		return ev, false
 	}
 	if res := s.lr.sc.ScanTextForDLPQuiet(ctx, ev.Text); !res.Clean {
