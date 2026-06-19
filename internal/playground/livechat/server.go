@@ -54,6 +54,14 @@ type ServerConfig struct {
 	// only; public exposure MUST set a positive value). When the day's budget is
 	// spent, further messages are refused until the next UTC day.
 	DailyTurnBudget int
+	// PerIPDailyBudget and PerCodeDailyBudget cap model round trips per client IP
+	// and per invite code per UTC day, so one identity cannot drain the global
+	// DailyTurnBudget alone (the global cap and the per-key rate limiters do not
+	// stop a single identity spending the whole day's budget below the rate). 0 =
+	// no per-identity cap. Like the global budget they are denominated in model
+	// round trips and reserve each message's worst case.
+	PerIPDailyBudget   int
+	PerCodeDailyBudget int
 	// MaxMessagesPerSession caps how many messages one session may send (each is a
 	// real model call). 0 = the conservative default applied in NewServer.
 	MaxMessagesPerSession int
@@ -147,6 +155,8 @@ type Server struct {
 	codeRate         *RateLimiter
 	conc             *ConcurrencyLimiter
 	budget           *DailyBudget
+	perIP            *KeyedDailyBudget
+	perCode          *KeyedDailyBudget
 	maxMsgPerSession int
 	// roundTripsPerMsg is the worst-case model round trips one visitor message can
 	// drive (the model loop's max steps). The daily budget is denominated in model
@@ -177,9 +187,6 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	if cfg.RequireContainment && cfg.Containment == nil {
 		return nil, errors.New("livechat: RequireContainment set but no ContainmentVerifier supplied")
 	}
-	if cfg.DailyTurnBudget < 0 {
-		return nil, errors.New("livechat: DailyTurnBudget must be >= 0")
-	}
 	if cfg.MaxMessagesPerSession < 0 {
 		return nil, errors.New("livechat: MaxMessagesPerSession must be >= 0")
 	}
@@ -194,8 +201,20 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	if cfg.LLMAgent != nil {
 		roundTripsPerMsg = cfg.LLMAgent.EffectiveMaxSteps()
 	}
-	if cfg.DailyTurnBudget > 0 && cfg.DailyTurnBudget < roundTripsPerMsg {
-		return nil, fmt.Errorf("livechat: DailyTurnBudget (%d) is below one message's worst-case model round trips (%d); raise the budget or lower --model-max-steps", cfg.DailyTurnBudget, roundTripsPerMsg)
+	for _, c := range []struct {
+		name string
+		v    int
+	}{
+		{"DailyTurnBudget", cfg.DailyTurnBudget},
+		{"PerIPDailyBudget", cfg.PerIPDailyBudget},
+		{"PerCodeDailyBudget", cfg.PerCodeDailyBudget},
+	} {
+		if c.v < 0 {
+			return nil, fmt.Errorf("livechat: %s must be >= 0", c.name)
+		}
+		if c.v > 0 && c.v < roundTripsPerMsg {
+			return nil, fmt.Errorf("livechat: %s (%d) is below one message's worst-case model round trips (%d); raise the budget or lower --model-max-steps", c.name, c.v, roundTripsPerMsg)
+		}
 	}
 	return &Server{
 		cfg:              cfg,
@@ -204,6 +223,8 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 		codeRate:         NewRateLimiter(cfg.CodeRate),
 		conc:             NewConcurrencyLimiter(cfg.MaxConcurrent),
 		budget:           NewDailyBudget(cfg.DailyTurnBudget),
+		perIP:            NewKeyedDailyBudget(cfg.PerIPDailyBudget, 0),
+		perCode:          NewKeyedDailyBudget(cfg.PerCodeDailyBudget, 0),
 		maxMsgPerSession: maxMsg,
 		roundTripsPerMsg: roundTripsPerMsg,
 		sessions:         make(map[string]*liveEntry),
@@ -509,23 +530,50 @@ func (s *Server) handleMessage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "session not found")
 		return
 	}
-	// Per-session message cap: each message is a real model call.
+	// Spend caps, charged in order through a rollback stack so any downstream
+	// refusal returns every upstream reservation exactly once (no leak, no mint).
+	// Each layer reserves this message's worst-case model round trips: per-session
+	// (each message is a real model call), then per-IP and per-code daily caps so
+	// one client or one invite code cannot drain the global budget alone, then the
+	// global daily kill switch.
+	units := s.roundTripsPerMsg
+	var rollback []func()
+	undo := func() {
+		for i := len(rollback) - 1; i >= 0; i-- {
+			rollback[i]()
+		}
+	}
+
 	if !entry.tryMessage(s.maxMsgPerSession) {
 		writeErr(w, http.StatusTooManyRequests, "session message limit reached")
 		return
 	}
-	// Global daily spend kill switch: hard ceiling on total model round trips per
-	// UTC day. Reserve this message's worst-case round trips up front (all or
-	// nothing) so the cap bounds real model spend, not visitor message count.
-	if !s.budget.Charge(s.roundTripsPerMsg) {
-		entry.refundMessage(s.maxMsgPerSession)
+	rollback = append(rollback, func() { entry.refundMessage(s.maxMsgPerSession) })
+
+	if !s.perIP.Charge("ip:"+ip, units) {
+		undo()
+		writeErr(w, http.StatusTooManyRequests, "daily limit reached for your address")
+		return
+	}
+	rollback = append(rollback, func() { s.perIP.Refund("ip:"+ip, units) })
+
+	if !s.perCode.Charge("code:"+claims.CodeID, units) {
+		undo()
+		writeErr(w, http.StatusTooManyRequests, "daily limit reached for this code")
+		return
+	}
+	rollback = append(rollback, func() { s.perCode.Refund("code:"+claims.CodeID, units) })
+
+	if !s.budget.Charge(units) {
+		undo()
 		writeErr(w, http.StatusServiceUnavailable, "daily limit reached, the demo is paused until tomorrow")
 		return
 	}
+	rollback = append(rollback, func() { s.budget.Refund(units) })
+
 	if err := entry.sess.Send(r.Context(), body.Message); err != nil {
 		if errors.Is(err, playground.ErrSessionClosed) {
-			entry.refundMessage(s.maxMsgPerSession)
-			s.budget.Refund(s.roundTripsPerMsg)
+			undo()
 			writeErr(w, http.StatusConflict, "session is closed")
 			return
 		}

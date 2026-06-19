@@ -84,6 +84,8 @@ type serveFlags struct {
 	modelMaxSteps         int
 	modelTimeout          time.Duration
 	dailyTurnBudget       int
+	perIPDailyBudget      int
+	perCodeDailyBudget    int
 	maxMessagesPerSession int
 }
 
@@ -130,6 +132,8 @@ func newServeCmd() *cobra.Command {
 	fl.IntVar(&f.modelMaxSteps, "model-max-steps", 0, "max model/tool steps per turn (0 = default)")
 	fl.DurationVar(&f.modelTimeout, "model-timeout", 0, "per model/tool request timeout (0 = default)")
 	fl.IntVar(&f.dailyTurnBudget, "daily-turn-budget", 0, "hard global ceiling on total model round trips per UTC day, the spend kill switch (each visitor message reserves up to --model-max-steps round trips; 0 = unlimited; set a positive value for public exposure)")
+	fl.IntVar(&f.perIPDailyBudget, "per-ip-daily-budget", 0, "per client-IP ceiling on model round trips per UTC day so one client cannot drain the global budget (0 = no per-IP cap)")
+	fl.IntVar(&f.perCodeDailyBudget, "per-code-daily-budget", 0, "per invite-code ceiling on model round trips per UTC day so one code cannot drain the global budget (0 = no per-code cap)")
 	fl.IntVar(&f.maxMessagesPerSession, "max-messages-per-session", 0, "max messages one session may send (0 = default of 40)")
 	return cmd
 }
@@ -236,6 +240,8 @@ func buildServer(out io.Writer, f *serveFlags) (*livechat.Server, http.Handler, 
 		AllowOrigin:           f.allowOrigin,
 		LLMAgent:              llmAgent,
 		DailyTurnBudget:       f.dailyTurnBudget,
+		PerIPDailyBudget:      f.perIPDailyBudget,
+		PerCodeDailyBudget:    f.perCodeDailyBudget,
 		MaxMessagesPerSession: f.maxMessagesPerSession,
 	})
 	if err != nil {
@@ -279,6 +285,12 @@ func containedProxyPort(port int) int {
 func validateServeSafety(f *serveFlags, modelBacked bool) error {
 	if f.maxPerCode < 0 {
 		return errors.New("--max-per-code must be >= 0")
+	}
+	if f.perIPDailyBudget < 0 {
+		return errors.New("--per-ip-daily-budget must be >= 0")
+	}
+	if f.perCodeDailyBudget < 0 {
+		return errors.New("--per-code-daily-budget must be >= 0")
 	}
 	if f.dailyTurnBudget < 0 {
 		return errors.New("--daily-turn-budget must be >= 0")

@@ -119,3 +119,131 @@ func (b *DailyBudget) Open() bool {
 	}
 	return b.Remaining() > 0
 }
+
+// defaultKeyedBudgetMaxKeys bounds the per-identity budget map so a unique-key
+// spray cannot grow it without limit.
+const defaultKeyedBudgetMaxKeys = 100_000
+
+// keyedCounter is one identity's running count for a single UTC day.
+type keyedCounter struct {
+	day   string
+	count int
+}
+
+// KeyedDailyBudget caps charges per identity key (per IP, per code) per UTC day.
+// It is the per-user layer the global DailyBudget cannot provide: the global cap
+// alone lets ONE code or IP drain the whole day's budget, so a flood from a single
+// identity (still under the rate limiter, which only bounds RATE) adds up. Each
+// key gets its own daily ceiling.
+//
+// Memory is bounded (maxKeys) and the day boundary reclaims keys. The eviction
+// rule is the security-critical part: a key that still has budget consumed for
+// the CURRENT day is NEVER evicted, so an attacker cannot spray unique keys to
+// force their own at-cap key out of the map and reset its count. Only stale
+// previous-day keys are reclaimed; if the map is full of live same-day keys, a
+// new key is refused (fail-closed), matching the rate limiter's spray behavior.
+type KeyedDailyBudget struct {
+	mu      sync.Mutex
+	cap     int
+	maxKeys int
+	keys    map[string]*keyedCounter
+	now     func() time.Time
+}
+
+// NewKeyedDailyBudget builds a per-key daily budget. perKeyCap <= 0 disables it
+// (always allows). maxKeys <= 0 uses the default bound.
+func NewKeyedDailyBudget(perKeyCap, maxKeys int) *KeyedDailyBudget {
+	if maxKeys <= 0 {
+		maxKeys = defaultKeyedBudgetMaxKeys
+	}
+	return &KeyedDailyBudget{
+		cap:     perKeyCap,
+		maxKeys: maxKeys,
+		keys:    make(map[string]*keyedCounter),
+		now:     time.Now,
+	}
+}
+
+// Charge records n units against key's budget for today, ALL-OR-NOTHING. It
+// returns false (recording nothing) when the full n does not fit, when the key is
+// new and the map is saturated with live same-day keys (fail-closed), or for an
+// empty key. n <= 0 is treated as 1. A disabled budget (cap <= 0 or nil) always
+// allows.
+func (b *KeyedDailyBudget) Charge(key string, n int) bool {
+	if b == nil || b.cap <= 0 {
+		return true
+	}
+	if key == "" {
+		return false
+	}
+	if n <= 0 {
+		n = 1
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	today := dayKey(b.now())
+
+	c, ok := b.keys[key]
+	if !ok {
+		if len(b.keys) >= b.maxKeys {
+			b.evictStaleLocked(today)
+		}
+		if len(b.keys) >= b.maxKeys {
+			return false // saturated with live same-day keys: fail closed
+		}
+		c = &keyedCounter{day: today}
+		b.keys[key] = c
+	}
+	if c.day != today {
+		c.day = today
+		c.count = 0
+	}
+	if c.count+n > b.cap {
+		return false
+	}
+	c.count += n
+	return true
+}
+
+// Refund returns n units to key's budget for today. It never mints budget: it
+// decrements only a positive same-day count and clamps at zero, and does nothing
+// for an unknown key or a key whose recorded day is not today. n <= 0 => 1.
+func (b *KeyedDailyBudget) Refund(key string, n int) {
+	if b == nil || b.cap <= 0 || key == "" {
+		return
+	}
+	if n <= 0 {
+		n = 1
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	c, ok := b.keys[key]
+	if !ok || c.day != dayKey(b.now()) {
+		return
+	}
+	c.count -= n
+	if c.count < 0 {
+		c.count = 0
+	}
+}
+
+// evictStaleLocked removes only keys whose recorded day is not today. A live
+// same-day key (including one at its cap) is retained, so eviction can never
+// reset an identity's consumed budget within the day.
+func (b *KeyedDailyBudget) evictStaleLocked(today string) {
+	for k, c := range b.keys {
+		if c.day != today {
+			delete(b.keys, k)
+		}
+	}
+}
+
+// Len reports the number of tracked keys (test/observability helper).
+func (b *KeyedDailyBudget) Len() int {
+	if b == nil {
+		return 0
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return len(b.keys)
+}
