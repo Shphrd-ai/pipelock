@@ -187,6 +187,18 @@ type LLMAgentConfig struct {
 	ModelHostOverride []string
 }
 
+// EffectiveMaxSteps is the worst-case number of model round trips a single
+// visitor message can drive: the configured MaxSteps, or the wrapper default
+// when unset. Spend accounting reserves this many budget units per message so
+// the daily ceiling is denominated in model calls (the real cost unit), not in
+// visitor messages (which each cost up to this many calls).
+func (c *LLMAgentConfig) EffectiveMaxSteps() int {
+	if c != nil && c.MaxSteps > 0 {
+		return c.MaxSteps
+	}
+	return llmagent.DefaultMaxSteps
+}
+
 // LiveSession drives a deterministic agent through a real contained Pipelock
 // proxy from visitor chat input, streaming each signed decision as it happens.
 type LiveSession struct {

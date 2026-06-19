@@ -14,7 +14,7 @@ func TestDailyBudget_Unlimited(t *testing.T) {
 	t.Parallel()
 	b := NewDailyBudget(0)
 	for i := 0; i < 5; i++ {
-		if !b.Charge() {
+		if !b.Charge(1) {
 			t.Fatal("cap 0 must be unlimited")
 		}
 	}
@@ -27,7 +27,7 @@ func TestDailyBudget_Unlimited(t *testing.T) {
 
 	// A nil budget also allows (a server without a budget configured).
 	var nb *DailyBudget
-	if !nb.Charge() || !nb.Open() || nb.Remaining() != -1 {
+	if !nb.Charge(1) || !nb.Open() || nb.Remaining() != -1 {
 		t.Error("nil budget must allow and report unlimited")
 	}
 }
@@ -38,13 +38,13 @@ func TestDailyBudget_CapAndDailyReset(t *testing.T) {
 	b := NewDailyBudget(2)
 	b.now = func() time.Time { return day1 }
 
-	if !b.Charge() {
+	if !b.Charge(1) {
 		t.Fatal("first charge must fit cap 2")
 	}
-	if !b.Charge() {
+	if !b.Charge(1) {
 		t.Fatal("second charge must fit cap 2")
 	}
-	if b.Charge() {
+	if b.Charge(1) {
 		t.Error("third charge must fail at the cap")
 	}
 	if b.Remaining() != 0 {
@@ -59,7 +59,7 @@ func TestDailyBudget_CapAndDailyReset(t *testing.T) {
 	if b.Remaining() != 2 {
 		t.Errorf("Remaining after daily reset = %d, want 2", b.Remaining())
 	}
-	if !b.Open() || !b.Charge() {
+	if !b.Open() || !b.Charge(1) {
 		t.Error("budget must reopen on a new UTC day")
 	}
 }
@@ -70,21 +70,59 @@ func TestDailyBudget_RefundSameDayOnly(t *testing.T) {
 	b := NewDailyBudget(2)
 	b.now = func() time.Time { return day1 }
 
-	if !b.Charge() || b.Remaining() != 1 {
+	if !b.Charge(1) || b.Remaining() != 1 {
 		t.Fatalf("initial charge failed or remaining = %d, want 1", b.Remaining())
 	}
-	b.Refund()
+	b.Refund(1)
 	if b.Remaining() != 2 {
 		t.Fatalf("refund remaining = %d, want 2", b.Remaining())
 	}
 
-	if !b.Charge() {
+	if !b.Charge(1) {
 		t.Fatal("second charge failed")
 	}
 	b.now = func() time.Time { return day1.Add(24 * time.Hour) }
-	b.Refund()
+	b.Refund(1)
 	if b.Remaining() != 2 {
 		t.Fatalf("cross-day refund must not affect new day, remaining = %d", b.Remaining())
+	}
+}
+
+func TestDailyBudget_ChargeNAllOrNothing(t *testing.T) {
+	t.Parallel()
+	day1 := time.Date(2026, 6, 17, 10, 0, 0, 0, time.UTC)
+	b := NewDailyBudget(5)
+	b.now = func() time.Time { return day1 }
+
+	if !b.Charge(3) {
+		t.Fatal("charge of 3 must fit cap 5")
+	}
+	if b.Remaining() != 2 {
+		t.Fatalf("remaining after charging 3 = %d, want 2", b.Remaining())
+	}
+	// A 3-unit message does not fit the remaining 2: all-or-nothing records
+	// NOTHING and leaves the budget intact (no partial leak).
+	if b.Charge(3) {
+		t.Fatal("charge of 3 must fail when only 2 remain")
+	}
+	if b.Remaining() != 2 {
+		t.Fatalf("a rejected over-charge must not consume budget; remaining = %d, want 2", b.Remaining())
+	}
+	if !b.Charge(2) {
+		t.Fatal("charge of 2 must fit the remaining 2")
+	}
+	if b.Remaining() != 0 {
+		t.Fatalf("remaining after exhausting = %d, want 0", b.Remaining())
+	}
+
+	// Refund of n returns exactly n and clamps at the cap.
+	b.Refund(2)
+	if b.Remaining() != 2 {
+		t.Fatalf("remaining after refunding 2 = %d, want 2", b.Remaining())
+	}
+	b.Refund(100)
+	if b.Remaining() != 5 {
+		t.Fatalf("over-refund must clamp at the cap; remaining = %d, want 5", b.Remaining())
 	}
 }
 

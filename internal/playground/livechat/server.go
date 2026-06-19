@@ -47,10 +47,12 @@ type ServerConfig struct {
 	CodeRate RateConfig
 	// MaxConcurrent caps simultaneous live sessions (global). Never unlimited.
 	MaxConcurrent int
-	// DailyTurnBudget is the hard global ceiling on total visitor turns (model
-	// calls) per UTC day -- the spend kill switch. 0 = unlimited (dev/local only;
-	// public exposure MUST set a positive value). When the day's budget is spent,
-	// further messages are refused until the next UTC day.
+	// DailyTurnBudget is the hard global ceiling on total model ROUND TRIPS per
+	// UTC day -- the spend kill switch. Each visitor message reserves its
+	// worst-case round trips (the model loop's max steps) up front, so the cap
+	// bounds real model spend, not visitor-message count. 0 = unlimited (dev/local
+	// only; public exposure MUST set a positive value). When the day's budget is
+	// spent, further messages are refused until the next UTC day.
 	DailyTurnBudget int
 	// MaxMessagesPerSession caps how many messages one session may send (each is a
 	// real model call). 0 = the conservative default applied in NewServer.
@@ -146,6 +148,11 @@ type Server struct {
 	conc             *ConcurrencyLimiter
 	budget           *DailyBudget
 	maxMsgPerSession int
+	// roundTripsPerMsg is the worst-case model round trips one visitor message can
+	// drive (the model loop's max steps). The daily budget is denominated in model
+	// round trips, so each message reserves this many units up front -- the safe
+	// over-count for a spend kill switch. 1 for the deterministic agent.
+	roundTripsPerMsg int
 
 	// killed is the operator emergency stop. Unlike the daily budget (which caps
 	// spend by refusing new charges), tripping this terminates every ACTIVE
@@ -180,6 +187,16 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	if maxMsg == 0 {
 		maxMsg = defaultMaxMessagesPerSession
 	}
+	// The daily budget counts model ROUND TRIPS, not visitor messages: a
+	// model-backed message can drive up to MaxSteps model calls, so reserve that
+	// many per message. The deterministic agent makes no model calls; charge 1.
+	roundTripsPerMsg := 1
+	if cfg.LLMAgent != nil {
+		roundTripsPerMsg = cfg.LLMAgent.EffectiveMaxSteps()
+	}
+	if cfg.DailyTurnBudget > 0 && cfg.DailyTurnBudget < roundTripsPerMsg {
+		return nil, fmt.Errorf("livechat: DailyTurnBudget (%d) is below one message's worst-case model round trips (%d); raise the budget or lower --model-max-steps", cfg.DailyTurnBudget, roundTripsPerMsg)
+	}
 	return &Server{
 		cfg:              cfg,
 		limits:           cfg.Limits.Clamp(),
@@ -188,6 +205,7 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 		conc:             NewConcurrencyLimiter(cfg.MaxConcurrent),
 		budget:           NewDailyBudget(cfg.DailyTurnBudget),
 		maxMsgPerSession: maxMsg,
+		roundTripsPerMsg: roundTripsPerMsg,
 		sessions:         make(map[string]*liveEntry),
 	}, nil
 }
@@ -496,8 +514,10 @@ func (s *Server) handleMessage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusTooManyRequests, "session message limit reached")
 		return
 	}
-	// Global daily spend kill switch: hard ceiling on total turns per UTC day.
-	if !s.budget.Charge() {
+	// Global daily spend kill switch: hard ceiling on total model round trips per
+	// UTC day. Reserve this message's worst-case round trips up front (all or
+	// nothing) so the cap bounds real model spend, not visitor message count.
+	if !s.budget.Charge(s.roundTripsPerMsg) {
 		entry.refundMessage(s.maxMsgPerSession)
 		writeErr(w, http.StatusServiceUnavailable, "daily limit reached, the demo is paused until tomorrow")
 		return
@@ -505,7 +525,7 @@ func (s *Server) handleMessage(w http.ResponseWriter, r *http.Request) {
 	if err := entry.sess.Send(r.Context(), body.Message); err != nil {
 		if errors.Is(err, playground.ErrSessionClosed) {
 			entry.refundMessage(s.maxMsgPerSession)
-			s.budget.Refund()
+			s.budget.Refund(s.roundTripsPerMsg)
 			writeErr(w, http.StatusConflict, "session is closed")
 			return
 		}

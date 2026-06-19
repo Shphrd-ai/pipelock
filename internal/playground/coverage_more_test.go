@@ -307,6 +307,21 @@ func TestBuildHostContainmentWitnessFailsClosedOnProbeError(t *testing.T) {
 	}
 }
 
+func TestLLMAgentConfig_EffectiveMaxSteps(t *testing.T) {
+	t.Parallel()
+	if got := (&LLMAgentConfig{MaxSteps: 4}).EffectiveMaxSteps(); got != 4 {
+		t.Errorf("configured MaxSteps = %d, want 4", got)
+	}
+	def := (&LLMAgentConfig{}).EffectiveMaxSteps()
+	if def <= 0 {
+		t.Errorf("unset MaxSteps default = %d, want a positive worst-case", def)
+	}
+	var nilCfg *LLMAgentConfig
+	if nilCfg.EffectiveMaxSteps() != def {
+		t.Errorf("nil config = %d, want the same default as an unset MaxSteps (%d)", nilCfg.EffectiveMaxSteps(), def)
+	}
+}
+
 func TestBuildHostContainmentWitnessFailsClosedOnNilProxyListener(t *testing.T) {
 	t.Parallel()
 

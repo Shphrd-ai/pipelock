@@ -45,13 +45,20 @@ func dayKey(t time.Time) string {
 	return t.UTC().Format("2006-01-02")
 }
 
-// Charge records one unit against today's budget and reports whether it fit. It
+// Charge records n units against today's budget and reports whether they fit,
+// ALL-OR-NOTHING: if the full n does not fit under the cap it records nothing and
+// returns false. n is the worst-case model round trips one visitor message can
+// drive, so the daily ceiling is a true bound on model calls (the cost unit). It
 // resets the count at the UTC day boundary. With an unlimited cap (<= 0) it always
-// allows and records nothing. Fail-closed semantics: at the cap, it returns false
-// WITHOUT incrementing, so a rejected charge does not consume tomorrow's headroom.
-func (b *DailyBudget) Charge() bool {
+// allows and records nothing. n <= 0 is treated as 1. Fail-closed: at or near the
+// cap it returns false WITHOUT incrementing, so a rejected charge does not consume
+// tomorrow's headroom and a partial charge can never leak budget.
+func (b *DailyBudget) Charge(n int) bool {
 	if b == nil || b.cap <= 0 {
 		return true
+	}
+	if n <= 0 {
+		n = 1
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -60,27 +67,33 @@ func (b *DailyBudget) Charge() bool {
 		b.day = today
 		b.count = 0
 	}
-	if b.count >= b.cap {
+	if b.count+n > b.cap {
 		return false
 	}
-	b.count++
+	b.count += n
 	return true
 }
 
-// Refund returns one already-admitted charge to today's budget. It is used only
-// when the server reserved budget but the session was already sealed before the
-// turn could start. Refund never creates extra headroom: it only decrements a
-// positive count for the same UTC day.
-func (b *DailyBudget) Refund() {
+// Refund returns n already-admitted units to today's budget. It is used when the
+// server reserved budget but the turn could not start (the session was sealed or
+// the send failed). Refund never creates extra headroom: it decrements only a
+// positive count for the same UTC day and clamps at zero. n <= 0 is treated as 1.
+func (b *DailyBudget) Refund(n int) {
 	if b == nil || b.cap <= 0 {
 		return
 	}
+	if n <= 0 {
+		n = 1
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if dayKey(b.now()) != b.day || b.count <= 0 {
+	if dayKey(b.now()) != b.day {
 		return
 	}
-	b.count--
+	b.count -= n
+	if b.count < 0 {
+		b.count = 0
+	}
 }
 
 // Remaining reports today's remaining budget, or -1 when unlimited.

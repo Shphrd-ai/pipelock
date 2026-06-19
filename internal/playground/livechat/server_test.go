@@ -81,6 +81,16 @@ func TestServer_NewServer_FailsClosed(t *testing.T) {
 	if _, err := NewServer(ServerConfig{Gate: g, MaxMessagesPerSession: -1}); err == nil {
 		t.Error("NewServer accepted negative MaxMessagesPerSession; want error")
 	}
+	// The daily budget is denominated in model round trips: a budget below one
+	// model-backed message's worst-case round trips can never admit a message, so
+	// NewServer rejects it (MaxSteps 4 => 4 round trips per message).
+	llm := &playground.LLMAgentConfig{Bin: "x", ModelBaseURL: "http://m.example/v1", Model: "m", MaxSteps: 4}
+	if _, err := NewServer(ServerConfig{Gate: g, DailyTurnBudget: 3, LLMAgent: llm}); err == nil {
+		t.Error("NewServer accepted a daily budget below one message's worst-case model round trips; want error")
+	}
+	if _, err := NewServer(ServerConfig{Gate: g, DailyTurnBudget: 4, LLMAgent: llm}); err != nil {
+		t.Errorf("NewServer rejected a budget equal to per-message round trips: %v", err)
+	}
 }
 
 func TestServer_Session_MethodAndCodeChecks(t *testing.T) {

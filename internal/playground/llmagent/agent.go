@@ -50,9 +50,10 @@ type Event struct {
 	Detail string `json:"detail,omitempty"` // shell command / file path for shell-tool actions (no HTTP method/URL)
 }
 
-// defaultMaxSteps bounds the model<->tool loop so a stuck or adversarial model
-// cannot spin forever. Each step is one model round trip.
-const defaultMaxSteps = 6
+// DefaultMaxSteps bounds the model<->tool loop so a stuck or adversarial model
+// cannot spin forever. Each step is one model round trip, so it is also the
+// worst-case model-call count per visitor message that spend accounting reserves.
+const DefaultMaxSteps = 6
 
 // defaultMaxToolCalls bounds the TOTAL tool calls a single turn may execute,
 // across all steps. MaxSteps alone does not cap this: one model response can
@@ -170,7 +171,7 @@ func (c ModelConfig) maxSteps() int {
 	if c.MaxSteps > 0 {
 		return c.MaxSteps
 	}
-	return defaultMaxSteps
+	return DefaultMaxSteps
 }
 
 func (c ModelConfig) maxToolCalls() int {

@@ -129,7 +129,7 @@ func newServeCmd() *cobra.Command {
 	fl.StringVar(&f.modelSecretFile, "model-secret-file", "", "path to a file holding the model API key (kept out of argv); required to enable the model-backed agent")
 	fl.IntVar(&f.modelMaxSteps, "model-max-steps", 0, "max model/tool steps per turn (0 = default)")
 	fl.DurationVar(&f.modelTimeout, "model-timeout", 0, "per model/tool request timeout (0 = default)")
-	fl.IntVar(&f.dailyTurnBudget, "daily-turn-budget", 0, "hard global ceiling on total visitor turns (model calls) per UTC day, the spend kill switch (0 = unlimited; set a positive value for public exposure)")
+	fl.IntVar(&f.dailyTurnBudget, "daily-turn-budget", 0, "hard global ceiling on total model round trips per UTC day, the spend kill switch (each visitor message reserves up to --model-max-steps round trips; 0 = unlimited; set a positive value for public exposure)")
 	fl.IntVar(&f.maxMessagesPerSession, "max-messages-per-session", 0, "max messages one session may send (0 = default of 40)")
 	return cmd
 }

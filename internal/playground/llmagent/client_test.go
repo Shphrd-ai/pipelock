@@ -27,7 +27,7 @@ func TestNew_Defaults(t *testing.T) {
 
 func TestModelConfig_Helpers(t *testing.T) {
 	def := ModelConfig{}
-	if def.maxSteps() != defaultMaxSteps {
+	if def.maxSteps() != DefaultMaxSteps {
 		t.Fatalf("maxSteps default = %d", def.maxSteps())
 	}
 	if def.timeout() != defaultTimeout {
