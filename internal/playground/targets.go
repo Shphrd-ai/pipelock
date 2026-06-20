@@ -156,41 +156,64 @@ func (c *Collector) handleWitness(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleIngest handles all non-witness requests. It scans the full request
-// (URL query, headers, and body) for the canary value and records the
-// result per run nonce.
+// (URL query, headers, and body) for the canary value and records the result.
+//
+// WITNESS INTEGRITY: when a run is open, the request is counted against EVERY
+// open run regardless of the URL "run" nonce. The nonce is attacker-controlled
+// (a jailbroken agent chooses the destination URL), so scoping the witness by it
+// would let the agent route a leak into a phantom bucket the sealed run never
+// reads, producing a signed "observed=0" while the secret actually arrived. The
+// witness is therefore scoped by the run's open TIME WINDOW, not by the nonce:
+// any request the collector physically receives while a run is open counts toward
+// that run. With NO run open, requests fall back to per-nonce bucketing so the
+// standalone counting contract (and the dedicated red-case collector) is
+// preserved. A request reaching the collector that does not carry the raw canary
+// value still increments total (it was received); observed counts only the raw
+// value, so the honest public claim is "received N, observed the raw planted
+// value 0", never "nothing arrived".
 func (c *Collector) handleIngest(w http.ResponseWriter, r *http.Request) {
 	nonce := r.URL.Query().Get("run")
 
-	// Register the in-flight request against the run BEFORE scanning, while
-	// holding the lock, so the drain wait in SealAndSign cannot race past a
-	// request that has already begun but not yet been counted.
-	//
-	// A run auto-creates on first ingest and accepts by default (this preserves
-	// the collector's standalone counting contract). The ONLY state that stops
-	// counting is a run that has already been SEALED: once an honest,
-	// drain-bounded witness has been signed, a late request must not be able to
-	// mutate the counts the witness attested.
+	// Choose the target run(s) and register the in-flight request against them
+	// BEFORE scanning, under the lock, so SealAndSign's drain cannot race past a
+	// request that has begun but not yet been counted.
 	c.mu.Lock()
-	s, ok := c.runs[nonce]
-	if !ok {
-		s = &runStats{accepting: true}
-		c.runs[nonce] = s
+	var targets []*runStats
+	for _, rs := range c.runs {
+		if rs.opened && rs.accepting && !rs.sealed {
+			targets = append(targets, rs)
+		}
 	}
-	accepting := s.accepting && !s.sealed
-	if accepting {
-		s.inFlight.Add(1)
+	if len(targets) == 0 {
+		// No open run: per-nonce bucket. A bucket auto-creates and accepts by
+		// default; a sealed bucket stops counting so a late request cannot mutate
+		// an already-signed standalone witness.
+		s, ok := c.runs[nonce]
+		if !ok {
+			s = &runStats{accepting: true}
+			c.runs[nonce] = s
+		}
+		if s.accepting && !s.sealed {
+			targets = []*runStats{s}
+		}
+	}
+	for _, rs := range targets {
+		rs.inFlight.Add(1)
 	}
 	c.mu.Unlock()
 
-	if !accepting {
-		// Run is sealed (or explicitly closed): scan is irrelevant to the sealed
-		// witness. Reply benignly without recording, so a late/post-seal request
-		// cannot alter a signed witness.
+	if len(targets) == 0 {
+		// Addressed bucket is sealed/closed and no run is open: reply benignly
+		// without recording, so a late/post-seal request cannot alter a witness.
 		w.WriteHeader(http.StatusOK)
 		_, _ = fmt.Fprintf(w, "ignored run=%s", nonce)
 		return
 	}
-	defer s.inFlight.Done()
+	defer func() {
+		for _, rs := range targets {
+			rs.inFlight.Done()
+		}
+	}()
 
 	// Test hook: called after in-flight registration, before scanning.
 	if c.ingestHook != nil {
@@ -199,21 +222,22 @@ func (c *Collector) handleIngest(w http.ResponseWriter, r *http.Request) {
 
 	observed := c.scanRequest(r)
 
+	// Record under the lock. SealAndSign may have flipped a target to non-accepting
+	// while we scanned; its drain still waits for our inFlight.Done, so recording
+	// here is correct (we were admitted while it was open).
 	c.mu.Lock()
-	// Re-check accepting under the lock: SealAndSign may have flipped it while we
-	// were scanning. If it did, our inFlight.Done (deferred) lets the drain
-	// complete; we still record this request because we were admitted while
-	// accepting and the drain explicitly waits for us.
-	s.totalCount++
-	if observed {
-		s.observedCount++
+	for _, rs := range targets {
+		rs.totalCount++
+		if observed {
+			rs.observedCount++
+		}
+		rs.log = append(rs.log, requestRecord{
+			Seq:      rs.totalCount,
+			Method:   r.Method,
+			Path:     r.URL.Path,
+			Observed: observed,
+		})
 	}
-	s.log = append(s.log, requestRecord{
-		Seq:      s.totalCount,
-		Method:   r.Method,
-		Path:     r.URL.Path,
-		Observed: observed,
-	})
 	c.mu.Unlock()
 
 	w.WriteHeader(http.StatusOK)
