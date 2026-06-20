@@ -83,6 +83,7 @@ type config struct {
 	modelBaseURL   string
 	model          string
 	secretFile     string
+	secretFd       int
 	proxyURL       string
 	safeURL        string
 	scratchDir     string
@@ -106,7 +107,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "config:", err)
 		os.Exit(2)
 	}
-	apiKey, err := resolveAPIKey(cfg.secretFile, os.Getenv)
+	apiKey, err := resolveAPIKey(cfg.secretFd, cfg.secretFile, os.Getenv)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "api key:", err)
 		os.Exit(2)
@@ -139,7 +140,8 @@ func parseFlags(args []string, getenv func(string) string) (config, error) {
 	fl.SetOutput(io.Discard)
 	fl.StringVar(&cfg.modelBaseURL, "model-base-url", "", "chat-completions API base URL (e.g. https://provider.example/v1)")
 	fl.StringVar(&cfg.model, "model", "", "model name")
-	fl.StringVar(&cfg.secretFile, "secret-file", "", "path to a file holding the model API key (preferred: keeps it out of argv)")
+	fl.StringVar(&cfg.secretFile, "secret-file", "", "path to a file holding the model API key (keeps it out of argv)")
+	fl.IntVar(&cfg.secretFd, "secret-fd", -1, "file descriptor to read the model API key from (an inherited pipe; preferred over --secret-file so the key never lands on a file the agent can read)")
 	fl.StringVar(&cfg.proxyURL, "proxy-url", "", "HTTP proxy URL all egress routes through (the Pipelock proxy)")
 	fl.StringVar(&cfg.safeURL, "safe-url", "", "lab config URL the agent may read")
 	fl.StringVar(&cfg.scratchDir, "scratch-dir", "", "per-session working directory for the shell/filesystem tools")
@@ -172,9 +174,27 @@ func parseFlags(args []string, getenv func(string) string) (config, error) {
 	return cfg, nil
 }
 
-// resolveAPIKey reads the model key from --secret-file (trimmed) or the env
-// fallback. It never accepts the key on the command line (argv is world-readable).
-func resolveAPIKey(secretFile string, getenv func(string) string) (string, error) {
+// resolveAPIKey reads the model key from --secret-fd (an inherited pipe; the
+// preferred path, so the key never lands on a file the agent can read), then
+// --secret-file (trimmed), then the env fallback. It never accepts the key on the
+// command line (argv is world-readable).
+func resolveAPIKey(secretFd int, secretFile string, getenv func(string) string) (string, error) {
+	if secretFd >= 0 {
+		f := os.NewFile(uintptr(secretFd), "model-key-fd")
+		if f == nil {
+			return "", fmt.Errorf("--secret-fd %d is not a valid file descriptor", secretFd)
+		}
+		defer func() { _ = f.Close() }()
+		data, err := io.ReadAll(f)
+		if err != nil {
+			return "", fmt.Errorf("read --secret-fd: %w", err)
+		}
+		key := strings.TrimSpace(string(data))
+		if key == "" {
+			return "", fmt.Errorf("--secret-fd produced an empty key")
+		}
+		return key, nil
+	}
 	if secretFile != "" {
 		data, err := os.ReadFile(filepath.Clean(secretFile))
 		if err != nil {

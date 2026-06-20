@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -326,12 +327,24 @@ func StartLiveSession(ctx context.Context, cfg LiveSessionConfig) (*LiveSession,
 			return nil, fmt.Errorf("generate secret access key: %w", kErr)
 		}
 		s.plantedSecrets = append(s.plantedSecrets, secretKey)
+		// The model provider key is a REAL credential (unlike the synthetic canary).
+		// A jailbroken agent can read its key file and surface the value in its chat
+		// narration. Read it parent-side and add it to the redaction set so it can
+		// never reach the visitor, and hand the value to the runner so the key can be
+		// passed to the subprocess over an inherited pipe FD instead of a file the
+		// agent's read_file tool can open. If the parent cannot read it (degraded),
+		// the runner falls back to --secret-file and redaction is simply skipped.
+		modelKey := readTrimmedFile(cfg.LLMAgent.SecretFile)
+		if modelKey != "" {
+			s.plantedSecrets = append(s.plantedSecrets, modelKey)
+		}
 		runner, rErr := newSubprocessTurnRunner(ctx, subprocessRunnerOpts{
 			Bin:          cfg.LLMAgent.Bin,
 			ProxyURL:     "http://" + lr.proxyLn.Addr().String(),
 			ModelBaseURL: cfg.LLMAgent.ModelBaseURL,
 			Model:        cfg.LLMAgent.Model,
 			SecretFile:   cfg.LLMAgent.SecretFile,
+			ModelKey:     modelKey,
 			SafeURL:      lr.liveSafeURL(),
 			ScratchDir:   scratch,
 			// run_command (arbitrary shell) is handed out ONLY when the host
@@ -441,6 +454,21 @@ func (s *LiveSession) Send(ctx context.Context, msg string) error {
 const redactedReplyNotice = "[Pipelock redacted this reply: it contained a secret]"
 
 const agentReplyDLPMessage = "agent reply contained a secret; session stopped"
+
+// readTrimmedFile reads path and returns its trimmed contents, or "" if the file
+// is missing or unreadable. Used parent-side to obtain the model provider key for
+// redaction and FD-passing; an empty return cleanly degrades to the old
+// --secret-file path (the subprocess reads it itself).
+func readTrimmedFile(path string) string {
+	if path == "" {
+		return ""
+	}
+	data, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
 
 // scanAgentReply runs the agent's outbound chat reply through DLP before it
 // reaches the visitor. The browser chat is an untrusted egress surface: a reply

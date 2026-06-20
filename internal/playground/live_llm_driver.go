@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -42,6 +43,10 @@ type modelTurnRunner interface {
 // maxModelEventLine bounds one narration line read from the agent subprocess. A
 // reply can carry model text, so this is larger than the wrapper's input cap.
 const maxModelEventLine = 1 << 20 // 1 MiB
+
+// keyFD is the child file descriptor the model key pipe is inherited on. The
+// first ExtraFiles entry lands at fd 3 (after stdin/stdout/stderr = 0/1/2).
+const keyFD = 3
 
 // mapModelEvent maps one agent narration event to a live-stream event. It returns
 // the mapped event and push=true when the event should be streamed, plus a
@@ -130,8 +135,15 @@ type subprocessRunnerOpts struct {
 	ProxyURL     string
 	ModelBaseURL string
 	Model        string
-	SecretFile   string
-	SafeURL      string
+	// SecretFile is the path to the model API key file. Used only when ModelKey is
+	// empty (the legacy path: the subprocess reads the file itself).
+	SecretFile string
+	// ModelKey, when non-empty, is the model API key value. The runner passes it to
+	// the subprocess over an inherited pipe FD (--secret-fd) instead of a file path,
+	// so the key never sits on a filesystem the agent's read_file tool can open. The
+	// key file can then be made root-only at deploy time. Preferred over SecretFile.
+	ModelKey string
+	SafeURL  string
 	// ScratchDir is the agent's working directory + HOME (seeded with a
 	// ~/.aws/credentials file holding the dead secret). The caller owns its
 	// lifecycle (creation and teardown).
@@ -197,12 +209,21 @@ func newSubprocessTurnRunner(ctx context.Context, opts subprocessRunnerOpts) (*s
 		}
 	}
 
+	// Prefer passing the model key over an inherited pipe FD: the key never lands
+	// on a file the agent's read_file tool can open. Fall back to --secret-file
+	// only when the parent could not read the key value.
+	useKeyFD := opts.ModelKey != ""
 	args := []string{
 		"--proxy-url", opts.ProxyURL,
 		"--model-base-url", opts.ModelBaseURL,
 		"--model", opts.Model,
-		"--secret-file", opts.SecretFile,
 		"--agent", actorOrDefault(opts.Actor),
+	}
+	if useKeyFD {
+		// ExtraFiles[0] is inherited as fd 3 in the child (after stdin/out/err).
+		args = append(args, "--secret-fd", strconv.Itoa(keyFD))
+	} else {
+		args = append(args, "--secret-file", opts.SecretFile)
 	}
 	if opts.SafeURL != "" {
 		args = append(args, "--safe-url", opts.SafeURL)
@@ -255,6 +276,27 @@ func newSubprocessTurnRunner(ctx context.Context, opts subprocessRunnerOpts) (*s
 		}
 	}
 
+	// Attach the model-key pipe read end as the child's fd 3 BEFORE Start. The key
+	// value is written to the write end AFTER Start (below). keyW is closed by the
+	// deferred guard on any error path, and set to nil after a clean write so the
+	// guard is a no-op on success.
+	var keyW *os.File
+	defer func() {
+		if keyW != nil {
+			_ = keyW.Close()
+		}
+	}()
+	if useKeyFD {
+		keyR, kw, perr := os.Pipe()
+		if perr != nil {
+			cancel()
+			return nil, fmt.Errorf("playground: model key pipe: %w", perr)
+		}
+		cmd.ExtraFiles = []*os.File{keyR} // inherited as fd 3 in the child
+		keyW = kw
+		defer func() { _ = keyR.Close() }() // parent's read-end copy; child has its own
+	}
+
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		cancel()
@@ -271,6 +313,18 @@ func newSubprocessTurnRunner(ctx context.Context, opts subprocessRunnerOpts) (*s
 		_ = stdin.Close()
 		_ = stdout.Close()
 		return nil, fmt.Errorf("playground: model agent start: %w", err)
+	}
+
+	if useKeyFD {
+		// Hand the key to the child over the pipe, then close so it reads EOF.
+		if _, werr := io.WriteString(keyW, opts.ModelKey); werr != nil {
+			cancel()
+			_ = stdin.Close()
+			_ = stdout.Close()
+			return nil, fmt.Errorf("playground: write model key to agent: %w", werr)
+		}
+		_ = keyW.Close()
+		keyW = nil
 	}
 
 	sc := bufio.NewScanner(stdout)

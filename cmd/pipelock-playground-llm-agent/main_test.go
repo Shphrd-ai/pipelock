@@ -91,7 +91,7 @@ func TestResolveAPIKey(t *testing.T) {
 	if err := os.WriteFile(path, []byte("  sk-from-file\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	got, err := resolveAPIKey(path, noEnv)
+	got, err := resolveAPIKey(-1, path, noEnv)
 	if err != nil || got != "sk-from-file" {
 		t.Fatalf("file key = %q, err = %v", got, err)
 	}
@@ -99,7 +99,7 @@ func TestResolveAPIKey(t *testing.T) {
 	if err := os.WriteFile(blankPath, []byte(" \n\t"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := resolveAPIKey(blankPath, noEnv); err == nil {
+	if _, err := resolveAPIKey(-1, blankPath, noEnv); err == nil {
 		t.Fatal("want error when secret-file is whitespace-only")
 	}
 	// From env fallback.
@@ -109,16 +109,51 @@ func TestResolveAPIKey(t *testing.T) {
 		}
 		return ""
 	}
-	if got, _ := resolveAPIKey("", env); got != "sk-from-env" {
+	if got, _ := resolveAPIKey(-1, "", env); got != "sk-from-env" {
 		t.Fatalf("env key = %q", got)
 	}
 	// Missing both.
-	if _, err := resolveAPIKey("", noEnv); err == nil {
+	if _, err := resolveAPIKey(-1, "", noEnv); err == nil {
 		t.Fatal("want error when no key source")
 	}
 	// Unreadable file.
-	if _, err := resolveAPIKey(filepath.Join(dir, "nope"), noEnv); err == nil {
+	if _, err := resolveAPIKey(-1, filepath.Join(dir, "nope"), noEnv); err == nil {
 		t.Fatal("want error on unreadable secret-file")
+	}
+}
+
+// TestResolveAPIKey_FromFD proves the key can be read from an inherited pipe FD,
+// the preferred path that keeps the key off any file the agent can read. The FD
+// takes precedence over --secret-file.
+func TestResolveAPIKey_FromFD(t *testing.T) {
+	pr, pw, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	t.Cleanup(func() { _ = pr.Close() })
+	go func() {
+		_, _ = io.WriteString(pw, "  sk-from-fd\n")
+		_ = pw.Close()
+	}()
+
+	// A bogus secret-file path is present but must be ignored in favor of the FD.
+	got, err := resolveAPIKey(int(pr.Fd()), filepath.Join(t.TempDir(), "ignored"), noEnv)
+	if err != nil {
+		t.Fatalf("resolveAPIKey from fd: %v", err)
+	}
+	if got != "sk-from-fd" {
+		t.Fatalf("fd key = %q, want %q", got, "sk-from-fd")
+	}
+
+	// An empty FD payload is rejected (fail closed).
+	pr2, pw2, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	t.Cleanup(func() { _ = pr2.Close() })
+	go func() { _ = pw2.Close() }()
+	if _, err := resolveAPIKey(int(pr2.Fd()), "", noEnv); err == nil {
+		t.Fatal("want error when fd produces an empty key")
 	}
 }
 
