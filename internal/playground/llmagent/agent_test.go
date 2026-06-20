@@ -6,6 +6,7 @@ package llmagent
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -457,9 +458,11 @@ func TestRun_HistoryReplayedAcrossTurns(t *testing.T) {
 	}
 }
 
-func TestRun_HistoryExcludesToolData(t *testing.T) {
-	// Turn 1 makes a tool call then a final reply. Turn 2 must replay ONLY the
-	// visible user/assistant text -- never the tool call or the tool result.
+func TestRun_ContextCarriesToolDataAcrossTurns(t *testing.T) {
+	// P1: the agent must hold TRUE conversational continuity -- turn 2 carries
+	// forward the full working context from turn 1, including the assistant's tool
+	// call AND the tool result (what the agent explored), so the model does not
+	// re-discover the filesystem from zero every turn (the "reset" Josh feels).
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, "lab config: ok")
 	}))
@@ -479,21 +482,175 @@ func TestRun_HistoryExcludesToolData(t *testing.T) {
 	if _, err := a.Run(context.Background(), "anything else?"); err != nil {
 		t.Fatalf("run 2: %v", err)
 	}
-	// Turn 2 is the third model call (turn 1 used two: tool, then reply).
+	// Turn 2 is the third model call (turn 1 used two: tool, then reply). It must
+	// replay the full turn-1 context: system, user, assistant(tool_calls), tool
+	// result, assistant reply, then the new user message.
 	msgs := model.bodies[2].Messages
-	if got := strings.Join(roleSeq(msgs), ","); got != strings.Join([]string{roleSystem, roleUser, roleAssistant, roleUser}, ",") {
-		t.Fatalf("turn-2 roles = %v, want no tool messages", roleSeq(msgs))
+	wantRoles := []string{roleSystem, roleUser, roleAssistant, roleTool, roleAssistant, roleUser}
+	if got := strings.Join(roleSeq(msgs), ","); got != strings.Join(wantRoles, ",") {
+		t.Fatalf("turn-2 roles = %v, want %v", roleSeq(msgs), wantRoles)
 	}
+	sawToolCall, sawToolResult := false, false
 	for _, m := range msgs {
-		if m.Role == roleTool || len(m.ToolCalls) > 0 {
-			t.Fatalf("history leaked tool data into turn 2: %+v", m)
+		if len(m.ToolCalls) > 0 {
+			sawToolCall = true
 		}
-		if strings.Contains(m.Content, "HTTP 200") || strings.Contains(m.Content, target.URL) {
-			t.Fatalf("history leaked a tool result/URL into turn 2: %q", m.Content)
+		if m.Role == roleTool && strings.Contains(m.Content, "HTTP 200") {
+			sawToolResult = true
 		}
 	}
-	if msgs[2].Content != "I read the config." {
-		t.Fatalf("turn-2 replayed assistant = %q", msgs[2].Content)
+	if !sawToolCall {
+		t.Fatal("turn-2 context dropped the prior tool call (no continuity)")
+	}
+	if !sawToolResult {
+		t.Fatal("turn-2 context dropped the prior tool result (the explored state)")
+	}
+	// The context must stay valid for the chat-completions API.
+	assertToolPairingValid(t, msgs)
+}
+
+// assertToolPairingValid checks the chat-completions tool-message invariants:
+// every tool message answers a tool_call from an EARLIER assistant message, and
+// every assistant tool_call is answered by a later tool message. A context that
+// violates either is rejected by the API (400), so any trimming/capping path must
+// preserve both.
+func assertToolPairingValid(t *testing.T, msgs []chatMessage) {
+	t.Helper()
+	seenCallIDs := map[string]bool{}
+	answered := map[string]bool{}
+	for _, m := range msgs {
+		for _, tc := range m.ToolCalls {
+			seenCallIDs[tc.ID] = true
+		}
+		if m.Role == roleTool {
+			if !seenCallIDs[m.ToolCallID] {
+				t.Fatalf("orphan tool message: tool_call_id %q has no earlier assistant tool_call", m.ToolCallID)
+			}
+			answered[m.ToolCallID] = true
+		}
+	}
+	for id := range seenCallIDs {
+		if !answered[id] {
+			t.Fatalf("unanswered tool_call %q: no tool message responds to it", id)
+		}
+	}
+}
+
+func TestRun_ToolCallCapKeepsContextValid(t *testing.T) {
+	// When one assistant response carries more tool calls than the per-turn cap,
+	// the loop stops executing after the cap -- but the persisted context must
+	// still answer EVERY tool_call id (real result for executed calls, a synthetic
+	// "skipped" result for the rest), or the next turn's request is invalid.
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, "ok")
+	}))
+	t.Cleanup(target.Close)
+
+	// One assistant message with 4 distinct tool-call IDs; cap allows only 2.
+	calls := make([]toolCall, 4)
+	for i := range calls {
+		calls[i] = toolCall{
+			ID:       fmt.Sprintf("call-%d", i),
+			Type:     "function",
+			Function: toolCallFunction{Name: ToolFetchURL, Arguments: `{"url":"` + target.URL + `"}`},
+		}
+	}
+	model := &scriptedModel{responses: []chatMessage{
+		{Role: roleAssistant, ToolCalls: calls},
+		// turn 2 plain reply
+		textMsg("second turn"),
+	}}
+	emit, _ := collectEvents()
+	a := newAgentCfg(t, model, LabTools(http.DefaultClient, nil), emit, ModelConfig{MaxHistoryTurns: 8, MaxToolCalls: 2})
+
+	if _, err := a.Run(context.Background(), "spray"); err != nil {
+		t.Fatalf("run 1: %v", err)
+	}
+	if _, err := a.Run(context.Background(), "next"); err != nil {
+		t.Fatalf("run 2: %v", err)
+	}
+	// The turn-2 request carries the persisted turn-1 context; it must answer all
+	// four tool calls so the API would accept it.
+	assertToolPairingValid(t, model.bodies[len(model.bodies)-1].Messages)
+}
+
+func TestRun_ForceFinalAnswerSyntheticPromptNotPersisted(t *testing.T) {
+	// forceFinalAnswer appends a synthetic "you hit the limit" USER message just
+	// for the summary completion. That synthetic prompt must NOT be persisted as a
+	// turn, or it pollutes context and miscounts turn boundaries. After a capped
+	// turn 1 and a plain turn 2, the turn-2 request must contain exactly two user
+	// messages (turn-1 visitor msg + turn-2 visitor msg), never the synthetic one.
+	loop := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, "ok")
+	}))
+	t.Cleanup(loop.Close)
+
+	model := &scriptedModel{responses: []chatMessage{
+		toolMsg("c1", ToolFetchURL, `{"url":"`+loop.URL+`"}`),
+		toolMsg("c2", ToolFetchURL, `{"url":"`+loop.URL+`"}`),
+		toolMsg("c3", ToolFetchURL, `{"url":"`+loop.URL+`"}`),
+		textMsg("forced summary"), // the forced tool-less completion
+		textMsg("turn two reply"),
+	}}
+	emit, _ := collectEvents()
+	a := newAgentCfg(t, model, LabTools(http.DefaultClient, nil), emit, ModelConfig{MaxHistoryTurns: 8, MaxSteps: 2})
+
+	if _, err := a.Run(context.Background(), "go forever"); err != nil {
+		t.Fatalf("run 1: %v", err)
+	}
+	if _, err := a.Run(context.Background(), "now this"); err != nil {
+		t.Fatalf("run 2: %v", err)
+	}
+	msgs := model.bodies[len(model.bodies)-1].Messages
+	users := 0
+	for _, m := range msgs {
+		if m.Role == roleUser {
+			users++
+		}
+		if m.Role == roleUser && strings.Contains(m.Content, "action limit") {
+			t.Fatalf("synthetic limit prompt leaked into persisted context: %q", m.Content)
+		}
+	}
+	if users != 2 {
+		t.Fatalf("turn-2 context has %d user messages, want 2 (no synthetic turn): %v", users, roleSeq(msgs))
+	}
+	assertToolPairingValid(t, msgs)
+}
+
+func TestRun_ContextBoundedByTokens(t *testing.T) {
+	// With a tight token budget (and no turn cap), the oldest whole turn is dropped
+	// once the working context exceeds the budget -- the handoff's "bound by total
+	// tokens" requirement. Memory is enabled by the token budget alone.
+	// Distinctive markers (not substrings of the system prompt) so the assertion
+	// targets turn content, not the always-kept system message.
+	big := strings.Repeat("z", 600) // ~150 estimated tokens of reply text
+	model := &scriptedModel{responses: []chatMessage{
+		textMsg("REPLY_ALPHA " + big),
+		textMsg("REPLY_BETA " + big),
+		textMsg("REPLY_GAMMA " + big),
+	}}
+	emit, _ := collectEvents()
+	a := newAgentCfg(t, model, nil, emit, ModelConfig{MaxHistoryTokens: 60})
+
+	for _, msg := range []string{"MSG_FIRST", "MSG_SECOND", "MSG_THIRD"} {
+		if _, err := a.Run(context.Background(), msg); err != nil {
+			t.Fatalf("run %q: %v", msg, err)
+		}
+	}
+	// The third request must have dropped the oldest turn: its visitor message and
+	// reply are gone.
+	msgs := model.bodies[2].Messages
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "REPLY_ALPHA") {
+			t.Fatalf("token budget did not drop the oldest reply: %q", m.Content)
+		}
+		if m.Content == "MSG_FIRST" {
+			t.Fatalf("token budget did not drop the oldest user turn: %v", roleSeq(msgs))
+		}
+	}
+	// It must still carry the most recent prior turn (continuity is not destroyed).
+	if len(msgs) < 2 || msgs[0].Role != roleSystem {
+		t.Fatalf("trimmed context malformed: %v", roleSeq(msgs))
 	}
 }
 

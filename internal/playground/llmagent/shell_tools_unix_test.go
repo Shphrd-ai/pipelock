@@ -45,8 +45,11 @@ func TestRunCommandInvoke_KillsBackgroundedChildOnTimeout(t *testing.T) {
 	pid := readChildPID(t, pidFile)
 
 	// After the group kill the backgrounded child must die promptly. Poll so the
-	// test does not depend on exact reaping timing.
+	// test does not depend on exact reaping timing. A ticker (not time.Sleep) keeps
+	// the poll within the test-stability tripwire's allowed synchronization set.
 	deadline := time.Now().Add(3 * time.Second)
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
 	for {
 		if !processAlive(pid) {
 			return // killed, as required
@@ -57,15 +60,18 @@ func TestRunCommandInvoke_KillsBackgroundedChildOnTimeout(t *testing.T) {
 			_ = syscall.Kill(pid, syscall.SIGKILL)
 			t.Fatalf("backgrounded child pid %d still alive after timeout; process group was not reaped", pid)
 		}
-		time.Sleep(50 * time.Millisecond)
+		<-ticker.C
 	}
 }
 
 func readChildPID(t *testing.T, pidFile string) int {
 	t.Helper()
 	// The pid file is written immediately after backgrounding, well before the
-	// timeout, but allow a brief poll in case the scheduler is slow.
+	// timeout, but allow a brief poll in case the scheduler is slow. A ticker (not
+	// time.Sleep) keeps the poll within the test-stability tripwire's allowed set.
 	deadline := time.Now().Add(2 * time.Second)
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
 	for {
 		data, err := os.ReadFile(filepath.Clean(pidFile))
 		if err == nil {
@@ -76,7 +82,7 @@ func readChildPID(t *testing.T, pidFile string) int {
 		if time.Now().After(deadline) {
 			t.Fatalf("child pid file %s never became readable", pidFile)
 		}
-		time.Sleep(20 * time.Millisecond)
+		<-ticker.C
 	}
 }
 

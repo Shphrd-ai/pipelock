@@ -12,12 +12,14 @@
 //
 // Protocol: it reads visitor messages as JSON lines on stdin ({"message":"..."})
 // and writes narration as JSON lines on stdout (llmagent.Event), emitting a
-// turn_done event after each message. The agent keeps bounded conversation
-// memory across turns (the last liveHistoryTurns turns) so the demo holds a
-// coherent chat; that memory retains only the visible conversation text -- the
-// visitor's messages and the agent's own replies -- never tool calls or tool
-// results, so a turn still cannot replay tool state forward. (The lab secret is
-// dead, so it carries no risk if a reply surfaces it.)
+// turn_done event after each message. The agent keeps a persistent working
+// conversation across turns -- the full context including the tool calls it made
+// and the tool results it explored -- bounded by a token budget (liveHistoryTokens)
+// and a turn cap (liveHistoryTurns), so the demo holds true continuity and does
+// not re-discover the filesystem every prompt (the "reset" the bounded text-only
+// memory caused). This is safe here: the lab secret is a dead synthetic canary,
+// the subprocess egresses only through the mediating proxy, and the visitor-facing
+// chat is redacted independently by the server (live_session.scanAgentReply).
 package main
 
 import (
@@ -63,14 +65,19 @@ const maxInputLine = 16 << 10 // 16 KiB
 // to, so the proxy records this subprocess's requests as the lab agent.
 const defaultActor = "lab-agent"
 
-// liveHistoryTurns is the bounded conversation memory the live chat agent keeps
-// across visitor messages (one turn = one visitor message + the agent's final
-// reply). The demo is a chat, so it needs memory to handle "and then..." /
-// "continue" follow-ups coherently; without it each message re-explores from
-// scratch. Only visible conversation text is retained (never tool data or the
-// canary -- see llmagent.ModelConfig.MaxHistoryTurns), and the per-session
-// message cap bounds total turns, so this stays small and cheap.
-const liveHistoryTurns = 8
+// liveHistoryTokens is the PRIMARY bound on the live chat agent's persistent
+// working conversation: an approximate token budget for the full carried context
+// (visitor messages + the agent's tool calls and tool results + replies). The
+// demo is a multi-step chat, so the agent must remember what it already explored
+// to handle "and then..." / "continue" without re-discovering from scratch; the
+// budget keeps that rich memory bounded in cost and context size. The oldest
+// whole turns are dropped when it overflows.
+const liveHistoryTokens = 16000
+
+// liveHistoryTurns is a secondary safety cap on the number of turns retained, a
+// backstop against a long run of tiny turns. The token budget is the real
+// limiter for normal tool-laden turns.
+const liveHistoryTurns = 12
 
 type config struct {
 	modelBaseURL   string
@@ -235,9 +242,10 @@ func buildAgent(cfg config, apiKey string, emit func(llmagent.Event)) (*llmagent
 		// SystemPrompt left empty: the aggressive, uninstructed llmagent default
 		// applies. The agent is told nothing about secrets, collectors, or
 		// guardrails; Pipelock and host containment are the only controls.
-		MaxSteps:        cfg.maxSteps,
-		MaxHistoryTurns: liveHistoryTurns,
-		Timeout:         cfg.timeout,
+		MaxSteps:         cfg.maxSteps,
+		MaxHistoryTurns:  liveHistoryTurns,
+		MaxHistoryTokens: liveHistoryTokens,
+		Timeout:          cfg.timeout,
 	}
 	return llmagent.New(mc, client, tools, emit), nil
 }
