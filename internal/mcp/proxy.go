@@ -536,9 +536,18 @@ func ForwardScanned(reader transport.MessageReader, writer transport.MessageWrit
 
 		// Injection detected.
 		foundInjection = true
-		action := sc.ResponseAction()
+		action := verdict.Action
+		if action == "" {
+			action = sc.ResponseAction()
+		}
 		originalAction := action
 		names := matchNames(verdict.Matches)
+		patterns := strings.Join(names, ", ")
+		trustClass := responseScanTrustClass(respScanOpts)
+		serverName := opts.ServerName
+		if serverName == "" {
+			serverName = "unknown"
+		}
 
 		// Escalation upgrade: may promote warn/ask to block for elevated sessions.
 		if rec != nil {
@@ -546,8 +555,8 @@ func ForwardScanned(reader transport.MessageReader, writer transport.MessageWrit
 		}
 		escalationDriven := action != originalAction
 
-		_, _ = fmt.Fprintf(logW, "pipelock: line %d: injection detected (%s), action=%s\n",
-			lineNum, strings.Join(names, ", "), action)
+		_, _ = fmt.Fprintf(logW, "pipelock: line %d: injection detected (%s), server=%s trust=%s action=%s\n",
+			lineNum, patterns, serverName, trustClass, action)
 
 		effectiveAction := action
 		var outbound []byte
@@ -560,7 +569,7 @@ func ForwardScanned(reader transport.MessageReader, writer transport.MessageWrit
 			if escalationDriven {
 				outbound = blockSessionDenyResponse(verdict.ID, session.EscalationLabel(rec.EscalationLevel()))
 			} else {
-				outbound = blockResponse(verdict.ID)
+				outbound = blockResponseReason(verdict.ID, fmt.Sprintf("prompt injection detected in MCP response (server=%s pattern=%s trust=%s)", serverName, firstNonEmptyPattern(names), trustClass))
 			}
 		case config.ActionAsk:
 			if approver == nil {
@@ -757,6 +766,15 @@ func (o MCPProxyOpts) withResponseTimeout(r transport.MessageReader) transport.M
 // operators debugging MCP do not chase a scanner false positive.
 func blockResponse(id json.RawMessage) []byte {
 	return blockResponseReason(id, "prompt injection detected in MCP response")
+}
+
+func firstNonEmptyPattern(names []string) string {
+	for _, name := range names {
+		if name != "" {
+			return name
+		}
+	}
+	return "unknown"
 }
 
 // blockResponseReason is like blockResponse but lets the caller supply a

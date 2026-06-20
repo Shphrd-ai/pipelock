@@ -147,12 +147,31 @@ type MCPProxyOpts struct {
 	// global change, reaching parity with the SSE/HTTP response paths.
 	// Nil/empty preserves no-suppression behavior.
 	Suppress []config.SuppressEntry
+	// SuppressFn returns the current response suppress rules for long-lived
+	// proxy surfaces that support hot reload. Nil falls back to Suppress.
+	SuppressFn func() []config.SuppressEntry
 
 	// ServerName is a stable per-server identity used to build the suppress
 	// Target ("mcp://<ServerName>/response") that path-scoped suppress entries
 	// match against. Empty disables target-scoped response suppression. Set
 	// from `pipelock mcp proxy --server-name`.
 	ServerName string
+
+	// ResponseTrustClass is the effective trust class for this server's MCP
+	// responses. Empty is treated as "untrusted" and fails closed. Set from
+	// response_scanning.mcp_servers when --server-name matches an entry.
+	ResponseTrustClass string
+	// ResponseTrustClassFn returns the current response trust class for
+	// hot-reload-aware proxy surfaces. Nil falls back to ResponseTrustClass.
+	ResponseTrustClassFn func() string
+
+	// ResponseActionOverride is the MCP response-scan action derived from
+	// ResponseTrustClass by runtime config wiring. Empty preserves the
+	// scanner's action for low-level callers and diagnostic tests.
+	ResponseActionOverride string
+	// ResponseActionOverrideFn returns the current MCP response action override
+	// for hot-reload-aware proxy surfaces. Nil falls back to ResponseActionOverride.
+	ResponseActionOverrideFn func() string
 
 	// AdaptiveResetFile, when set, is a local operator control file: when it
 	// appears (regular file, mode 0600, owned by the proxy user) the stdio
@@ -231,9 +250,37 @@ func (o MCPProxyOpts) responseTarget() string {
 // the stdio response scan (ScanResponseOpts).
 func (o MCPProxyOpts) responseScanOptions() ResponseScanOptions {
 	return ResponseScanOptions{
-		Target:   o.responseTarget(),
-		Suppress: o.Suppress,
+		Target:         o.responseTarget(),
+		Suppress:       o.responseSuppress(),
+		ActionOverride: o.responseActionOverride(),
+		TrustClass:     o.responseTrustClass(),
 	}
+}
+
+func (o MCPProxyOpts) responseSuppress() []config.SuppressEntry {
+	if o.SuppressFn != nil {
+		return o.SuppressFn()
+	}
+	return o.Suppress
+}
+
+func (o MCPProxyOpts) responseTrustClass() string {
+	if o.ResponseTrustClassFn != nil {
+		if v := o.ResponseTrustClassFn(); v != "" {
+			return v
+		}
+	}
+	if o.ResponseTrustClass != "" {
+		return o.ResponseTrustClass
+	}
+	return config.ResponseTrustUntrusted
+}
+
+func (o MCPProxyOpts) responseActionOverride() string {
+	if o.ResponseActionOverrideFn != nil {
+		return o.ResponseActionOverrideFn()
+	}
+	return o.ResponseActionOverride
 }
 
 // captureObserver returns the observer, defaulting to NopObserver when nil.

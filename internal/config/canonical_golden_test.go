@@ -187,7 +187,10 @@ const (
 	// Re-bumped for mcp_input_scanning.response_timeout_seconds field
 	// (v2.8 stress-followup Finding 12). New policy-semantic field that
 	// changes upstream response timeout behavior. Zero default = disabled.
-	goldenHashDefaults = "0d8fb5014d616d5207afd946094b98561f564d6394aa1d6c99f739c01c572728"
+	// Re-bumped for response_scanning.mcp_servers: per-server MCP response
+	// trust classes change response-injection enforcement from the fail-closed
+	// untrusted block default to explicit reasoning/warn.
+	goldenHashDefaults = "734ce147726792a7a9f0a3d4ff1dd6cecbd0dd3861a2e6adea5b232e80f7149a"
 
 	// goldenHashRichConfig pins the hash for goldenRichYAML loaded via
 	// config.Load, post-ApplyDefaults + Validate. Covers a broad,
@@ -279,7 +282,10 @@ const (
 	// bounds are policy semantics for action enforcement.
 	// Re-bumped for mcp_input_scanning.response_timeout_seconds: see
 	// goldenHashDefaults note above.
-	goldenHashRichConfig = "a182adbf13fcf2add0e10480aeeba79586e64ae017b9ad45fb06bad9bc13bfee"
+	// Re-bumped for response_scanning.mcp_servers: see goldenHashDefaults note
+	// above. The rich fixture omits the list, but the empty policy field is
+	// still part of the canonical view.
+	goldenHashRichConfig = "11a24da86ba9e0f1ed8686dbe8a2a44a1f48f3492d180b09cbcfd7ecd75d44cb"
 )
 
 // goldenRichYAML is the canonical fixture for goldenHashRichConfig. It

@@ -693,6 +693,26 @@ func (s *Server) Start(ctx context.Context) error {
 			c := s.proxy.CurrentConfig()
 			return c != nil && c.FlightRecorder.RequireReceipts
 		}
+		mcpResponseSuppressFn := func() []config.SuppressEntry {
+			c := s.proxy.CurrentConfig()
+			if c == nil {
+				return nil
+			}
+			return c.Suppress
+		}
+		mcpResponseTrustFn := func() string {
+			trust := config.ResponseTrustUntrusted
+			c := s.proxy.CurrentConfig()
+			if c != nil {
+				if configuredTrust, ok := c.MCPResponseTrustForServer(s.opts.MCPServerName); ok {
+					trust = configuredTrust
+				}
+			}
+			return trust
+		}
+		mcpResponseActionFn := func() string {
+			return config.MCPResponseActionForTrust(mcpResponseTrustFn())
+		}
 
 		mcpErr = make(chan error, 1)
 		lifecycleWG.Add(1)
@@ -706,38 +726,42 @@ func (s *Server) Start(ctx context.Context) error {
 				mcpCaptureObs = s.captureWriter
 			}
 			mcpErr <- mcp.RunHTTPListenerProxy(ctx, mcpLn, s.opts.MCPUpstream, s.opts.Stderr, mcp.MCPProxyOpts{
-				ScannerFn:              mcpScannerFn,
-				Approver:               mcpApprover,
-				InputCfgFn:             mcpInputCfgFn,
-				RequestBodyFn:          mcpRequestBodyFn,
-				ToolCfgFn:              mcpToolCfgFn,
-				PolicyCfgFn:            s.currentToolPolicyCfg,
-				KillSwitch:             s.killswitch,
-				ChainMatcherFn:         s.currentMCPChainMatcher,
-				AuditLogger:            s.logger,
-				CEEFn:                  s.currentMCPCEE,
-				Store:                  mcpStore,
-				AdaptiveCfgFn:          mcpAdaptiveFn,
-				Metrics:                s.metrics,
-				RedirectRTFn:           mcpRedirectRTFn,
-				CaptureObs:             mcpCaptureObs,
-				ConfigHashFn:           mcpConfigHashFn,
-				Profile:                edition.ProfileDefault,
-				AddressProtectionAgent: edition.ProfileDefault,
-				ProvenanceCfgFn:        mcpProvenanceCfgFn,
-				ReceiptEmitterFn:       s.liveReceiptEmitter,
-				RequireReceiptsFn:      mcpRequireReceiptsFn,
-				V2ReceiptEmitterFn:     s.liveV2ReceiptEmitter,
-				PolicyHashFn:           mcpConfigHashFn,
-				EnvelopeEmitterFn:      s.liveEnvelopeEmitter,
-				RedactionCfgFn:         mcpRedactionCfgFn,
-				TaintCfgFn:             mcpTaintCfgFn,
-				A2ACfgFn:               mcpA2ACfgFn,
-				MediaPolicyFn:          mcpMediaPolicyFn,
-				ToolFreezer:            s.proxy.FrozenTools(),
-				FrozenToolStableKey:    s.opts.MCPUpstream,
-				ContractLoaderPtr:      s.proxy.ContractLoaderPtr(),
-				ContractAgent:          edition.ProfileDefault,
+				ScannerFn:                mcpScannerFn,
+				Approver:                 mcpApprover,
+				InputCfgFn:               mcpInputCfgFn,
+				RequestBodyFn:            mcpRequestBodyFn,
+				ToolCfgFn:                mcpToolCfgFn,
+				PolicyCfgFn:              s.currentToolPolicyCfg,
+				KillSwitch:               s.killswitch,
+				ChainMatcherFn:           s.currentMCPChainMatcher,
+				AuditLogger:              s.logger,
+				CEEFn:                    s.currentMCPCEE,
+				Store:                    mcpStore,
+				AdaptiveCfgFn:            mcpAdaptiveFn,
+				Metrics:                  s.metrics,
+				RedirectRTFn:             mcpRedirectRTFn,
+				CaptureObs:               mcpCaptureObs,
+				ConfigHashFn:             mcpConfigHashFn,
+				Profile:                  edition.ProfileDefault,
+				AddressProtectionAgent:   edition.ProfileDefault,
+				ProvenanceCfgFn:          mcpProvenanceCfgFn,
+				ReceiptEmitterFn:         s.liveReceiptEmitter,
+				RequireReceiptsFn:        mcpRequireReceiptsFn,
+				V2ReceiptEmitterFn:       s.liveV2ReceiptEmitter,
+				PolicyHashFn:             mcpConfigHashFn,
+				EnvelopeEmitterFn:        s.liveEnvelopeEmitter,
+				RedactionCfgFn:           mcpRedactionCfgFn,
+				TaintCfgFn:               mcpTaintCfgFn,
+				A2ACfgFn:                 mcpA2ACfgFn,
+				MediaPolicyFn:            mcpMediaPolicyFn,
+				ServerName:               s.opts.MCPServerName,
+				SuppressFn:               mcpResponseSuppressFn,
+				ResponseTrustClassFn:     mcpResponseTrustFn,
+				ResponseActionOverrideFn: mcpResponseActionFn,
+				ToolFreezer:              s.proxy.FrozenTools(),
+				FrozenToolStableKey:      s.opts.MCPUpstream,
+				ContractLoaderPtr:        s.proxy.ContractLoaderPtr(),
+				ContractAgent:            edition.ProfileDefault,
 			})
 		}()
 	}

@@ -775,6 +775,32 @@ func (c *Config) validateResponseScanning(warnings *[]Warning) error {
 			Message: "configured but response_scanning is disabled — these will take effect when enabled",
 		})
 	}
+	seenMCPServers := make(map[string]struct{}, len(c.ResponseScanning.MCPServers))
+	for i, entry := range c.ResponseScanning.MCPServers {
+		field := fmt.Sprintf("response_scanning.mcp_servers[%d]", i)
+		if entry.Server == "" {
+			return fmt.Errorf("%s.server is empty", field)
+		}
+		if strings.Contains(entry.Server, "://") || strings.ContainsAny(entry.Server, "/\\\r\n\t") {
+			return fmt.Errorf("%s.server %q: use the MCP --server-name value without URL syntax or slashes", field, entry.Server)
+		}
+		if _, ok := seenMCPServers[entry.Server]; ok {
+			return fmt.Errorf("%s.server %q duplicates an earlier MCP response trust entry", field, entry.Server)
+		}
+		seenMCPServers[entry.Server] = struct{}{}
+		switch entry.Trust {
+		case ResponseTrustUntrusted, ResponseTrustReasoning:
+			// valid
+		default:
+			return fmt.Errorf("%s.trust %q: must be %q or %q", field, entry.Trust, ResponseTrustUntrusted, ResponseTrustReasoning)
+		}
+	}
+	if !c.ResponseScanning.Enabled && len(c.ResponseScanning.MCPServers) > 0 {
+		*warnings = append(*warnings, Warning{
+			Field:   "response_scanning.mcp_servers",
+			Message: "configured but response_scanning is disabled — MCP response trust classes are inert until enabled",
+		})
+	}
 
 	// Generic SSE streaming sub-section. Validated regardless of the
 	// parent response_scanning.enabled flag so dormant bad config can't

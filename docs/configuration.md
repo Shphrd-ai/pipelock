@@ -791,6 +791,9 @@ response_scanning:
     - "*.anthropic.com"
   size_exempt_domains:          # trusted large-download hosts; scan cap only
     - "downloads.example.com"
+  mcp_servers:                  # MCP response trust classes; default is untrusted/block
+    - server: "codex"
+      trust: "reasoning"        # reasoning => warn; untrusted => block
   patterns:
     - name: "Custom Injection"
       regex: 'override system prompt'
@@ -804,6 +807,7 @@ response_scanning:
 | `include_defaults` | `true` | Merge with 29 built-in patterns |
 | `exempt_domains` | `[]` | Hosts to skip injection scanning for (DLP still applies on outbound). Supports `*.example.com` wildcards (also matches the apex `example.com`). |
 | `size_exempt_domains` | `[]` | Trusted hosts whose oversized forward-proxy or TLS-intercepted responses may stream through instead of failing the scan ceiling. Request-side scanning and budget accounting still run. |
+| `mcp_servers` | `[]` | Per-MCP-server response trust classes keyed by `pipelock mcp proxy --server-name`. Omitted, missing, malformed, or non-matching servers are treated as `untrusted` and block response-injection findings. `reasoning` is an explicit opt-in that logs/warns but forwards the response. |
 | `patterns` | 29 built-in | Injection and state/control poisoning patterns |
 
 **Built-in patterns (29):** Prompt-injection and state/control poisoning coverage includes jailbreak phrases, system overrides, role overrides, instruction manipulation, encoded payloads, tool invocation commands, authority escalation, credential solicitation, credential path directives, auth material requirements, memory persistence directives, preference poisoning, covert-action directives, silent credential handling, and CJK-language override patterns. All patterns use DOTALL mode to match across newlines in multiline tool output.
@@ -814,7 +818,20 @@ response_scanning:
 - **warn:** log the match, return content unchanged
 - **ask:** pause and prompt the operator for approval (requires TTY)
 
-**Exempt domains:** LLM provider APIs (OpenAI, Anthropic, etc.) return instruction-like text as part of normal operation, which can trigger false positives. Use `exempt_domains` to skip injection scanning for trusted providers. DLP scanning on the outbound request still runs — only the response injection scan is skipped. Applies to fetch proxy, forward proxy, CONNECT (TLS intercept), WebSocket, and reverse proxy. Does not affect MCP response scanning (tool results use a separate trust model).
+**Exempt domains:** LLM provider APIs (OpenAI, Anthropic, etc.) return instruction-like text as part of normal operation, which can trigger false positives. Use `exempt_domains` to skip injection scanning for trusted providers. DLP scanning on the outbound request still runs — only the response injection scan is skipped. Applies to fetch proxy, forward proxy, CONNECT (TLS intercept), WebSocket, and reverse proxy. Does not affect MCP response scanning; MCP uses `response_scanning.mcp_servers` so a reasoning-model MCP server can warn while web-relay MCP servers keep blocking.
+
+**MCP response trust classes:** MCP response scanning defaults to `untrusted`, which blocks response-injection findings even if the generic `response_scanning.action` is `warn`. This protects web-relay servers such as fetch/search/scraping tools. To allow a reasoning-model MCP server to answer security-analysis questions that quote canonical jailbreak strings, opt in by server name:
+
+```yaml
+response_scanning:
+  mcp_servers:
+    - server: "codex"
+      trust: "reasoning"
+```
+
+`reasoning` maps to `warn`; `untrusted` maps to `block`. Unknown trust values fail config validation, duplicate server entries fail validation, and entries are surfaced as warnings when `response_scanning.enabled` is false. The trust decision applies to MCP stdio, stdio-to-HTTP, reverse Streamable HTTP/SSE, and WebSocket surfaces because they share the MCP response scan gate. Block logs and JSON-RPC errors name the server, matched pattern, and trust class so operators can see whether a server needs an explicit trust-class review.
+
+Launch MCP proxies with a stable server identity so the entry can match: use `pipelock mcp proxy --server-name codex ...` for per-server wrappers, or `pipelock run --mcp-listen ... --mcp-upstream ... --mcp-server-name codex` for the long-lived MCP listener.
 
 For forward-proxy and TLS-intercepted traffic, an exempt host's response streams through untouched when `response_scanning.enabled` is true: no buffering, response scan-cap block, media metadata strip, Browser Shield rewrite, or injection scan is applied to that trusted response. Request-side DLP, redaction, SSRF, authority checks, and budget accounting still run. If a host needs full byte-preserving passthrough without MITM, prefer `tls_interception.passthrough_domains`.
 

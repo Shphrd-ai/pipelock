@@ -38,6 +38,59 @@ func TestApplyMCPResponseSuppressOpts(t *testing.T) {
 	if opts.Suppress[0].Path != testMCPResponseSuppress {
 		t.Fatalf("Suppress[0].Path = %q", opts.Suppress[0].Path)
 	}
+	if opts.ResponseTrustClass != config.ResponseTrustUntrusted || opts.ResponseActionOverride != config.ActionBlock {
+		t.Fatalf("default trust/action = %q/%q, want untrusted/block", opts.ResponseTrustClass, opts.ResponseActionOverride)
+	}
+}
+
+func TestApplyMCPResponseSuppressOpts_ReasoningTrustWarnsMatchingServer(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.ResponseScanning.MCPServers = []config.MCPResponseServerTrust{
+		{Server: testMCPServerName, Trust: config.ResponseTrustReasoning},
+		{Server: "web-fetch", Trust: config.ResponseTrustUntrusted},
+	}
+	opts := mcp.MCPProxyOpts{}
+
+	applyMCPResponseSuppressOpts(&opts, cfg, testMCPServerName)
+
+	if opts.ResponseTrustClass != config.ResponseTrustReasoning {
+		t.Fatalf("ResponseTrustClass = %q, want %q", opts.ResponseTrustClass, config.ResponseTrustReasoning)
+	}
+	if opts.ResponseActionOverride != config.ActionWarn {
+		t.Fatalf("ResponseActionOverride = %q, want %q", opts.ResponseActionOverride, config.ActionWarn)
+	}
+}
+
+func TestApplyMCPResponseSuppressOpts_MissingServerFailsClosed(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.ResponseScanning.MCPServers = []config.MCPResponseServerTrust{
+		{Server: "codex", Trust: config.ResponseTrustReasoning},
+	}
+	opts := mcp.MCPProxyOpts{}
+
+	applyMCPResponseSuppressOpts(&opts, cfg, "web-fetch")
+
+	if opts.ResponseTrustClass != config.ResponseTrustUntrusted || opts.ResponseActionOverride != config.ActionBlock {
+		t.Fatalf("missing server trust/action = %q/%q, want untrusted/block", opts.ResponseTrustClass, opts.ResponseActionOverride)
+	}
+}
+
+func TestMCPResponseLogFieldsShowsEffectivePosture(t *testing.T) {
+	opts := mcp.MCPProxyOpts{}
+	action, trust, server := mcpResponseLogFields(opts)
+	if action != config.ActionBlock || trust != config.ResponseTrustUntrusted || server != "(unnamed)" {
+		t.Fatalf("empty opts log fields = %q/%q/%q, want block/untrusted/(unnamed)", action, trust, server)
+	}
+
+	opts = mcp.MCPProxyOpts{
+		ServerName:             testMCPServerName,
+		ResponseTrustClass:     config.ResponseTrustReasoning,
+		ResponseActionOverride: config.ActionWarn,
+	}
+	action, trust, server = mcpResponseLogFields(opts)
+	if action != config.ActionWarn || trust != config.ResponseTrustReasoning || server != testMCPServerName {
+		t.Fatalf("reasoning opts log fields = %q/%q/%q, want warn/reasoning/%s", action, trust, server, testMCPServerName)
+	}
 }
 
 func TestApplyMCPResponseSuppressOpts_NilConfigKeepsExistingRules(t *testing.T) {

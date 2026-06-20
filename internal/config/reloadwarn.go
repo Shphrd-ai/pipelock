@@ -18,6 +18,13 @@ type ReloadWarning struct {
 	Message string
 }
 
+func defaultMCPResponseTrust(trust string, existed bool) string {
+	if !existed || trust == "" {
+		return ResponseTrustUntrusted
+	}
+	return trust
+}
+
 // ValidateReload compares old and new configs and returns warnings for
 // potential security downgrades. Warnings don't block the reload.
 func ValidateReload(old, updated *Config) []ReloadWarning {
@@ -80,6 +87,19 @@ func ValidateReload(old, updated *Config) []ReloadWarning {
 			Field:   "response_scanning.enabled",
 			Message: "response scanning disabled",
 		})
+	}
+	oldMCPTrust := make(map[string]string, len(old.ResponseScanning.MCPServers))
+	for _, entry := range old.ResponseScanning.MCPServers {
+		oldMCPTrust[entry.Server] = entry.Trust
+	}
+	for _, entry := range updated.ResponseScanning.MCPServers {
+		oldTrust, existed := oldMCPTrust[entry.Server]
+		if entry.Trust == ResponseTrustReasoning && (!existed || oldTrust != ResponseTrustReasoning) {
+			warnings = append(warnings, ReloadWarning{
+				Field:   "response_scanning.mcp_servers",
+				Message: fmt.Sprintf("MCP server %q response trust changed from %s to %s", entry.Server, defaultMCPResponseTrust(oldTrust, existed), entry.Trust),
+			})
+		}
 	}
 
 	// Response scanning exempt_domains: warn when the exemption surface may have

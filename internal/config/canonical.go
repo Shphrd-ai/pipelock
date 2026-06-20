@@ -214,6 +214,7 @@ func (c *Config) policySemanticView() Config {
 	view.TrustedDomains = sortedCopy(view.TrustedDomains)
 	view.A2AScanning.TrustedAgentCardKeys = canonicalA2ATrustedCardKeys(view.A2AScanning.TrustedAgentCardKeys)
 	view.ResponseScanning.SizeExemptDomains = sortedCopy(view.ResponseScanning.SizeExemptDomains)
+	view.ResponseScanning.MCPServers = canonicalMCPResponseServers(view.ResponseScanning.MCPServers)
 	if view.Redaction.Enabled {
 		view.Redaction.AllowlistUnparseable = sortedCopy(view.Redaction.AllowlistUnparseable)
 	} else {
@@ -254,6 +255,20 @@ func canonicalA2ATrustedCardKeys(keys []A2ATrustedCardKey) []A2ATrustedCardKey {
 		left, _ := json.Marshal(out[i].AllowedOrigins)
 		right, _ := json.Marshal(out[j].AllowedOrigins)
 		return string(left) < string(right)
+	})
+	return out
+}
+
+func canonicalMCPResponseServers(entries []MCPResponseServerTrust) []MCPResponseServerTrust {
+	if len(entries) == 0 {
+		return nil
+	}
+	out := append([]MCPResponseServerTrust(nil), entries...)
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Server == out[j].Server {
+			return out[i].Trust < out[j].Trust
+		}
+		return out[i].Server < out[j].Server
 	})
 	return out
 }

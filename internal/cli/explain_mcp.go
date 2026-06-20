@@ -29,6 +29,7 @@ type mcpExplainReport struct {
 	Version     string                 `json:"version"`
 	ServerName  string                 `json:"server_name,omitempty"`
 	Target      string                 `json:"target,omitempty"`
+	TrustClass  string                 `json:"trust_class,omitempty"`
 	Allowed     bool                   `json:"allowed"`
 	Scanner     string                 `json:"scanner,omitempty"`
 	Action      string                 `json:"action,omitempty"`
@@ -170,12 +171,23 @@ func buildMCPExplainReport(cfg *config.Config, cfgLabel, serverName string, line
 	sc := scanner.New(cfg)
 	defer sc.Close()
 
-	// Scan with NO suppression so explain reports what WOULD block; the
-	// remediation then names the suppress entry that lifts it. Dispatch exactly
-	// as the runtime proxy does (tools/list responses bypass generic response
-	// scanning when tool scanning is enabled) so explain never reports a block
-	// the proxy would not produce.
-	verdict := mcp.ScanResponseDispatch(line, sc, cfg.MCPToolScanning.Enabled, mcp.ResponseScanOptions{})
+	trust := config.ResponseTrustUntrusted
+	if configuredTrust, ok := cfg.MCPResponseTrustForServer(serverName); ok {
+		trust = configuredTrust
+	}
+	action := config.MCPResponseActionForTrust(trust)
+	report.TrustClass = trust
+
+	// Scan with NO suppression so explain reports what WOULD be detected; the
+	// remediation then names the suppress entry that lifts a blocking untrusted
+	// finding. Dispatch exactly as the runtime proxy does (tools/list responses
+	// bypass generic response scanning when tool scanning is enabled) so explain
+	// never reports a block the proxy would not produce.
+	verdict := mcp.ScanResponseDispatch(line, sc, cfg.MCPToolScanning.Enabled, mcp.ResponseScanOptions{
+		Target:         mcpResponseTarget(serverName),
+		ActionOverride: action,
+		TrustClass:     trust,
+	})
 
 	if verdict.Error != "" {
 		report.Error = verdict.Error
@@ -189,7 +201,13 @@ func buildMCPExplainReport(cfg *config.Config, cfgLabel, serverName string, line
 	report.Scanner = explainMCPResponseScanner
 	report.Action = verdict.Action
 	report.Patterns = dedupePatternNames(verdict.Matches)
-	report.Remediation = mcpExplainRemediationFor(report.Patterns, serverName)
+	report.Allowed = verdict.Action == config.ActionWarn
+	if !report.Allowed {
+		report.Remediation = mcpExplainRemediationFor(report.Patterns, serverName)
+	}
+	if report.Allowed {
+		report.Notes = append(report.Notes, "MCP response trust class "+trust+" maps this finding to warn; runtime forwards the response and logs the match.")
+	}
 	if serverName == "" {
 		report.Notes = append(report.Notes,
 			"no --server-name given: the suppress target is empty and no suppress entry can match. "+
@@ -254,6 +272,9 @@ func printMCPExplainReport(w io.Writer, report mcpExplainReport) {
 	if report.Target != "" {
 		_, _ = fmt.Fprintf(w, "Target:  %s\n", report.Target)
 	}
+	if report.TrustClass != "" {
+		_, _ = fmt.Fprintf(w, "Trust:   %s\n", report.TrustClass)
+	}
 	_, _ = fmt.Fprintln(w)
 
 	if report.Error != "" {
@@ -263,6 +284,13 @@ func printMCPExplainReport(w io.Writer, report mcpExplainReport) {
 	}
 	if report.Allowed {
 		_, _ = fmt.Fprintln(w, "Verdict: ALLOWED")
+		if report.Scanner != "" {
+			_, _ = fmt.Fprintf(w, "Scanner: %s\n", report.Scanner)
+			_, _ = fmt.Fprintf(w, "Action:  %s\n", report.Action)
+		}
+		if len(report.Patterns) > 0 {
+			_, _ = fmt.Fprintf(w, "Patterns: %s\n", strings.Join(report.Patterns, ", "))
+		}
 		for _, note := range report.Notes {
 			_, _ = fmt.Fprintf(w, "note: %s\n", note)
 		}

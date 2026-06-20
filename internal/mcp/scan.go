@@ -37,6 +37,13 @@ type ResponseScanOptions struct {
 	Target string
 	// Suppress holds the operator's suppress rules (config Suppress list).
 	Suppress []config.SuppressEntry
+	// ActionOverride is the effective MCP response-scan action for this server.
+	// Empty preserves scanner.ResponseAction() for diagnostic callers; the
+	// runtime proxy sets this from the fail-closed trust class decision.
+	ActionOverride string
+	// TrustClass is the effective response trust class used for operator logs.
+	// Empty is treated as untrusted.
+	TrustClass string
 }
 
 // ScanResponse parses a single JSON-RPC 2.0 response and scans its text
@@ -140,9 +147,23 @@ func ScanResponseOpts(line []byte, sc *scanner.Scanner, opts ResponseScanOptions
 	return jsonrpc.ScanVerdict{
 		ID:      rpc.ID,
 		Clean:   false,
-		Action:  sc.ResponseAction(),
+		Action:  responseScanAction(sc, opts),
 		Matches: result.Matches,
 	}
+}
+
+func responseScanAction(sc *scanner.Scanner, opts ResponseScanOptions) string {
+	if opts.ActionOverride != "" {
+		return opts.ActionOverride
+	}
+	return sc.ResponseAction()
+}
+
+func responseScanTrustClass(opts ResponseScanOptions) string {
+	if opts.TrustClass != "" {
+		return opts.TrustClass
+	}
+	return config.ResponseTrustUntrusted
 }
 
 // ScanResponseDispatch scans an MCP response the way ForwardScanned does, so a
@@ -284,7 +305,7 @@ func scanToolsListNonToolFields(line []byte, sc *scanner.Scanner, opts ResponseS
 	return jsonrpc.ScanVerdict{
 		ID:      rpc.ID,
 		Clean:   false,
-		Action:  sc.ResponseAction(),
+		Action:  responseScanAction(sc, opts),
 		Matches: result.Matches,
 	}
 }

@@ -221,9 +221,31 @@ func handleProxyError(err error, logW io.Writer, sentryClient *plsentry.Client) 
 
 func applyMCPResponseSuppressOpts(opts *mcp.MCPProxyOpts, cfg *config.Config, serverName string) {
 	opts.ServerName = serverName
+	trust := config.ResponseTrustUntrusted
 	if cfg != nil {
 		opts.Suppress = cfg.Suppress
+		if configuredTrust, ok := cfg.MCPResponseTrustForServer(serverName); ok {
+			trust = configuredTrust
+		}
 	}
+	opts.ResponseTrustClass = trust
+	opts.ResponseActionOverride = config.MCPResponseActionForTrust(trust)
+}
+
+func mcpResponseLogFields(opts mcp.MCPProxyOpts) (action, trust, server string) {
+	trust = opts.ResponseTrustClass
+	if trust == "" {
+		trust = config.ResponseTrustUntrusted
+	}
+	action = opts.ResponseActionOverride
+	if action == "" {
+		action = config.MCPResponseActionForTrust(trust)
+	}
+	server = opts.ServerName
+	if server == "" {
+		server = "(unnamed)"
+	}
+	return action, trust, server
 }
 
 func mcpReceiptParityOpts(
@@ -995,8 +1017,6 @@ Key-free evidence capture:
 						}
 						return err
 					}
-					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "pipelock: MCP reverse proxy %s -> %s (response=%s, input=%s, tools=%s, policy=%s)\n",
-						listenAddr, upstreamURL, sc.ResponseAction(), inputCfg.Action, toolAction, policyAction)
 					// Wrap static adaptiveCfg in a function to satisfy the
 					// AdaptiveConfigFunc signature. Short-lived: no hot-reload concern.
 					adaptiveFn := mcp.AdaptiveConfigFunc(func() *config.AdaptiveEnforcement {
@@ -1025,6 +1045,9 @@ Key-free evidence capture:
 					}
 					applyMCPResponseSuppressOpts(&listenerOpts, cfg, serverName)
 					listenerOpts = mcpReceiptParityOpts(listenerOpts, receiptEmitter, v2ReceiptEmitter, captureConfigHash, cfg.FlightRecorder.RequireReceipts)
+					respAction, respTrust, respServer := mcpResponseLogFields(listenerOpts)
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "pipelock: MCP reverse proxy %s -> %s (response=%s, trust=%s, server=%s, input=%s, tools=%s, policy=%s)\n",
+						listenAddr, upstreamURL, respAction, respTrust, respServer, inputCfg.Action, toolAction, policyAction)
 					if err := mcp.RunHTTPListenerProxy(ctx, mcpLn, upstreamURL, cmd.ErrOrStderr(), listenerOpts); err != nil {
 						if sentryClient != nil {
 							sentryClient.CaptureError(err)
@@ -1039,8 +1062,6 @@ Key-free evidence capture:
 					if err := validateMCPDeferSurface(deferred.SurfaceMCPWS, cfg); err != nil {
 						return err
 					}
-					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "pipelock: proxying WS upstream %s (response=%s, input=%s, tools=%s, policy=%s)\n",
-						upstreamURL, sc.ResponseAction(), inputCfg.Action, toolAction, policyAction)
 					wsOpts := mcp.MCPProxyOpts{
 						Scanner: sc, Approver: approver,
 						InputCfg: inputCfg, ToolCfg: toolCfg, PolicyCfg: policyCfg,
@@ -1065,6 +1086,9 @@ Key-free evidence capture:
 					}
 					applyMCPResponseSuppressOpts(&wsOpts, cfg, serverName)
 					wsOpts = mcpReceiptParityOpts(wsOpts, receiptEmitter, v2ReceiptEmitter, captureConfigHash, cfg.FlightRecorder.RequireReceipts)
+					respAction, respTrust, respServer := mcpResponseLogFields(wsOpts)
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "pipelock: proxying WS upstream %s (response=%s, trust=%s, server=%s, input=%s, tools=%s, policy=%s)\n",
+						upstreamURL, respAction, respTrust, respServer, inputCfg.Action, toolAction, policyAction)
 					if err := mcp.RunWSProxy(ctx, cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr(), upstreamURL, wsOpts); err != nil {
 						if sentryClient != nil {
 							sentryClient.CaptureError(err)
@@ -1078,8 +1102,6 @@ Key-free evidence capture:
 				if err := validateMCPDeferSurface(deferred.SurfaceMCPHTTPUpstream, cfg); err != nil {
 					return err
 				}
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "pipelock: proxying upstream %s (response=%s, input=%s, tools=%s, policy=%s)\n",
-					upstreamURL, sc.ResponseAction(), inputCfg.Action, toolAction, policyAction)
 				httpOpts := mcp.MCPProxyOpts{
 					Scanner: sc, Approver: approver,
 					InputCfg: inputCfg, ToolCfg: toolCfg, PolicyCfg: policyCfg,
@@ -1105,6 +1127,9 @@ Key-free evidence capture:
 				}
 				applyMCPResponseSuppressOpts(&httpOpts, cfg, serverName)
 				httpOpts = mcpReceiptParityOpts(httpOpts, receiptEmitter, v2ReceiptEmitter, captureConfigHash, cfg.FlightRecorder.RequireReceipts)
+				respAction, respTrust, respServer := mcpResponseLogFields(httpOpts)
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "pipelock: proxying upstream %s (response=%s, trust=%s, server=%s, input=%s, tools=%s, policy=%s)\n",
+					upstreamURL, respAction, respTrust, respServer, inputCfg.Action, toolAction, policyAction)
 				if err := mcp.RunHTTPProxy(ctx, cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr(), upstreamURL, extraHeaders, httpOpts); err != nil {
 					if sentryClient != nil {
 						sentryClient.CaptureError(err)
@@ -1178,10 +1203,6 @@ Key-free evidence capture:
 					workspace, _ = os.Getwd()
 				}
 				workspace, _ = filepath.Abs(workspace)
-
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-					"pipelock: proxying MCP server %v [SANDBOXED] (response=%s, input=%s, tools=%s, policy=%s, workspace=%s)\n",
-					serverCmd, sc.ResponseAction(), inputCfg.Action, toolAction, policyAction, workspace)
 
 				ctx, cancel := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM)
 				defer cancel()
@@ -1271,6 +1292,10 @@ Key-free evidence capture:
 				}
 				applyMCPResponseSuppressOpts(&proxyOpts, cfg, serverName)
 				proxyOpts = mcpReceiptParityOpts(proxyOpts, receiptEmitter, v2ReceiptEmitter, captureConfigHash, cfg.FlightRecorder.RequireReceipts)
+				respAction, respTrust, respServer := mcpResponseLogFields(proxyOpts)
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
+					"pipelock: proxying MCP server %v [SANDBOXED] (response=%s, trust=%s, server=%s, input=%s, tools=%s, policy=%s, workspace=%s)\n",
+					serverCmd, respAction, respTrust, respServer, inputCfg.Action, toolAction, policyAction, workspace)
 				if err := mcp.RunProxyWithSandbox(ctx, sandboxCmd, cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr(), proxyOpts, mcpStrict); err != nil {
 					return handleProxyError(err, cmd.ErrOrStderr(), sentryClient)
 				}
@@ -1281,9 +1306,6 @@ Key-free evidence capture:
 			if err := validateMCPDeferSurface(deferred.SurfaceMCPStdio, cfg); err != nil {
 				return err
 			}
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "pipelock: proxying MCP server %v (response=%s, input=%s, tools=%s, policy=%s)\n",
-				serverCmd, sc.ResponseAction(), inputCfg.Action, toolAction, policyAction)
-
 			ctx, cancel := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM)
 			defer cancel()
 
@@ -1389,6 +1411,9 @@ Key-free evidence capture:
 			}
 			applyMCPResponseSuppressOpts(&proxyOpts, cfg, serverName)
 			proxyOpts = mcpReceiptParityOpts(proxyOpts, receiptEmitter, v2ReceiptEmitter, captureConfigHash, cfg.FlightRecorder.RequireReceipts)
+			respAction, respTrust, respServer := mcpResponseLogFields(proxyOpts)
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "pipelock: proxying MCP server %v (response=%s, trust=%s, server=%s, input=%s, tools=%s, policy=%s)\n",
+				serverCmd, respAction, respTrust, respServer, inputCfg.Action, toolAction, policyAction)
 			if err := mcp.RunProxy(ctx, cmd.InOrStdin(), cmd.OutOrStdout(), logW, serverCmd, proxyOpts, extraEnv...); err != nil {
 				return handleProxyError(err, logW, sentryClient)
 			}

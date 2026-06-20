@@ -39,6 +39,30 @@ func TestBuildMCPExplainReport_BlockNamesSuppressEntry(t *testing.T) {
 	if report.Remediation.RequiresServerName {
 		t.Fatalf("RequiresServerName must be false when --server-name is given")
 	}
+	if report.Action != config.ActionBlock || report.TrustClass != config.ResponseTrustUntrusted {
+		t.Fatalf("action/trust = %q/%q, want block/untrusted", report.Action, report.TrustClass)
+	}
+}
+
+func TestBuildMCPExplainReport_ReasoningTrustWarnsWithoutSuppressRemediation(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.ResponseScanning.MCPServers = []config.MCPResponseServerTrust{
+		{Server: "code-assistant", Trust: config.ResponseTrustReasoning},
+	}
+	report := buildMCPExplainReport(cfg, "(test)", "code-assistant", []byte(mcpSolicitation))
+
+	if !report.Allowed {
+		t.Fatalf("reasoning trust should report allowed warn, got %+v", report)
+	}
+	if report.Action != config.ActionWarn || report.TrustClass != config.ResponseTrustReasoning {
+		t.Fatalf("action/trust = %q/%q, want warn/reasoning", report.Action, report.TrustClass)
+	}
+	if len(report.Patterns) == 0 {
+		t.Fatal("reasoning warn report should still name detected patterns")
+	}
+	if report.Remediation != nil {
+		t.Fatalf("warn-only reasoning report should not suggest suppress remediation: %+v", report.Remediation)
+	}
 }
 
 func TestBuildMCPExplainReport_NoServerNamePlaceholderAndNote(t *testing.T) {

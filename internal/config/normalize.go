@@ -251,6 +251,10 @@ func (c *Config) ApplyDefaults() {
 	if c.ResponseScanning.Action == ActionAsk && c.ResponseScanning.AskTimeoutSeconds <= 0 {
 		c.ResponseScanning.AskTimeoutSeconds = 30
 	}
+	for i := range c.ResponseScanning.MCPServers {
+		c.ResponseScanning.MCPServers[i].Server = strings.TrimSpace(c.ResponseScanning.MCPServers[i].Server)
+		c.ResponseScanning.MCPServers[i].Trust = strings.ToLower(strings.TrimSpace(c.ResponseScanning.MCPServers[i].Trust))
+	}
 	// Merge default response scanning patterns with user patterns.
 	// include_defaults (nil/true): defaults load first, user patterns override by name.
 	// include_defaults (false): only user patterns are used (full override).

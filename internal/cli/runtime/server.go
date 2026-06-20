@@ -49,6 +49,7 @@ type ServerOpts struct {
 	Listen           string
 	MCPListen        string
 	MCPUpstream      string
+	MCPServerName    string
 	ReverseProxy     bool
 	ReverseUpstream  string
 	ReverseListen    string

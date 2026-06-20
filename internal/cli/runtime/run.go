@@ -101,6 +101,7 @@ func RunCmd() *cobra.Command {
 	var listen string
 	var mcpListen string
 	var mcpUpstream string
+	var mcpServerName string
 	var reverseProxy bool
 	var reverseUpstream string
 	var reverseListen string
@@ -147,6 +148,7 @@ Examples:
 				Listen:           listen,
 				MCPListen:        mcpListen,
 				MCPUpstream:      mcpUpstream,
+				MCPServerName:    mcpServerName,
 				ReverseProxy:     reverseProxy,
 				ReverseUpstream:  reverseUpstream,
 				ReverseListen:    reverseListen,
@@ -185,6 +187,7 @@ Examples:
 	cmd.Flags().StringVarP(&listen, "listen", "l", "", "listen address (default 127.0.0.1:8888)")
 	cmd.Flags().StringVar(&mcpListen, "mcp-listen", "", "MCP HTTP listener address (e.g. 0.0.0.0:8889)")
 	cmd.Flags().StringVar(&mcpUpstream, "mcp-upstream", "", "upstream MCP server URL for HTTP listener")
+	cmd.Flags().StringVar(&mcpServerName, "mcp-server-name", "", "stable identity for the MCP listener; enables per-server response trust and suppression via target 'mcp://<name>/response'")
 	cmd.Flags().BoolVar(&reverseProxy, "reverse-proxy", false, "enable reverse proxy mode with body scanning")
 	cmd.Flags().StringVar(&reverseUpstream, "reverse-upstream", "", "upstream URL for reverse proxy (e.g. http://localhost:7899)")
 	cmd.Flags().StringVar(&reverseListen, "reverse-listen", ":8890", "listen address for reverse proxy")

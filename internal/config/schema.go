@@ -6,6 +6,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"github.com/luckyPipewrench/pipelock/internal/redact"
@@ -46,6 +47,14 @@ const (
 	// (e.g. "<pl:ipv4:1>"). Irreversible: pipelock holds no mapping.
 	// See the redaction-v1 design spec in ops for the semantic model.
 	ActionRedact = "redact"
+)
+
+// MCP response trust classes control MCP response-scan enforcement. Omitted or
+// unmatched servers are treated as untrusted by the MCP proxy and therefore
+// fail closed on response-injection findings.
+const (
+	ResponseTrustUntrusted = "untrusted"
+	ResponseTrustReasoning = "reasoning"
 )
 
 // Severity constants for chain detection and emit thresholds.
@@ -583,6 +592,13 @@ type MCPToolScanning struct {
 	DetectDrift bool   `yaml:"detect_drift"` // rug pull detection
 }
 
+// MCPResponseServerTrust assigns a response trust class to one named MCP
+// server. The server name must match the proxy's --server-name value.
+type MCPResponseServerTrust struct {
+	Server string `yaml:"server"`
+	Trust  string `yaml:"trust"` // untrusted, reasoning
+}
+
 // RedirectProfile defines a local executable to invoke when a tool call
 // is redirected instead of blocked. The redirect handler receives the
 // original tool arguments and returns output that pipelock wraps as a
@@ -670,14 +686,44 @@ type ToolPolicyRule struct {
 
 // ResponseScanning configures scanning of fetched page content for prompt injection.
 type ResponseScanning struct {
-	Enabled           bool                  `yaml:"enabled"`
-	Action            string                `yaml:"action"`              // strip, warn, block, ask
-	AskTimeoutSeconds int                   `yaml:"ask_timeout_seconds"` // timeout for HITL prompt (default 30)
-	IncludeDefaults   *bool                 `yaml:"include_defaults"`    // nil/true: merge user patterns with defaults; false: user patterns only
-	Patterns          []ResponseScanPattern `yaml:"patterns"`
-	ExemptDomains     []string              `yaml:"exempt_domains"`      // responses from these hosts skip injection scanning (DLP still applies)
-	SizeExemptDomains []string              `yaml:"size_exempt_domains"` // trusted hosts whose oversized responses may stream through instead of failing the scan cap
-	SSEStreaming      GenericSSEScanning    `yaml:"sse_streaming"`       // generic text/event-stream inline scanning (LLM SSE)
+	Enabled           bool                     `yaml:"enabled"`
+	Action            string                   `yaml:"action"`              // strip, warn, block, ask
+	AskTimeoutSeconds int                      `yaml:"ask_timeout_seconds"` // timeout for HITL prompt (default 30)
+	IncludeDefaults   *bool                    `yaml:"include_defaults"`    // nil/true: merge user patterns with defaults; false: user patterns only
+	Patterns          []ResponseScanPattern    `yaml:"patterns"`
+	ExemptDomains     []string                 `yaml:"exempt_domains"`      // responses from these hosts skip injection scanning (DLP still applies)
+	SizeExemptDomains []string                 `yaml:"size_exempt_domains"` // trusted hosts whose oversized responses may stream through instead of failing the scan cap
+	SSEStreaming      GenericSSEScanning       `yaml:"sse_streaming"`       // generic text/event-stream inline scanning (LLM SSE)
+	MCPServers        []MCPResponseServerTrust `yaml:"mcp_servers"`         // per-server MCP response trust overrides
+}
+
+// MCPResponseTrustForServer returns the configured MCP response trust class for
+// serverName. The bool is true only for an explicit per-server entry.
+func (c *Config) MCPResponseTrustForServer(serverName string) (string, bool) {
+	name := strings.TrimSpace(serverName)
+	if c == nil || name == "" {
+		return ResponseTrustUntrusted, false
+	}
+	for _, entry := range c.ResponseScanning.MCPServers {
+		if entry.Server == name {
+			return entry.Trust, true
+		}
+	}
+	return ResponseTrustUntrusted, false
+}
+
+// MCPResponseActionForTrust maps a trust class to the fail-closed MCP
+// response-scan action. Unknown values block; validation should reject them
+// before runtime, but the proxy must still be conservative.
+func MCPResponseActionForTrust(trust string) string {
+	switch trust {
+	case ResponseTrustReasoning:
+		return ActionWarn
+	case ResponseTrustUntrusted:
+		return ActionBlock
+	default:
+		return ActionBlock
+	}
 }
 
 // GenericSSEScanning configures inline body scanning of non-A2A
