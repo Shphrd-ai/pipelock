@@ -497,7 +497,8 @@ func newGenCodeCmd() *cobra.Command {
 
 // containVerifier proves kernel containment is in place before a public session
 // starts. It requires root (the contained drop is a privileged operation) and
-// confirms `pipelock contain verify` passes (via playground.ContainmentAvailable).
+// confirms `pipelock contain verify --enforcement-only` passes (via
+// playground.ContainmentEnforced).
 // The per-session CRYPTOGRAPHIC proof is the signed host-containment witness
 // produced at session finalize; this is the start-time gate that refuses to even
 // begin if the kernel drop is not active.
@@ -507,8 +508,8 @@ func (containVerifier) Verify(_ context.Context) error {
 	if os.Geteuid() != 0 {
 		return errors.New("containment requires root (run the server as root, or use --dev to run uncontained)")
 	}
-	if !playground.ContainmentAvailable() {
-		return errors.New("'pipelock contain verify' did not pass; containment is not installed")
+	if !playground.ContainmentEnforced() {
+		return errors.New("'pipelock contain verify --enforcement-only' did not pass; containment enforcement is not installed")
 	}
 	return nil
 }

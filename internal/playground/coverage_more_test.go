@@ -356,6 +356,85 @@ func TestContainmentAvailableFalseWhenPipelockMissing(t *testing.T) {
 	}
 }
 
+func TestContainmentEnforcedUsesEnforcementOnlyVerify(t *testing.T) {
+	dir := t.TempDir()
+	argsLog := filepath.Join(dir, "args.log")
+	pipelockPath := filepath.Join(dir, "pipelock")
+	body := "#!/bin/sh\nprintf '%s\\n' \"$*\" > \"$PIPELOCK_ARGS_LOG\"\n"
+	if err := os.WriteFile(pipelockPath, []byte(body), 0o755); err != nil { //nolint:gosec // test executable
+		t.Fatalf("write fake pipelock: %v", err)
+	}
+	t.Setenv("PATH", dir)
+	t.Setenv("PIPELOCK_ARGS_LOG", argsLog)
+
+	if !ContainmentEnforced() {
+		t.Fatal("fake pipelock should make containment enforcement available")
+	}
+	got, err := os.ReadFile(argsLog) //nolint:gosec // tmpdir-scoped test output
+	if err != nil {
+		t.Fatalf("read args log: %v", err)
+	}
+	if string(got) != "contain verify --enforcement-only\n" {
+		t.Fatalf("fake pipelock args = %q", got)
+	}
+}
+
+func TestVerifyModelLiveContained(t *testing.T) {
+	t.Parallel()
+	oneReceipt := []receipt.Receipt{{}}
+	cases := []struct {
+		name     string
+		receipts []receipt.Receipt
+		witness  Witness
+		wantErr  bool
+	}{
+		{"clean: observed 0 with a signed decision", oneReceipt, Witness{ObservedCount: 0, TotalCount: 0}, false},
+		{"leak observed fails closed", oneReceipt, Witness{ObservedCount: 1, TotalCount: 1}, true},
+		{"any total reaching collector fails closed", oneReceipt, Witness{ObservedCount: 0, TotalCount: 1}, true},
+		{"empty run has nothing to attest", nil, Witness{ObservedCount: 0, TotalCount: 0}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := verifyModelLiveContained(tc.receipts, tc.witness)
+			if tc.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("expected nil, got %v", err)
+			}
+		})
+	}
+}
+
+func TestManifestAgentKind(t *testing.T) {
+	t.Parallel()
+	if got := manifestAgentKind("https://api.vendor.example"); got != AgentKindModel {
+		t.Errorf("model url -> %q, want %q", got, AgentKindModel)
+	}
+	if got := manifestAgentKind(""); got != AgentKindDeterministic {
+		t.Errorf("empty url -> %q, want %q", got, AgentKindDeterministic)
+	}
+}
+
+func TestLaunchManifest_AgentKindIsSigned(t *testing.T) {
+	t.Parallel()
+	pub, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed := SignLaunchManifest(priv, LaunchManifest{RunNonce: "n", AgentKind: AgentKindModel})
+	if !VerifyLaunchManifest(pub, signed) {
+		t.Fatal("freshly signed model manifest must verify")
+	}
+	// Flipping AgentKind must break the signature: an attacker must not be able to
+	// relabel a run to route it to a different verify predicate.
+	tampered := signed
+	tampered.AgentKind = AgentKindDeterministic
+	if VerifyLaunchManifest(pub, tampered) {
+		t.Fatal("tampering AgentKind must invalidate the manifest signature")
+	}
+}
+
 func TestVerifyBodyExfilLiveDemoSemantics(t *testing.T) {
 	t.Parallel()
 

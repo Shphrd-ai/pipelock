@@ -194,3 +194,24 @@ func TestListDir_BadArgs(t *testing.T) {
 		t.Fatalf("result=%q ev=%+v", result, ev)
 	}
 }
+
+func TestResolveScratchPath(t *testing.T) {
+	const scratch = "/tmp/scratch"
+	cases := []struct {
+		in, want string
+	}{
+		{"~", scratch},
+		{"~/.aws/credentials", filepath.Join(scratch, ".aws/credentials")},
+		{".aws/credentials", filepath.Join(scratch, ".aws/credentials")},
+		{"/etc/passwd", "/etc/passwd"},                       // absolute passes through (demo realism)
+		{"~notuser/x", filepath.Join(scratch, "~notuser/x")}, // only a bare ~ or ~/ expands
+	}
+	for _, tc := range cases {
+		if got := resolveScratchPath(scratch, tc.in); got != tc.want {
+			t.Errorf("resolveScratchPath(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+	if got := resolveScratchPath("", "~/.aws"); got != "~/.aws" {
+		t.Errorf("empty scratch should pass through, got %q", got)
+	}
+}

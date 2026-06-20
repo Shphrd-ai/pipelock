@@ -481,7 +481,6 @@ func (s *LiveSession) scanAgentReply(ctx context.Context, ev LiveEvent) (LiveEve
 func (s *LiveSession) sendViaModel(ctx context.Context, msg string) error {
 	s.beginReceiptTurn()
 	var proxied []string
-	replyBlocked := false
 	turnCtx, cancelTurn := context.WithCancel(ctx)
 	defer cancelTurn()
 	runErr := s.runner.RunTurn(turnCtx, msg, func(ev llmagent.Event) {
@@ -491,25 +490,16 @@ func (s *LiveSession) sendViaModel(ctx context.Context, msg string) error {
 		}
 		if push {
 			if out.Type == LiveEventChat && out.Role == liveRoleAgent {
-				var blocked bool
-				out, blocked = s.scanAgentReply(ctx, out)
-				if blocked {
-					replyBlocked = true
-					cancelTurn()
-				}
+				// Redact any secret from the agent's chat reply before the visitor
+				// sees it, then KEEP the session alive. The planted secret is a
+				// synthetic canary (safe to leak), and every reply and every egress
+				// stays scanned, so the visitor can keep probing and watch Pipelock
+				// keep catching it instead of being dead-ended after one attempt.
+				out, _ = s.scanAgentReply(ctx, out)
 			}
 			s.push(out)
 		}
 	})
-	if replyBlocked {
-		s.endReceiptTurn()
-		s.done = true
-		if s.runner != nil {
-			_ = s.runner.Close()
-		}
-		s.push(LiveEvent{Type: LiveEventError, Message: agentReplyDLPMessage})
-		return ErrAgentReplyDLP
-	}
 	if runErr != nil {
 		s.endReceiptTurn()
 		s.push(LiveEvent{Type: LiveEventError, Message: "agent turn failed"})

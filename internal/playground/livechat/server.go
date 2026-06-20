@@ -640,11 +640,15 @@ func (s *Server) seal(entry *liveEntry) error {
 	entry.sealOnce.Do(func() {
 		if _, err := entry.sess.Finalize(entry.runDir); err != nil {
 			entry.sealErr = err
+			// Server-side observability: a seal failure surfaces to the client only
+			// as a generic 503, so log the real cause for the operator.
+			_, _ = fmt.Fprintf(os.Stderr, "livechat: session seal failed at finalize: %v\n", err)
 			return
 		}
 		arc, err := playground.ArchiveRunForDownload(entry.runDir, entry.sess.OrchestratorPubHex())
 		if err != nil {
 			entry.sealErr = fmt.Errorf("archive session bundle: %w", err)
+			_, _ = fmt.Fprintf(os.Stderr, "livechat: session seal failed at archive: %v\n", err)
 			return
 		}
 		entry.bundle = arc

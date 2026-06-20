@@ -209,7 +209,7 @@ func resolveSecretValues(getenv func(string) string) []string {
 }
 
 func buildAgent(cfg config, apiKey string, emit func(llmagent.Event)) (*llmagent.Agent, error) {
-	client, err := buildClient(cfg.proxyURL, cfg.timeout)
+	client, err := buildClient(cfg.proxyURL, cfg.timeout, cfg.actor)
 	if err != nil {
 		return nil, err
 	}
@@ -228,6 +228,10 @@ func buildAgent(cfg config, apiKey string, emit func(llmagent.Event)) (*llmagent
 		BaseURL: cfg.modelBaseURL,
 		Model:   cfg.model,
 		APIKey:  apiKey,
+		// Attribute the model API traffic to the lab agent on its proxy receipts,
+		// matching the tools above. Without this the mediator records "anonymous"
+		// and the public-safe packet assembler rejects the receipt at seal time.
+		RequestHeaders: map[string]string{proxy.AgentHeader: cfg.actor},
 		// SystemPrompt left empty: the aggressive, uninstructed llmagent default
 		// applies. The agent is told nothing about secrets, collectors, or
 		// guardrails; Pipelock and host containment are the only controls.
@@ -247,7 +251,7 @@ func hostnameFromHTTPURL(raw string) (string, error) {
 	return host, nil
 }
 
-func buildClient(proxyURL string, timeout time.Duration) (*http.Client, error) {
+func buildClient(proxyURL string, timeout time.Duration, agentID string) (*http.Client, error) {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
@@ -261,6 +265,14 @@ func buildClient(proxyURL string, timeout time.Duration) (*http.Client, error) {
 			return nil, fmt.Errorf("parse proxy url: %w", err)
 		}
 		tr.Proxy = http.ProxyURL(u)
+		// Carry the agent identity on the CONNECT request. HTTPS traffic (model API
+		// + tool calls) is CONNECT-tunneled, and Go does not put inner request
+		// headers on the CONNECT, so without this the mediating proxy records the
+		// actor as "anonymous" and the public-safe packet assembler rejects the
+		// receipt at seal time.
+		if agentID != "" {
+			tr.ProxyConnectHeader = http.Header{proxy.AgentHeader: []string{agentID}}
+		}
 		// Proxy-only transport guard: the subprocess's transport may dial ONLY the
 		// proxy address. This is not kernel no-bypass (the host attests that
 		// separately), but it fails closed on a direct dial — catching a NO_PROXY

@@ -1316,6 +1316,48 @@ func TestRunVerify_JSONOutput_AllPass(t *testing.T) {
 	}
 }
 
+func TestRunVerify_EnforcementOnlySkipsProxyLiveness(t *testing.T) {
+	env := allPassEnv(t)
+	var systemdCalled bool
+	env.runCmd = func(_ context.Context, name string, args ...string) (string, int, error) {
+		if name == testSystemctl {
+			systemdCalled = true
+			return "", 1, errors.New("systemd should not run in enforcement-only mode")
+		}
+		return defaultRunForAllPass(name, args)
+	}
+	var dialCalled bool
+	env.dialCtx = func(_ context.Context, _, _ string, _ time.Duration) (net.Conn, error) {
+		dialCalled = true
+		return nil, errors.New("loopback dial should not run in enforcement-only mode")
+	}
+
+	cmd := newVerifyCmd(t)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+
+	err := runVerify(cmd, env, verifyOpts{enforcementOnly: true})
+	if err != nil {
+		t.Fatalf("runVerify returned err: %v", err)
+	}
+	if systemdCalled {
+		t.Fatal("probe 2 systemd check ran in enforcement-only mode")
+	}
+	if dialCalled {
+		t.Fatal("probe 6 loopback dial ran in enforcement-only mode")
+	}
+	out := buf.String()
+	if !strings.HasPrefix(out, "pipelock contain verify --enforcement-only") {
+		t.Errorf("missing enforcement-only header: %q", out)
+	}
+	if strings.Contains(out, "probe 2:") || strings.Contains(out, "probe 6:") {
+		t.Errorf("liveness probes should be omitted: %q", out)
+	}
+	if !strings.Contains(out, "10 PASS / 0 FAIL / 0 SKIP") {
+		t.Errorf("missing enforcement-only aggregate: %q", out)
+	}
+}
+
 func TestRunVerify_FailExitCode(t *testing.T) {
 	env := allPassEnv(t)
 	// Force the egress canary (probe 8) to fail by reporting curl success.
@@ -1386,6 +1428,9 @@ func TestVerifyCmd_Wiring(t *testing.T) {
 	}
 	if f := verify.Flag("json"); f == nil {
 		t.Errorf("--json flag missing")
+	}
+	if f := verify.Flag("enforcement-only"); f == nil {
+		t.Errorf("--enforcement-only flag missing")
 	}
 	if f := verify.Flag("port"); f == nil {
 		t.Errorf("--port flag missing")

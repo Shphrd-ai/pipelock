@@ -118,6 +118,30 @@ func argvFor(name string, args ...string) string {
 	return name + " " + strings.Join(args, " ")
 }
 
+func withSystemCABundleCandidates(t *testing.T, paths ...string) {
+	t.Helper()
+	orig := systemCABundleCandidates
+	systemCABundleCandidates = append([]string(nil), paths...)
+	t.Cleanup(func() {
+		systemCABundleCandidates = orig
+	})
+}
+
+func TestSystemCABundlePathPicksFirstExistingCandidate(t *testing.T) {
+	root := t.TempDir()
+	missing := filepath.Join(root, "missing.pem")
+	existing := filepath.Join(root, "ca-certificates.crt")
+	if err := os.WriteFile(existing, []byte("# system bundle\n"), 0o600); err != nil {
+		t.Fatalf("write existing bundle: %v", err)
+	}
+
+	withSystemCABundleCandidates(t, missing, existing)
+
+	if got := systemCABundlePath(); got != existing {
+		t.Fatalf("systemCABundlePath() = %q, want %q", got, existing)
+	}
+}
+
 // newFakeEnv builds an installEnv backed by tmpdirs and fake hooks. The
 // filesystem-side fields (chown, mkdirAll, etc.) are wired to real os
 // calls operating under root, the tmpdir constructed for the test; the
@@ -222,27 +246,18 @@ func newFakeEnv(t *testing.T) (*installEnv, *fakeRunner, *bytes.Buffer) {
 	}
 	// Plant a fake system CA bundle the install will read.
 	systemBundle := filepath.Join(root, "etc", "ssl", "certs", "ca-bundle.crt")
-	if err := os.MkdirAll(filepath.Dir(systemBundle), 0o755); err != nil { //nolint:gosec // tmpdir
+	if err := os.MkdirAll(filepath.Dir(systemBundle), 0o750); err != nil {
 		t.Fatalf("mkdir system bundle parent: %v", err)
 	}
 	if err := os.WriteFile(systemBundle, []byte("# system bundle\n"), 0o600); err != nil {
 		t.Fatalf("write fake system bundle: %v", err)
 	}
+	withSystemCABundleCandidates(t, systemBundle)
 	// Plant a CA export file (will be created during install but we
 	// pre-create it so the runner doesn't need to mock the export
 	// subprocess writing through pipelock).
 	if err := os.MkdirAll(env.configDir, 0o750); err != nil {
 		t.Fatalf("mkdir configDir: %v", err)
-	}
-
-	// Patch defaultSystemCABundle indirection by overriding readFile so
-	// the canonical path resolves to our test path.
-	origReadFile := env.readFile
-	env.readFile = func(p string) ([]byte, error) {
-		if p == defaultSystemCABundle {
-			return os.ReadFile(systemBundle) //nolint:gosec // tmpdir-scoped test path
-		}
-		return origReadFile(p)
 	}
 
 	return env, runner, out
@@ -485,7 +500,7 @@ func TestRunInstall_UpgradeRotatesExistingBackups(t *testing.T) {
 	systemBundle := []byte("# system bundle v1\n")
 	origReadFile := env.readFile
 	env.readFile = func(path string) ([]byte, error) {
-		if path == defaultSystemCABundle {
+		if path == systemCABundlePath() {
 			return append([]byte(nil), systemBundle...), nil
 		}
 		return origReadFile(path)

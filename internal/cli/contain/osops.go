@@ -175,7 +175,6 @@ const (
 	defaultGuardServiceUnit   = "/etc/systemd/system/pipelock-cred-guard.service" //nolint:gosec // G101: unit filename, not a credential value.
 	defaultGuardPathUnit      = "/etc/systemd/system/pipelock-cred-guard.path"    //nolint:gosec // G101: unit filename, not a credential value.
 	defaultPipelockTarget     = "/usr/local/bin/pipelock"
-	defaultSystemCABundle     = "/etc/ssl/certs/ca-bundle.crt"
 
 	// File modes. The model is "pipelock-agent UID must be able to read every
 	// non-secret file the wrappers depend on at runtime, but cannot read
@@ -207,6 +206,22 @@ const backupArchiveTimeFormat = "2006-01-02T15:04:05.000000000Z"
 
 var backupArchiveNow = func() time.Time {
 	return time.Now().UTC()
+}
+
+var systemCABundleCandidates = []string{
+	"/etc/ssl/certs/ca-certificates.crt", // Debian/Ubuntu
+	"/etc/pki/tls/certs/ca-bundle.crt",   // Fedora/RHEL
+	"/etc/ssl/certs/ca-bundle.crt",       // older Fedora layout
+	"/etc/ssl/cert.pem",                  // Alpine/BSD
+}
+
+func systemCABundlePath() string {
+	for _, p := range systemCABundleCandidates {
+		if _, err := os.Stat(filepath.Clean(p)); err == nil {
+			return p
+		}
+	}
+	return "/etc/ssl/certs/ca-certificates.crt"
 }
 
 // writeFileAtomic writes path by creating a sibling .tmp and renaming it

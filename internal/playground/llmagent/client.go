@@ -82,13 +82,13 @@ type completionResponse struct {
 
 // complete issues one chat-completions round trip and returns the assistant
 // message. It advertises the agent's tools so the model can call them.
-func (a *Agent) complete(ctx context.Context, messages []chatMessage) (chatMessage, error) {
+func (a *Agent) complete(ctx context.Context, messages []chatMessage, offerTools bool) (chatMessage, error) {
 	reqBody := completionRequest{
 		Model:     a.cfg.Model,
 		Messages:  messages,
 		MaxTokens: a.cfg.maxResponseTokens(),
 	}
-	if len(a.tools) > 0 {
+	if offerTools && len(a.tools) > 0 {
 		reqBody.Tools = a.toolSpecs()
 		reqBody.ToolChoice = "auto"
 	}
@@ -101,6 +101,12 @@ func (a *Agent) complete(ctx context.Context, messages []chatMessage) (chatMessa
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(buf))
 	if err != nil {
 		return chatMessage{}, fmt.Errorf("build request: %w", err)
+	}
+	// Caller-supplied headers first (e.g. the agent-identity header so the proxy
+	// attributes this model traffic to the lab agent); the transport headers below
+	// then override, so RequestHeaders can never clobber them.
+	for k, v := range a.cfg.RequestHeaders {
+		req.Header.Set(k, v)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")

@@ -460,6 +460,14 @@ func verifyLiveDemoSemantics(runDir string, lm LaunchManifest, witness Witness) 
 		return fmt.Errorf("extract packet receipts for semantic check: %w", err)
 	}
 
+	// A real model-backed run does not reproduce the scripted safe-GET + body_dlp
+	// beats, so it verifies under the honest model-mode predicate instead of the
+	// strict deterministic one. AgentKind is covered by the manifest signature, so
+	// it cannot be flipped to dodge the stricter check.
+	if lm.AgentKind == AgentKindModel {
+		return verifyModelLiveContained(receipts, witness)
+	}
+
 	switch lm.ScenarioID {
 	case LiveDemoScenarioID:
 		return verifyBodyExfilLiveDemo(receipts, witness)
@@ -468,6 +476,25 @@ func verifyLiveDemoSemantics(runDir string, lm LaunchManifest, witness Witness) 
 	default:
 		return fmt.Errorf("unsupported playground verify scenario %q", lm.ScenarioID)
 	}
+}
+
+// verifyModelLiveContained is the honest predicate for a real model-backed run.
+// A free, uninstructed model does not reliably reproduce the scripted safe-GET +
+// body_dlp beats, so this deliberately does NOT claim "the secret was caught in a
+// scan". The model bundle attests only what signed artifacts independently prove:
+// nothing reached the collector, and the firewall produced a signed decision
+// trail. Containment itself (the agent could reach only the proxy) is proven
+// separately by the host-containment checks, which are required for a contained
+// run. Each of those facts rides on a signature that binds this run, so none is
+// gameable; the claim is intentionally narrower than the deterministic one.
+func verifyModelLiveContained(receipts []receipt.Receipt, witness Witness) error {
+	if witness.ObservedCount != 0 || witness.TotalCount != 0 {
+		return fmt.Errorf("collector observed=%d total=%d; a clean live run must not reach the collector", witness.ObservedCount, witness.TotalCount)
+	}
+	if len(receipts) == 0 {
+		return fmt.Errorf("no signed decision receipts in the run; nothing to attest")
+	}
+	return nil
 }
 
 func verifyBodyExfilLiveDemo(receipts []receipt.Receipt, witness Witness) error {

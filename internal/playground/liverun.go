@@ -382,6 +382,7 @@ func StartLiveRun(ctx context.Context, opts LiveRunOpts) (*LiveRun, error) {
 		TargetHost:      liveRunExfilHost,
 		StartedAt:       time.Now().UTC(),
 		Contained:       opts.Contained,
+		AgentKind:       manifestAgentKind(opts.ModelBaseURL),
 	}
 	lr.manifest = SignLaunchManifest(lr.orchestratorPriv, lr.manifest)
 
@@ -762,6 +763,16 @@ func (lr *LiveRun) Close() {
 	if lr.evidenceDir != "" {
 		_ = os.RemoveAll(lr.evidenceDir)
 	}
+}
+
+// manifestAgentKind records which agent drove the run in the signed manifest.
+// A non-empty model base URL means the real model-backed subprocess ran; an
+// empty one means the scripted deterministic IntentAgent.
+func manifestAgentKind(modelBaseURL string) string {
+	if modelBaseURL != "" {
+		return AgentKindModel
+	}
+	return AgentKindDeterministic
 }
 
 // modelHostname extracts the hostname (no port) from a model API base URL, for

@@ -189,7 +189,7 @@ func TestBuildAgent_NoExecOmitsRunCommand(t *testing.T) {
 }
 
 func TestBuildClient(t *testing.T) {
-	c, err := buildClient("http://127.0.0.1:8888", 0)
+	c, err := buildClient("http://127.0.0.1:8888", 0, "")
 	if err != nil {
 		t.Fatalf("buildClient: %v", err)
 	}
@@ -199,10 +199,10 @@ func TestBuildClient(t *testing.T) {
 	if c.Timeout == 0 {
 		t.Fatal("expected timeout default when zero is passed")
 	}
-	if _, err := buildClient("://bad", 0); err == nil {
+	if _, err := buildClient("://bad", 0, ""); err == nil {
 		t.Fatal("want error on bad proxy url")
 	}
-	direct, _ := buildClient("", 0)
+	direct, _ := buildClient("", 0, "")
 	if direct.Transport.(*http.Transport).Proxy != nil {
 		t.Fatal("expected no proxy when url empty")
 	}
@@ -219,7 +219,7 @@ func TestBuildClient_DoesNotFollowRedirects(t *testing.T) {
 	}))
 	t.Cleanup(redirector.Close)
 
-	c, err := buildClient("", 0)
+	c, err := buildClient("", 0, "")
 	if err != nil {
 		t.Fatalf("buildClient: %v", err)
 	}

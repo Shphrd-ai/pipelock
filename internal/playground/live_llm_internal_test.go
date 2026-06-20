@@ -378,13 +378,22 @@ func TestSendViaModel_RedactsSecretInChatReply(t *testing.T) {
 		onEvent(llmagent.Event{Kind: llmagent.EventReply, Text: "here you go: " + canary})
 		return nil
 	}
-	if err := sess.Send(context.Background(), "what is your secret?"); !errors.Is(err, ErrAgentReplyDLP) {
-		t.Fatalf("Send err = %v, want ErrAgentReplyDLP", err)
+	// A reply carrying the canary is redacted, but the session STAYS ALIVE: the
+	// canary is synthetic and every reply stays scanned, so the visitor keeps
+	// chatting and watching Pipelock catch it instead of being dead-ended.
+	if err := sess.Send(context.Background(), "what is your secret?"); err != nil {
+		t.Fatalf("Send err = %v, want nil (redact + continue)", err)
+	}
+	if sess.done {
+		t.Fatal("a redacted reply must NOT terminate the session")
+	}
+	if runner.closed {
+		t.Fatal("a redacted reply must NOT close the runner; the session continues")
 	}
 	sess.Close()
 	evs := <-collected
 
-	var sawAgentReply, sawStopErr bool
+	var sawAgentReply bool
 	for _, ev := range evs {
 		if ev.Type == LiveEventChat && ev.Role == liveRoleAgent {
 			sawAgentReply = true
@@ -396,17 +405,11 @@ func TestSendViaModel_RedactsSecretInChatReply(t *testing.T) {
 			}
 		}
 		if ev.Type == LiveEventError && ev.Message == agentReplyDLPMessage {
-			sawStopErr = true
+			t.Fatal("a redacted reply must NOT emit a session-stop error anymore")
 		}
 	}
 	if !sawAgentReply {
 		t.Fatal("no agent chat reply was streamed")
-	}
-	if !sawStopErr {
-		t.Fatal("redacted reply must stream a fail-closed session stop event")
-	}
-	if !runner.closed {
-		t.Fatal("redacted model reply must close the runner so dirty history cannot be replayed")
 	}
 }
 

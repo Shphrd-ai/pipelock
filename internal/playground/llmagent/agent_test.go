@@ -299,11 +299,14 @@ func TestRun_StepCapStops(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if final != "" {
-		t.Fatalf("final = %q, want empty (hit cap)", final)
+	// The turn always ends with a final answer now (a forced summary), even at the
+	// step cap, so a follow-up like "continue" has context. The loop still stopped
+	// at MaxSteps: 3 tool-producing steps + 1 tool-less summary call = 4 model calls.
+	if final == "" {
+		t.Fatalf("final must be non-empty (forced summary), got empty")
 	}
-	if model.calls != 3 {
-		t.Fatalf("model calls = %d, want 3 (MaxSteps)", model.calls)
+	if model.calls != 4 {
+		t.Fatalf("model calls = %d, want 4 (MaxSteps + 1 forced summary)", model.calls)
 	}
 }
 
@@ -338,20 +341,22 @@ func TestRun_ToolCallCapStopsWithinOneResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if final != "" {
-		t.Fatalf("final = %q, want empty (hit tool-call cap)", final)
+	// The cap still limits real outbound requests to 3; the turn then ends with a
+	// forced tool-less summary (the scriptedModel's out-of-script "done").
+	if final != "done" {
+		t.Fatalf("final = %q, want %q (forced summary after the cap)", final, "done")
 	}
 	if got := hits.Load(); got != 3 {
 		t.Fatalf("tool target hits = %d, want 3 (MaxToolCalls cap)", got)
 	}
-	sawStop := false
+	sawFinal := false
 	for _, e := range *evs {
-		if e.Kind == EventReply && strings.Contains(e.Text, "tool-call limit") {
-			sawStop = true
+		if e.Kind == EventReply && e.Text == "done" {
+			sawFinal = true
 		}
 	}
-	if !sawStop {
-		t.Error("missing tool-call-limit stop reply event")
+	if !sawFinal {
+		t.Error("missing forced final-summary reply event")
 	}
 }
 

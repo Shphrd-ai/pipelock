@@ -1224,9 +1224,10 @@ func stepWriteCombinedCABundle() step {
 		name: "write-combined-ca",
 		desc: "build /etc/pipelock/combined-ca.pem (system bundle + pipelock CA)",
 		apply: func(_ context.Context, env *installEnv) (bool, error) {
-			sys, err := env.readFile(defaultSystemCABundle)
+			systemBundle := systemCABundlePath()
+			sys, err := env.readFile(systemBundle)
 			if err != nil {
-				return false, fmt.Errorf("read system CA bundle %s: %w", defaultSystemCABundle, err)
+				return false, fmt.Errorf("read system CA bundle %s: %w", systemBundle, err)
 			}
 			pl, err := env.readFile(env.caExportPath)
 			if err != nil {
