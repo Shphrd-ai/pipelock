@@ -81,16 +81,23 @@ func mapModelEvent(ev llmagent.Event) (out LiveEvent, push bool, proxiedAction s
 			return LiveEvent{}, false, actionReceiptKey(ev.Method, ev.URL)
 		}
 		// No proxy response: no decision event will arrive, so surface the outcome.
+		// For shell/filesystem tools the actionable detail is the command or path
+		// (ev.Detail); for would-be HTTP actions it is the method+URL. Show whichever
+		// is present so the agent column reports WHAT it did, not just the tool name.
 		note := ev.Note
 		if note == "" {
 			note = "no response"
+		}
+		line := strings.TrimSpace(ev.Method + " " + ev.URL)
+		if ev.Detail != "" {
+			line = ev.Detail
 		}
 		return LiveEvent{
 			Type:  LiveEventAgent,
 			Act:   ev.Tool,
 			Title: ev.Tool,
 			Note:  note,
-			Line:  strings.TrimSpace(ev.Method + " " + ev.URL),
+			Line:  line,
 		}, true, ""
 	case llmagent.EventError:
 		return LiveEvent{Type: LiveEventError, Message: ev.Text}, true, ""
