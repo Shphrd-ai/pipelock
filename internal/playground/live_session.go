@@ -23,13 +23,21 @@ import (
 
 // Live event types streamed to the viewer.
 const (
-	LiveEventStatus   = "status"
-	LiveEventChat     = "chat"
-	LiveEventAgent    = "agent"
-	LiveEventDecision = "decision"
-	LiveEventVerified = "verified"
-	LiveEventError    = "error"
-	LiveEventDone     = "done"
+	LiveEventStatus     = "status"
+	LiveEventChat       = "chat"
+	LiveEventAgent      = "agent"
+	LiveEventAgentState = "agent_state" // thinking / acting / ended (with a reason)
+	LiveEventDecision   = "decision"
+	LiveEventVerified   = "verified"
+	LiveEventError      = "error"
+	LiveEventDone       = "done"
+)
+
+// Agent activity states carried on a LiveEventAgentState event's State field, so
+// the viewer shows the agent's state exactly instead of inferring it.
+const (
+	agentStateThinking = "thinking" // a model round trip is in flight
+	agentStateEnded    = "ended"    // the turn finished
 )
 
 // Live session states surfaced in the status event.

@@ -101,10 +101,31 @@ func mapModelEvent(ev llmagent.Event) (out LiveEvent, push bool, proxiedAction s
 			Note:  note,
 			Line:  line,
 		}, true, ""
+	case llmagent.EventThinking:
+		// Model round trip in flight: surface the exact "thinking" state so the
+		// viewer does not have to infer it from event silence.
+		return LiveEvent{Type: LiveEventAgentState, State: agentStateThinking}, true, ""
+	case llmagent.EventTurnEnd:
+		// Precise terminal state for the turn, with a human-readable reason so the
+		// agent column shows "hit action limit" vs "done" instead of inferring it.
+		return LiveEvent{Type: LiveEventAgentState, State: agentStateEnded, Note: turnEndNote(ev.Reason)}, true, ""
 	case llmagent.EventError:
 		return LiveEvent{Type: LiveEventError, Message: ev.Text}, true, ""
 	default:
 		return LiveEvent{}, false, ""
+	}
+}
+
+// turnEndNote maps an agent turn-end reason to short viewer text. Unknown reasons
+// fall through to a neutral "turn ended" so a new reason never renders blank.
+func turnEndNote(reason string) string {
+	switch reason {
+	case "tool_call_limit", "step_limit":
+		return "hit action limit"
+	case "complete":
+		return "done"
+	default:
+		return "turn ended"
 	}
 }
 

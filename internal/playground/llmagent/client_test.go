@@ -89,11 +89,18 @@ func TestComplete_RedactsAPIKeyFromStatusErrorAndEvent(t *testing.T) {
 	if strings.Contains(err.Error(), apiKey) || !strings.Contains(err.Error(), "[redacted]") {
 		t.Fatalf("err = %q, want API key redacted", err.Error())
 	}
-	if len(*evs) != 1 || (*evs)[0].Kind != EventError {
-		t.Fatalf("events = %+v, want one error event", *evs)
+	// A thinking signal precedes the model call; find the resulting error event.
+	var errEv *Event
+	for i := range *evs {
+		if (*evs)[i].Kind == EventError {
+			errEv = &(*evs)[i]
+		}
 	}
-	if strings.Contains((*evs)[0].Text, apiKey) || !strings.Contains((*evs)[0].Text, "[redacted]") {
-		t.Fatalf("event text = %q, want API key redacted", (*evs)[0].Text)
+	if errEv == nil {
+		t.Fatalf("events = %+v, want an error event", *evs)
+	}
+	if strings.Contains(errEv.Text, apiKey) || !strings.Contains(errEv.Text, "[redacted]") {
+		t.Fatalf("event text = %q, want API key redacted", errEv.Text)
 	}
 }
 

@@ -110,6 +110,20 @@ func kinds(evs []Event) []string {
 	return out
 }
 
+// coreKinds returns the event kinds with the framing signals (thinking, turn_end)
+// stripped, so a test focused on the tool/reply flow is not coupled to the
+// thinking/turn-end framing (which the dedicated signal tests cover).
+func coreKinds(evs []Event) []string {
+	out := make([]string, 0, len(evs))
+	for _, e := range evs {
+		if e.Kind == EventThinking || e.Kind == EventTurnEnd {
+			continue
+		}
+		out = append(out, e.Kind)
+	}
+	return out
+}
+
 func TestRun_PlainReply(t *testing.T) {
 	model := &scriptedModel{responses: []chatMessage{textMsg("hello there")}}
 	emit, evs := collectEvents()
@@ -122,8 +136,8 @@ func TestRun_PlainReply(t *testing.T) {
 	if final != "hello there" {
 		t.Fatalf("final = %q, want %q", final, "hello there")
 	}
-	if got := kinds(*evs); len(got) != 1 || got[0] != EventReply {
-		t.Fatalf("events = %v, want [reply]", got)
+	if got := coreKinds(*evs); len(got) != 1 || got[0] != EventReply {
+		t.Fatalf("core events = %v, want [reply]", got)
 	}
 	if model.calls != 1 {
 		t.Fatalf("model calls = %d, want 1", model.calls)
@@ -160,10 +174,11 @@ func TestRun_ToolCallThenReply(t *testing.T) {
 	if toolHits != 1 {
 		t.Fatalf("tool target hits = %d, want 1", toolHits)
 	}
-	// Expect: tool_call, tool_result, reply (in order).
+	// Expect the core flow: tool_call, tool_result, reply (in order). Framing
+	// signals (thinking/turn_end) are covered by the dedicated signal tests.
 	want := []string{EventToolCall, EventToolResult, EventReply}
-	if got := kinds(*evs); strings.Join(got, ",") != strings.Join(want, ",") {
-		t.Fatalf("events = %v, want %v", got, want)
+	if got := coreKinds(*evs); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("core events = %v, want %v", got, want)
 	}
 	// The second model call must carry the tool result back.
 	if model.calls != 2 {
@@ -272,8 +287,10 @@ func TestRun_ModelHTTPErrorReturned(t *testing.T) {
 	if err == nil {
 		t.Fatal("want error on model 500")
 	}
-	if got := kinds(*evs); len(got) != 1 || got[0] != EventError {
-		t.Fatalf("events = %v, want [error]", got)
+	// A thinking signal precedes the model call; the call then errors. Expect
+	// exactly [thinking, error] and no turn-end (the turn aborted on error).
+	if got := kinds(*evs); strings.Join(got, ",") != EventThinking+","+EventError {
+		t.Fatalf("events = %v, want [thinking error]", got)
 	}
 }
 
@@ -412,6 +429,90 @@ func TestComplete_SetsMaxTokens(t *testing.T) {
 	if got := model2.bodies[0].MaxTokens; got != 256 {
 		t.Fatalf("custom max_tokens = %d, want 256", got)
 	}
+}
+
+func TestRun_EmitsThinkingThenTurnEndComplete(t *testing.T) {
+	// A plain-reply turn must emit a thinking signal BEFORE the model answers (so
+	// the UI shows "thinking" exactly, not by guessing) and a turn-end signal with
+	// reason "complete" when the model finishes on its own.
+	model := &scriptedModel{responses: []chatMessage{textMsg("all done")}}
+	emit, evs := collectEvents()
+	a := newAgent(t, model, nil, emit)
+
+	if _, err := a.Run(context.Background(), "hi"); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	got := kinds(*evs)
+	// thinking must come before the reply.
+	thinkIdx, replyIdx, endIdx := -1, -1, -1
+	for i, k := range got {
+		switch k {
+		case EventThinking:
+			if thinkIdx == -1 {
+				thinkIdx = i
+			}
+		case EventReply:
+			replyIdx = i
+		case EventTurnEnd:
+			endIdx = i
+		}
+	}
+	if thinkIdx == -1 || replyIdx == -1 || thinkIdx > replyIdx {
+		t.Fatalf("expected a thinking event before the reply, events = %v", got)
+	}
+	if endIdx == -1 {
+		t.Fatalf("expected a turn-end event, events = %v", got)
+	}
+	if r := (*evs)[endIdx].Reason; r != turnEndComplete {
+		t.Fatalf("turn-end reason = %q, want %q", r, turnEndComplete)
+	}
+}
+
+func TestRun_TurnEndReason_ToolCallCap(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, "ok")
+	}))
+	t.Cleanup(target.Close)
+	model := &scriptedModel{responses: []chatMessage{
+		multiToolMsg(ToolFetchURL, `{"url":"`+target.URL+`"}`, 5),
+	}}
+	emit, evs := collectEvents()
+	a := newAgentCfg(t, model, LabTools(http.DefaultClient, nil), emit, ModelConfig{MaxToolCalls: 2})
+	if _, err := a.Run(context.Background(), "spray"); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := lastTurnEndReason(*evs); got != turnEndToolCallLimit {
+		t.Fatalf("turn-end reason = %q, want %q", got, turnEndToolCallLimit)
+	}
+}
+
+func TestRun_TurnEndReason_StepCap(t *testing.T) {
+	loop := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, "ok")
+	}))
+	t.Cleanup(loop.Close)
+	var resp []chatMessage
+	for i := 0; i < 10; i++ {
+		resp = append(resp, toolMsg("c", ToolFetchURL, `{"url":"`+loop.URL+`"}`))
+	}
+	model := &scriptedModel{responses: resp}
+	emit, evs := collectEvents()
+	a := newAgentCfg(t, model, LabTools(http.DefaultClient, nil), emit, ModelConfig{MaxSteps: 2})
+	if _, err := a.Run(context.Background(), "loop"); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := lastTurnEndReason(*evs); got != turnEndStepLimit {
+		t.Fatalf("turn-end reason = %q, want %q", got, turnEndStepLimit)
+	}
+}
+
+func lastTurnEndReason(evs []Event) string {
+	for i := len(evs) - 1; i >= 0; i-- {
+		if evs[i].Kind == EventTurnEnd {
+			return evs[i].Reason
+		}
+	}
+	return ""
 }
 
 func TestRun_NoHistoryByDefault(t *testing.T) {

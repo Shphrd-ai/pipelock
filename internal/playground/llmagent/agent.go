@@ -32,9 +32,25 @@ const (
 	EventToolCall   = "tool_call"   // the agent is about to invoke a tool
 	EventToolResult = "tool_result" // a tool returned (or the proxy blocked it)
 	EventError      = "error"       // a model/transport error ended the turn
+	// EventThinking is emitted just before each model round trip, so the UI can
+	// show "thinking" (model call in flight) exactly rather than inferring it from
+	// the absence of streamed events.
+	EventThinking = "thinking"
+	// EventTurnEnd is emitted by the Agent at the end of a turn with a Reason, so
+	// the UI can show a precise terminal state ("hit action limit" vs "done")
+	// instead of inferring it from the request resolving. It precedes the wrapper's
+	// EventTurnDone marker.
+	EventTurnEnd = "turn_end"
 	// EventTurnDone is emitted by the subprocess wrapper (not the Agent) after a
 	// turn's narration, so the driver knows the turn is complete.
 	EventTurnDone = "turn_done"
+)
+
+// Turn-end reasons carried on EventTurnEnd.Reason.
+const (
+	turnEndComplete      = "complete"        // the model finished on its own
+	turnEndToolCallLimit = "tool_call_limit" // hit the per-turn tool-call ceiling
+	turnEndStepLimit     = "step_limit"      // hit the model<->tool step ceiling
 )
 
 // Event is one narration item emitted as the agent works. Fields are sparse:
@@ -48,6 +64,7 @@ type Event struct {
 	Status int    `json:"status,omitempty"` // tool HTTP status (0 = blocked/transport error before a response)
 	Note   string `json:"note,omitempty"`   // short sub-line
 	Detail string `json:"detail,omitempty"` // shell command / file path for shell-tool actions (no HTTP method/URL)
+	Reason string `json:"reason,omitempty"` // turn-end reason (EventTurnEnd): complete / tool_call_limit / step_limit
 }
 
 // DefaultMaxSteps bounds the model<->tool loop so a stuck or adversarial model
@@ -302,7 +319,11 @@ func (a *Agent) Run(ctx context.Context, userMsg string) (string, error) {
 	maxTools := a.cfg.maxToolCalls()
 	finalText := ""
 	finished := false
+	endReason := turnEndComplete
 	for step := 0; step < a.cfg.maxSteps() && !finished; step++ {
+		// A model round trip is about to start: signal "thinking" so the UI shows
+		// model-call-in-flight exactly, not by inferring it from event silence.
+		a.emit(Event{Kind: EventThinking})
 		reply, err := a.complete(ctx, messages, true)
 		if err != nil {
 			a.emit(Event{Kind: EventError, Text: err.Error()})
@@ -343,6 +364,7 @@ func (a *Agent) Run(ctx context.Context, userMsg string) (string, error) {
 		}
 		if capped {
 			finalText, messages = a.forceFinalAnswer(ctx, messages, "tool-call")
+			endReason = turnEndToolCallLimit
 			finished = true
 		}
 	}
@@ -350,7 +372,12 @@ func (a *Agent) Run(ctx context.Context, userMsg string) (string, error) {
 	if !finished {
 		// Hit the step cap with the model still wanting to act.
 		finalText, messages = a.forceFinalAnswer(ctx, messages, "step")
+		endReason = turnEndStepLimit
 	}
+
+	// Signal the precise terminal state so the UI can show "hit action limit" vs
+	// "done" instead of inferring it from the request resolving.
+	a.emit(Event{Kind: EventTurnEnd, Reason: endReason})
 
 	if stateful {
 		a.convo = a.trimContext(messages)
@@ -382,6 +409,7 @@ func (a *Agent) forceFinalAnswer(ctx context.Context, messages []chatMessage, li
 	}
 	// Copy so the synthetic prompt never lands in the persisted context.
 	completionInput := append(append([]chatMessage(nil), messages...), prompt)
+	a.emit(Event{Kind: EventThinking})
 	reply, err := a.complete(ctx, completionInput, false)
 	text := reply.Content
 	if err != nil || text == "" {

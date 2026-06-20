@@ -33,6 +33,8 @@ func TestMapModelEvent(t *testing.T) {
 		wantRole    string
 		wantTarget  string
 		wantMessage string
+		wantState   string
+		wantNote    string
 	}{
 		{
 			name:     "reply pushes agent chat",
@@ -93,6 +95,29 @@ func TestMapModelEvent(t *testing.T) {
 			ev:       llmagent.Event{Kind: llmagent.EventTurnDone},
 			wantPush: false,
 		},
+		{
+			name:      "thinking pushes agent_state thinking",
+			ev:        llmagent.Event{Kind: llmagent.EventThinking},
+			wantPush:  true,
+			wantType:  LiveEventAgentState,
+			wantState: agentStateThinking,
+		},
+		{
+			name:      "turn_end action limit pushes ended state with reason",
+			ev:        llmagent.Event{Kind: llmagent.EventTurnEnd, Reason: "tool_call_limit"},
+			wantPush:  true,
+			wantType:  LiveEventAgentState,
+			wantState: agentStateEnded,
+			wantNote:  "hit action limit",
+		},
+		{
+			name:      "turn_end complete pushes ended state done",
+			ev:        llmagent.Event{Kind: llmagent.EventTurnEnd, Reason: "complete"},
+			wantPush:  true,
+			wantType:  LiveEventAgentState,
+			wantState: agentStateEnded,
+			wantNote:  "done",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -112,6 +137,12 @@ func TestMapModelEvent(t *testing.T) {
 				}
 				if tc.wantMessage != "" && out.Message != tc.wantMessage {
 					t.Errorf("message = %q, want %q", out.Message, tc.wantMessage)
+				}
+				if tc.wantState != "" && out.State != tc.wantState {
+					t.Errorf("state = %q, want %q", out.State, tc.wantState)
+				}
+				if tc.wantNote != "" && out.Note != tc.wantNote {
+					t.Errorf("note = %q, want %q", out.Note, tc.wantNote)
 				}
 			}
 		})

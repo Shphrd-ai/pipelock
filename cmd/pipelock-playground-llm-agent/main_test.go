@@ -413,14 +413,28 @@ func TestRunLoop_EndToEnd(t *testing.T) {
 	}
 
 	evs := decodeEvents(t, out.Bytes())
-	var kinds []string
+	var kinds, core []string
+	sawThinking, sawTurnEnd := false, false
 	for _, e := range evs {
 		kinds = append(kinds, e.Kind)
+		switch e.Kind {
+		case llmagent.EventThinking:
+			sawThinking = true
+		case llmagent.EventTurnEnd:
+			sawTurnEnd = true
+		default:
+			core = append(core, e.Kind)
+		}
 	}
-	got := strings.Join(kinds, ",")
-	want := llmagent.EventToolCall + "," + llmagent.EventToolResult + "," + llmagent.EventReply + "," + llmagent.EventTurnDone
-	if got != want {
-		t.Fatalf("event kinds = %q, want %q", got, want)
+	// The wrapper must pass the agent's framing signals through...
+	if !sawThinking || !sawTurnEnd {
+		t.Fatalf("wrapper dropped framing signals: thinking=%v turn_end=%v (kinds=%v)", sawThinking, sawTurnEnd, kinds)
+	}
+	// ...and the core flow (framing stripped) is the tool->reply->done sequence.
+	gotCore := strings.Join(core, ",")
+	wantCore := llmagent.EventToolCall + "," + llmagent.EventToolResult + "," + llmagent.EventReply + "," + llmagent.EventTurnDone
+	if gotCore != wantCore {
+		t.Fatalf("core event kinds = %q, want %q (full=%v)", gotCore, wantCore, kinds)
 	}
 	if evs[len(evs)-1].Kind != llmagent.EventTurnDone {
 		t.Fatal("turn must end with turn_done")
