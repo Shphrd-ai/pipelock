@@ -58,6 +58,14 @@ func TestMapModelEvent(t *testing.T) {
 			wantPush: false, wantTarget: "GET safe.target.test:8080",
 		},
 		{
+			name: "https tool_result is covered by connect receipt",
+			ev: llmagent.Event{
+				Kind: llmagent.EventToolResult, Tool: "fetch_url",
+				Method: http.MethodGet, URL: "https://api.github.com/repos", Status: 403,
+			},
+			wantPush: false, wantTarget: "CONNECT api.github.com:443",
+		},
+		{
 			name: "tool_result with no proxy response surfaces outcome",
 			ev: llmagent.Event{
 				Kind: llmagent.EventToolResult, Tool: "post_data",
@@ -136,6 +144,25 @@ func TestActionReceiptKey(t *testing.T) {
 	}
 	if got := actionReceiptKey("", "host.only:443"); got != "host.only:443" {
 		t.Fatalf("actionReceiptKey without method = %q, want target only", got)
+	}
+}
+
+func TestModelEventReceiptKey_HTTPSUsesConnectTunnel(t *testing.T) {
+	t.Parallel()
+	ev := llmagent.Event{
+		Kind:   llmagent.EventToolResult,
+		Tool:   llmagent.ToolPostData,
+		Method: http.MethodPost,
+		URL:    "https://offsite-backup.example/upload",
+		Status: http.StatusForbidden,
+	}
+	if got := modelEventReceiptKey(ev); got != "CONNECT offsite-backup.example:443" {
+		t.Fatalf("modelEventReceiptKey = %q, want CONNECT host:443", got)
+	}
+
+	ev.URL = "https://offsite-backup.example:8443/upload"
+	if got := modelEventReceiptKey(ev); got != "CONNECT offsite-backup.example:8443" {
+		t.Fatalf("modelEventReceiptKey with explicit port = %q, want CONNECT host:8443", got)
 	}
 }
 
@@ -506,6 +533,92 @@ func TestSendViaModel_DuplicateHost_CountedNotSet(t *testing.T) {
 	}
 	sess.Close()
 	<-collected
+}
+
+func TestSendViaModel_StrictAllowlistBlocksNonAllowlistedHTTPAndHTTPSWithReceipts(t *testing.T) {
+	if testing.Short() {
+		t.Skip("boots a real proxy + does real HTTP through it")
+	}
+	runner := &scriptedRunner{}
+	model := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, `{"ok":true}`)
+	}))
+	defer model.Close()
+	modelPort, err := portFromURL(model.URL)
+	if err != nil {
+		t.Fatalf("model port: %v", err)
+	}
+	modelBase := fmt.Sprintf("http://model.api.test:%s/v1", modelPort)
+	sess := newModelSession(t, runner, modelBase, []string{"127.0.0.1"})
+	collected := collectEvents(sess.Events())
+	client := proxiedClient(t, sess.lr)
+
+	httpHit := make(chan struct{}, 1)
+	httpTarget := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		httpHit <- struct{}{}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer httpTarget.Close()
+
+	httpsHit := make(chan struct{}, 1)
+	httpsTarget := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		httpsHit <- struct{}{}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer httpsTarget.Close()
+
+	runner.run = func(ctx context.Context, _ string, onEvent func(llmagent.Event)) error {
+		onEvent(llmagent.Event{Kind: llmagent.EventToolCall, Tool: llmagent.ToolPostData})
+		httpStatus := doProxiedPost(ctx, client, httpTarget.URL+"/grab", []byte("dead-canary=not-a-real-secret"))
+		onEvent(llmagent.Event{
+			Kind: llmagent.EventToolResult, Tool: llmagent.ToolPostData,
+			Method: http.MethodPost, URL: httpTarget.URL + "/grab", Status: httpStatus, Note: "blocked",
+		})
+
+		onEvent(llmagent.Event{Kind: llmagent.EventToolCall, Tool: llmagent.ToolFetchURL})
+		httpsStatus := doProxiedGet(ctx, client, httpsTarget.URL+"/grab")
+		onEvent(llmagent.Event{
+			Kind: llmagent.EventToolResult, Tool: llmagent.ToolFetchURL,
+			Method: http.MethodGet, URL: httpsTarget.URL + "/grab", Status: httpsStatus, Note: "blocked",
+		})
+		return nil
+	}
+
+	if err := sess.Send(context.Background(), "try both non-allowlisted targets"); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	select {
+	case <-httpHit:
+		t.Fatal("HTTP non-allowlisted target was reached")
+	default:
+	}
+	select {
+	case <-httpsHit:
+		t.Fatal("HTTPS non-allowlisted target was reached")
+	default:
+	}
+	sess.Close()
+	evs := <-collected
+
+	var forwardBlock, connectBlock bool
+	for _, ev := range evs {
+		if ev.Type == LiveEventError {
+			t.Fatalf("unexpected error event: %q", ev.Message)
+		}
+		if ev.Type != LiveEventDecision || ev.Verdict != "BLOCKED" || ev.Layer != "allowlist" {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(ev.Target, httpTarget.URL):
+			forwardBlock = true
+		case strings.HasPrefix(ev.Target, httpsTarget.URL):
+			connectBlock = true
+		}
+	}
+	if !forwardBlock || !connectBlock {
+		t.Fatalf("missing strict allowlist BLOCKED decisions: forward=%v connect=%v events=%+v", forwardBlock, connectBlock, evs)
+	}
 }
 
 // TestSendViaModel_RunnerError_FailsTurn: a runner error fails the turn and

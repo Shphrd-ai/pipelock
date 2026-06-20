@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -78,7 +80,7 @@ func mapModelEvent(ev llmagent.Event) (out LiveEvent, push bool, proxiedAction s
 			// The proxy returned a response: the decision event (from onReceipt)
 			// renders allow/block. Record the action for the receipt invariant and
 			// do not double-push.
-			return LiveEvent{}, false, actionReceiptKey(ev.Method, ev.URL)
+			return LiveEvent{}, false, modelEventReceiptKey(ev)
 		}
 		// No proxy response: no decision event will arrive, so surface the outcome.
 		// For shell/filesystem tools the actionable detail is the command or path
@@ -119,6 +121,18 @@ func actionReceiptKey(method, target string) string {
 	return method + " " + target
 }
 
+// modelEventReceiptKey maps a model-narrated HTTP tool result to the proxy
+// decision the live demo can actually receipt. Plain HTTP is forwarded as the
+// original method; HTTPS is mediated as an opaque CONNECT tunnel, so the receipt
+// invariant must compare against CONNECT host:port rather than an unobservable
+// inner GET/POST.
+func modelEventReceiptKey(ev llmagent.Event) string {
+	if target, ok := httpsConnectTarget(ev.URL); ok {
+		return actionReceiptKey(http.MethodConnect, target)
+	}
+	return actionReceiptKey(ev.Method, ev.URL)
+}
+
 // targetHostPort extracts the host:port from a tool action URL or a receipt
 // target. Tool URLs and forward-proxy receipt targets are absolute URLs, so the
 // host:port matches across both sides of the receipt invariant. A non-URL target
@@ -131,6 +145,17 @@ func targetHostPort(raw string) string {
 		return u.Host
 	}
 	return raw
+}
+
+func httpsConnectTarget(raw string) (string, bool) {
+	u, err := url.Parse(raw)
+	if err != nil || !strings.EqualFold(u.Scheme, "https") || u.Host == "" {
+		return "", false
+	}
+	if u.Port() != "" {
+		return u.Host, true
+	}
+	return net.JoinHostPort(u.Hostname(), "443"), true
 }
 
 // subprocessRunnerOpts configures a subprocessTurnRunner. ProxyURL is mandatory:
