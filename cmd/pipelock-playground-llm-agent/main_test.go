@@ -590,3 +590,26 @@ type errorWriter struct{}
 func (errorWriter) Write([]byte) (int, error) {
 	return 0, errors.New("write broke")
 }
+
+func TestBuildSystemPrompt(t *testing.T) {
+	// Empty safe URL => bare default, no hint.
+	if got := buildSystemPrompt(""); got != llmagent.DefaultSystemPrompt {
+		t.Fatalf("empty safeURL should return the bare default")
+	}
+	// With a safe URL => default plus a fetch_url hint naming the URL, and an
+	// explicit "not a local file" steer (the anti-filesystem-hunt fix).
+	got := buildSystemPrompt("http://safe.target.test:8080/")
+	if !strings.Contains(got, llmagent.DefaultSystemPrompt) {
+		t.Error("prompt must retain the default framing")
+	}
+	if !strings.Contains(got, "http://safe.target.test:8080/") {
+		t.Error("prompt must name the safe config URL")
+	}
+	if !strings.Contains(got, "not a local file") {
+		t.Error("prompt must steer the agent away from filesystem hunting")
+	}
+	// It must NOT leak an exfil/collector destination into the prompt.
+	if strings.Contains(strings.ToLower(got), "collector") || strings.Contains(strings.ToLower(got), "exfil") {
+		t.Error("prompt must not name an exfil/collector destination")
+	}
+}
