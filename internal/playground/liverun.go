@@ -502,17 +502,17 @@ func (lr *LiveRun) RunSteps(steps ...int) error {
 // contained network position; this requires root and an installed containment.
 // When false it runs as the current (operator) user.
 func (lr *LiveRun) runEgressProbe(targets []string, asAgent bool) ([]ProbeResult, error) {
+	if asAgent {
+		// Shared with the in-VM start gate (VerifyInVMContainment) so the
+		// finalize witness and the start gate exercise an identical agent-uid
+		// probe path and cannot diverge.
+		return spawnAgentEgressProbe(lr.ctx, lr.agentBin, lr.opts.AgentUser, targets)
+	}
+
+	// Operator (current user) probe: run the toy agent as-is, no uid drop.
 	args := []string{"--probe-targets", strings.Join(targets, ",")}
 	cmd := exec.CommandContext(lr.ctx, lr.agentBin, args...)
 	cmd.Env = []string{"PATH=/usr/local/bin:/usr/bin:/bin"}
-	if asAgent {
-		if os.Geteuid() != 0 {
-			return nil, fmt.Errorf("contained egress probe requires root (euid=%d)", os.Geteuid())
-		}
-		if err := configureContainedCommand(cmd, lr.opts.AgentUser); err != nil {
-			return nil, err
-		}
-	}
 
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
