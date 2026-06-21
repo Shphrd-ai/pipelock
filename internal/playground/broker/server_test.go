@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -624,5 +625,132 @@ func TestServer_ReaperReleasesExpiredLease(t *testing.T) {
 	expectDestroyed(t, destroyed)
 	if got := srv.cfg.Leases.ActiveLeases(); got != 0 {
 		t.Fatalf("active leases after reaper = %d, want 0", got)
+	}
+}
+
+// flakyRoundTripper fails the first failFirst round trips with a pre-response
+// transport error (modelling a VM that has booted but is not yet accepting
+// connections while it completes its fail-closed containment proof), then
+// delegates to base. It exercises the broker's VM session-create readiness
+// retry.
+type flakyRoundTripper struct {
+	base      http.RoundTripper
+	failFirst int
+
+	mu    sync.Mutex
+	calls int
+}
+
+func (f *flakyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	f.mu.Lock()
+	f.calls++
+	failNow := f.calls <= f.failFirst
+	f.mu.Unlock()
+	if failNow {
+		return nil, errors.New("dial tcp: connect: connection refused")
+	}
+	return f.base.RoundTrip(req)
+}
+
+func (f *flakyRoundTripper) callCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls
+}
+
+// TestServer_CreateVMSession_RetriesWhileVMBooting proves the broker retries the
+// VM session-create across the boot window — a leased VM reports "started"
+// before its server listens, because the fail-closed boot gate proves
+// containment first. Without the retry every session 503s.
+func TestServer_CreateVMSession_RetriesWhileVMBooting(t *testing.T) {
+	vm := newFakeVM(t, "boot-token")
+	provider := &serverFakeProvider{targets: []string{vm.targetHost(t)}}
+	rt := &flakyRoundTripper{base: http.DefaultTransport, failFirst: 2}
+	_, ts := newBrokerTestServer(t, provider, ServerConfig{
+		HTTPClient:     &http.Client{Transport: rt},
+		VMReadyTimeout: 10 * time.Second,
+	})
+
+	status, session := postBrokerSession(t, ts)
+	if status != http.StatusOK {
+		t.Fatalf("session status = %d, want 200 (broker must retry across the VM boot window)", status)
+	}
+	if session.Token != vm.token {
+		t.Fatalf("session token = %q, want %q", session.Token, vm.token)
+	}
+	if got := rt.callCount(); got < 3 {
+		t.Fatalf("round trips = %d, want >= 3 (2 connection-refused + 1 success)", got)
+	}
+	if got := provider.createdCount(); got != 1 {
+		t.Fatalf("machines created = %d, want 1", got)
+	}
+	if got := provider.destroyedCount(); got != 0 {
+		t.Fatalf("machines destroyed = %d, want 0 (the session is live)", got)
+	}
+}
+
+// TestServer_CreateVMSession_HTTPErrorNotRetried proves the broker does NOT
+// retry once the VM server returns an HTTP response, even an error status. The
+// VM invite code is single-use, so retrying a request the server already
+// processed could double-spend it or mask a real rejection.
+func TestServer_CreateVMSession_HTTPErrorNotRetried(t *testing.T) {
+	var calls atomic.Int32
+	vmsrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == livechat.RouteSession {
+			calls.Add(1)
+			writeBrokerErr(w, http.StatusInternalServerError, "boom")
+			return
+		}
+		writeBrokerErr(w, http.StatusNotFound, "not found")
+	}))
+	t.Cleanup(vmsrv.Close)
+	u, err := url.Parse(vmsrv.URL)
+	if err != nil {
+		t.Fatalf("parse vm url: %v", err)
+	}
+	destroyed := make(chan string, 1)
+	provider := &serverFakeProvider{targets: []string{u.Host}, destroyedCh: destroyed}
+	_, ts := newBrokerTestServer(t, provider, ServerConfig{VMReadyTimeout: 5 * time.Second})
+
+	status, _ := postBrokerSession(t, ts)
+	if status != http.StatusServiceUnavailable {
+		t.Fatalf("session status = %d, want 503", status)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("VM session-create calls = %d, want 1 (an HTTP error must not be retried)", got)
+	}
+	select {
+	case <-destroyed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("VM was not destroyed after a failed session create (must fail closed)")
+	}
+}
+
+// TestServer_CreateVMSession_ReadyTimeoutFailsClosed proves a VM that never
+// starts listening is bounded by VMReadyTimeout and torn down: the broker gives
+// up, returns 503, and destroys the leased machine rather than leaking it.
+func TestServer_CreateVMSession_ReadyTimeoutFailsClosed(t *testing.T) {
+	vm := newFakeVM(t, "never-ready")
+	rt := &flakyRoundTripper{base: http.DefaultTransport, failFirst: 1 << 30}
+	destroyed := make(chan string, 1)
+	provider := &serverFakeProvider{targets: []string{vm.targetHost(t)}, destroyedCh: destroyed}
+	_, ts := newBrokerTestServer(t, provider, ServerConfig{
+		HTTPClient:     &http.Client{Transport: rt},
+		VMReadyTimeout: 700 * time.Millisecond,
+	})
+
+	start := time.Now()
+	status, _ := postBrokerSession(t, ts)
+	elapsed := time.Since(start)
+	if status != http.StatusServiceUnavailable {
+		t.Fatalf("session status = %d, want 503", status)
+	}
+	if elapsed > 5*time.Second {
+		t.Fatalf("session create took %s, want bounded by VMReadyTimeout", elapsed)
+	}
+	select {
+	case <-destroyed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("VM was not destroyed after readiness timeout (must fail closed)")
 	}
 }

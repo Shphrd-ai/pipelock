@@ -33,6 +33,20 @@ const (
 	vmInviteCodeBytes   = 18
 
 	envVMInviteCode = "PLAYGROUND_CODE"
+
+	// defaultVMReadyTimeout bounds the broker's whole VM session-create retry
+	// window. A freshly leased VM reports "started" (Firecracker booted) before it
+	// serves, and crosses TWO fail-closed containment proofs (six 2s egress probes
+	// each): the boot-gate proof in the entrypoint, then a per-session proof inside
+	// the session-create handler itself. So the connection is refused for several
+	// seconds, and the eventual session-create request then blocks for the
+	// per-session proof (~12s) before responding. This budget covers both with
+	// headroom; the whole window — not each attempt — is bounded, so a legitimately
+	// slow session-create is never cancelled mid-proof.
+	defaultVMReadyTimeout = 60 * time.Second
+	// vmReadyPollInterval is the wait between VM session-create attempts while the
+	// VM server is not yet accepting connections.
+	vmReadyPollInterval = 500 * time.Millisecond
 )
 
 // ServerConfig configures the public playground broker HTTP front door.
@@ -65,6 +79,10 @@ type ServerConfig struct {
 	// HTTPClient is used for the initial VM session-create request. Nil uses the
 	// default client.
 	HTTPClient *http.Client
+	// VMReadyTimeout bounds how long the broker retries the VM session-create
+	// while the freshly leased VM is still completing its fail-closed containment
+	// proof and not yet listening. Zero uses defaultVMReadyTimeout.
+	VMReadyTimeout time.Duration
 	// TrustForwardedFor reads client IP from X-Forwarded-For. Only set behind a
 	// trusted proxy.
 	TrustForwardedFor bool
@@ -81,6 +99,8 @@ type Server struct {
 	perCode  *livechat.KeyedDailyBudget
 	global   *livechat.DailyBudget
 	client   *http.Client
+
+	vmReadyTimeout time.Duration
 
 	killed atomic.Bool
 
@@ -148,17 +168,22 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
+	vmReadyTimeout := cfg.VMReadyTimeout
+	if vmReadyTimeout <= 0 {
+		vmReadyTimeout = defaultVMReadyTimeout
+	}
 	s := &Server{
-		cfg:      cfg,
-		ipRate:   livechat.NewRateLimiter(cfg.IPRate),
-		codeRate: livechat.NewRateLimiter(cfg.CodeRate),
-		perIP:    livechat.NewKeyedDailyBudget(cfg.PerIPDailyBudget, 0),
-		perCode:  livechat.NewKeyedDailyBudget(cfg.PerCodeDailyBudget, 0),
-		global:   livechat.NewDailyBudget(cfg.GlobalDailyBudget),
-		client:   client,
-		tokens:   make(map[string]*tokenLease),
-		bySess:   make(map[string]string),
-		reapDone: make(chan struct{}),
+		cfg:            cfg,
+		ipRate:         livechat.NewRateLimiter(cfg.IPRate),
+		codeRate:       livechat.NewRateLimiter(cfg.CodeRate),
+		perIP:          livechat.NewKeyedDailyBudget(cfg.PerIPDailyBudget, 0),
+		perCode:        livechat.NewKeyedDailyBudget(cfg.PerCodeDailyBudget, 0),
+		global:         livechat.NewDailyBudget(cfg.GlobalDailyBudget),
+		client:         client,
+		vmReadyTimeout: vmReadyTimeout,
+		tokens:         make(map[string]*tokenLease),
+		bySess:         make(map[string]string),
+		reapDone:       make(chan struct{}),
 	}
 	go s.reapLoop()
 	return s, nil
@@ -450,34 +475,82 @@ func (s *Server) createVMSession(ctx context.Context, lease *Lease, code string)
 	if err != nil {
 		return vmSessionResponse{}, time.Time{}, fmt.Errorf("broker: marshal vm session request: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target.String(), bytes.NewReader(reqBody))
+
+	// A leased VM reports "started" (Firecracker booted) before its in-process
+	// server is listening: it proves containment first. Retry the session-create
+	// through that window, but ONLY while the connection itself fails — a
+	// pre-response transport error means the request never reached the VM server,
+	// so no session was minted and the VM's single-use invite code is untouched
+	// (safe to retry). The first HTTP response, success or error status, ends the
+	// retry: the server answered and may have consumed the code, so retrying it
+	// could double-spend or mask a real rejection.
+	//
+	// The whole window is bounded by readyCtx, NOT each attempt: the eventual
+	// session-create request legitimately blocks for the per-session containment
+	// proof (~12s), and must not be cancelled mid-proof. A connection-refused
+	// returns immediately regardless, so refused attempts still retry promptly.
+	readyCtx, cancel := context.WithTimeout(ctx, s.vmReadyTimeout)
+	defer cancel()
+	var lastErr error
+	for {
+		resp, expiresAt, retryable, attemptErr := s.attemptVMSession(readyCtx, target.String(), reqBody)
+		if attemptErr == nil {
+			return resp, expiresAt, nil
+		}
+		if !retryable {
+			return vmSessionResponse{}, time.Time{}, attemptErr
+		}
+		lastErr = attemptErr
+		if readyCtx.Err() != nil {
+			if errors.Is(readyCtx.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
+				return vmSessionResponse{}, time.Time{}, fmt.Errorf("broker: vm server not ready within %s: %w", s.vmReadyTimeout, lastErr)
+			}
+			return vmSessionResponse{}, time.Time{}, readyCtx.Err()
+		}
+		select {
+		case <-readyCtx.Done():
+		case <-time.After(vmReadyPollInterval):
+		}
+	}
+}
+
+// attemptVMSession performs one VM session-create round trip. retryable reports
+// whether the failure was a pre-response transport error (the request never
+// reached the VM server, so no session was minted): such failures are safe to
+// retry while the VM finishes its fail-closed containment proof. Any received
+// HTTP response — success or error status — is non-retryable.
+func (s *Server) attemptVMSession(ctx context.Context, target string, reqBody []byte) (resp vmSessionResponse, expiresAt time.Time, retryable bool, err error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(reqBody))
 	if err != nil {
-		return vmSessionResponse{}, time.Time{}, fmt.Errorf("broker: build vm session request: %w", err)
+		return vmSessionResponse{}, time.Time{}, false, fmt.Errorf("broker: build vm session request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	httpResp, err := s.client.Do(req)
 	if err != nil {
-		return vmSessionResponse{}, time.Time{}, fmt.Errorf("broker: create vm session: %w", err)
+		// No HTTP response was received: the VM is not yet accepting connections
+		// (still proving containment). Retryable — the readyCtx deadline in the
+		// caller bounds the overall wait.
+		return vmSessionResponse{}, time.Time{}, true, fmt.Errorf("broker: create vm session: %w", err)
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
 	respBody, err := io.ReadAll(io.LimitReader(httpResp.Body, maxBrokerBodyBytes))
 	if err != nil {
-		return vmSessionResponse{}, time.Time{}, fmt.Errorf("broker: read vm session response: %w", err)
+		return vmSessionResponse{}, time.Time{}, false, fmt.Errorf("broker: read vm session response: %w", err)
 	}
 	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
-		return vmSessionResponse{}, time.Time{}, fmt.Errorf("broker: vm session status %d", httpResp.StatusCode)
+		return vmSessionResponse{}, time.Time{}, false, fmt.Errorf("broker: vm session status %d", httpResp.StatusCode)
 	}
 	var vmResp vmSessionResponse
 	if err := json.Unmarshal(respBody, &vmResp); err != nil {
-		return vmSessionResponse{}, time.Time{}, fmt.Errorf("broker: parse vm session response: %w", err)
+		return vmSessionResponse{}, time.Time{}, false, fmt.Errorf("broker: parse vm session response: %w", err)
 	}
-	expiresAt, err := time.Parse(time.RFC3339, vmResp.ExpiresAt)
+	parsedExpiry, err := time.Parse(time.RFC3339, vmResp.ExpiresAt)
 	if err != nil {
-		return vmSessionResponse{}, time.Time{}, fmt.Errorf("broker: parse vm session expiry: %w", err)
+		return vmSessionResponse{}, time.Time{}, false, fmt.Errorf("broker: parse vm session expiry: %w", err)
 	}
-	return vmResp, expiresAt, nil
+	return vmResp, parsedExpiry, false, nil
 }
 
 func (s *Server) proxy(w http.ResponseWriter, r *http.Request, binding *tokenLease, stream bool) {
