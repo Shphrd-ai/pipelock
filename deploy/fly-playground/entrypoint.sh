@@ -73,6 +73,12 @@ add_flag --model-max-steps "${PLAYGROUND_MODEL_MAX_STEPS:-}"
 add_flag --daily-turn-budget "${PLAYGROUND_DAILY_TURN_BUDGET:-}"
 add_flag --session-ttl "${PLAYGROUND_SESSION_TTL:-}"
 add_flag --max-messages-per-session "${PLAYGROUND_MAX_MESSAGES:-}"
+# The model agent is all-or-nothing (serve rejects --llm-agent-bin without the
+# model flags). Only enable it when a model is configured, so a no-model
+# deployment runs the deterministic agent cleanly.
+if [ -n "${PLAYGROUND_MODEL_BASE_URL:-}" ]; then
+	add_flag --llm-agent-bin "${LLM_AGENT_BIN}"
+fi
 
 # --- 4. Serve. One session per VM (--concurrency 1); "$@" allows extra overrides. -
 log "containment proven; starting server on ${LISTEN}"
@@ -84,7 +90,6 @@ exec "${BIN}" serve \
 	--concurrency 1 \
 	--toyagent-bin "${TOYAGENT_BIN}" \
 	--webtool-bin "${WEBTOOL_BIN}" \
-	--llm-agent-bin "${LLM_AGENT_BIN}" \
 	${ORCH_KEY_ARGS} \
 	${MODEL_KEY_ARGS} \
 	${EXTRA_ARGS} \
