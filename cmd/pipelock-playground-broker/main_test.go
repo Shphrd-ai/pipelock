@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/luckyPipewrench/pipelock/internal/playground/broker"
 )
@@ -192,4 +193,40 @@ func writeTestFile(t *testing.T, dir, name, content string) string {
 		t.Fatalf("write %s: %v", name, err)
 	}
 	return path
+}
+
+// TestBuildVMBaseEnv pins the PLAYGROUND_* env contract that the deploy
+// entrypoint (deploy/fly-playground/entrypoint.sh) consumes into serve flags. A
+// rename here without updating the entrypoint silently breaks the per-VM config,
+// so this test is the producer-side guard for that string-coupled contract.
+func TestBuildVMBaseEnv(t *testing.T) {
+	f := &serveFlags{
+		internalPort:      8080,
+		vmModelBaseURL:    "https://api.provider.example/v1",
+		vmModel:           "demo-model",
+		vmModelMaxSteps:   4,
+		vmDailyTurnBudget: 2000,
+		vmSessionTTL:      90 * time.Second,
+		vmMaxMessages:     12,
+	}
+	want := map[string]string{
+		"PLAYGROUND_LISTEN":            "0.0.0.0:8080",
+		"PLAYGROUND_MODEL_BASE_URL":    "https://api.provider.example/v1",
+		"PLAYGROUND_MODEL":             "demo-model",
+		"PLAYGROUND_MODEL_MAX_STEPS":   "4",
+		"PLAYGROUND_DAILY_TURN_BUDGET": "2000",
+		"PLAYGROUND_SESSION_TTL":       "1m30s",
+		"PLAYGROUND_MAX_MESSAGES":      "12",
+	}
+	env := buildVMBaseEnv(f)
+	for k, v := range want {
+		if env[k] != v {
+			t.Errorf("env[%s] = %q, want %q", k, env[k], v)
+		}
+	}
+	// Zero-valued optionals are omitted so the VM falls back to its own defaults.
+	empty := buildVMBaseEnv(&serveFlags{internalPort: 8080})
+	if len(empty) != 1 || empty["PLAYGROUND_LISTEN"] != "0.0.0.0:8080" {
+		t.Errorf("empty config should yield only PLAYGROUND_LISTEN, got %v", empty)
+	}
 }

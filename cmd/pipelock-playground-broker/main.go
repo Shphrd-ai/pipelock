@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -73,6 +74,14 @@ type serveFlags struct {
 	orchestratorKeyFile   string
 	orchestratorKeyEnv    string
 	requireSessionSecrets bool
+	// VM model/session config, passed into each per-visitor VM via PLAYGROUND_*
+	// env (consumed by deploy/fly-playground/entrypoint.sh).
+	vmModelBaseURL    string
+	vmModel           string
+	vmModelMaxSteps   int
+	vmDailyTurnBudget int
+	vmSessionTTL      time.Duration
+	vmMaxMessages     int
 }
 
 type providerFactory func(context.Context, *serveFlags, string) (broker.MachineProvider, error)
@@ -137,6 +146,12 @@ func newServeCmd() *cobra.Command {
 	fl.StringVar(&f.orchestratorKeyFile, "orchestrator-key-file", "", "path to the orchestrator key file passed to the VM env")
 	fl.StringVar(&f.orchestratorKeyEnv, "orchestrator-key-env", "", "environment variable holding the orchestrator key passed to the VM env")
 	fl.BoolVar(&f.requireSessionSecrets, "require-session-secrets", true, "require model and orchestrator keys from file/env")
+	fl.StringVar(&f.vmModelBaseURL, "vm-model-base-url", "", "model API base URL passed to each VM (enables the model-backed agent)")
+	fl.StringVar(&f.vmModel, "vm-model", "", "model name passed to each VM")
+	fl.IntVar(&f.vmModelMaxSteps, "vm-model-max-steps", 0, "max model/tool steps per turn in each VM (0 = VM default)")
+	fl.IntVar(&f.vmDailyTurnBudget, "vm-daily-turn-budget", 0, "per-VM model round-trip ceiling per UTC day (the in-VM spend kill switch; required by the VM when a model is set)")
+	fl.DurationVar(&f.vmSessionTTL, "vm-session-ttl", 0, "per-VM session wall-clock cap (0 = VM default)")
+	fl.IntVar(&f.vmMaxMessages, "vm-max-messages-per-session", 0, "per-VM max messages per session (0 = VM default)")
 	return cmd
 }
 
@@ -211,7 +226,7 @@ func buildServer(ctx context.Context, out io.Writer, f *serveFlags) (*broker.Ser
 		MemoryMB:     f.memoryMB,
 		CPUs:         f.cpus,
 		InternalPort: f.internalPort,
-		BaseEnv:      map[string]string{"PLAYGROUND_LISTEN": fmt.Sprintf("0.0.0.0:%d", f.internalPort)},
+		BaseEnv:      buildVMBaseEnv(f),
 	})
 	if err != nil {
 		return nil, nil, err
@@ -355,6 +370,37 @@ func resolveCodes(codes []string, maxPerCode int) ([]livechat.CodeSpec, error) {
 		specs = append(specs, livechat.CodeSpec{Code: code, MaxSessions: maxPerCode})
 	}
 	return specs, nil
+}
+
+// buildVMBaseEnv assembles the PLAYGROUND_* environment shared by every
+// per-visitor VM. The deploy entrypoint (deploy/fly-playground/entrypoint.sh)
+// consumes these env vars into `serve` flags — keep the names in sync with it.
+// The per-session invite code (PLAYGROUND_CODE) and the secrets
+// (PLAYGROUND_MODEL_KEY / PLAYGROUND_ORCHESTRATOR_KEY) are layered in elsewhere
+// (broker sessionEnv / resolveSessionEnv), not here.
+func buildVMBaseEnv(f *serveFlags) map[string]string {
+	env := map[string]string{
+		"PLAYGROUND_LISTEN": fmt.Sprintf("0.0.0.0:%d", f.internalPort),
+	}
+	if f.vmModelBaseURL != "" {
+		env["PLAYGROUND_MODEL_BASE_URL"] = f.vmModelBaseURL
+	}
+	if f.vmModel != "" {
+		env["PLAYGROUND_MODEL"] = f.vmModel
+	}
+	if f.vmModelMaxSteps > 0 {
+		env["PLAYGROUND_MODEL_MAX_STEPS"] = strconv.Itoa(f.vmModelMaxSteps)
+	}
+	if f.vmDailyTurnBudget > 0 {
+		env["PLAYGROUND_DAILY_TURN_BUDGET"] = strconv.Itoa(f.vmDailyTurnBudget)
+	}
+	if f.vmSessionTTL > 0 {
+		env["PLAYGROUND_SESSION_TTL"] = f.vmSessionTTL.String()
+	}
+	if f.vmMaxMessages > 0 {
+		env["PLAYGROUND_MAX_MESSAGES"] = strconv.Itoa(f.vmMaxMessages)
+	}
+	return env
 }
 
 func resolveSessionEnv(f *serveFlags) (map[string]string, error) {

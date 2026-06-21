@@ -56,16 +56,36 @@ log "loading containment nft rule (agent uid ${AGENT_UID} -> only 127.0.0.1:${PR
 log "proving containment (aborts the VM if the agent uid can still egress)"
 "${BIN}" verify-containment --toyagent-bin "${TOYAGENT_BIN}" --agent-user "${AGENT_USER}"
 
-# --- 3. Serve. Per-session/model flags come from the broker via "$@". -----------
+# --- 3. Per-session serve flags from broker-provided env ------------------------
+# The broker sets these PLAYGROUND_* env vars per machine; map the ones present to
+# serve flags. This is the env contract with the broker's BaseEnv/sessionEnv
+# (cmd/pipelock-playground-broker): keep the names in sync. Secrets (model /
+# orchestrator keys) are handled above as 0600 files, never argv.
+EXTRA_ARGS=""
+add_flag() { # add_flag <flag> <value>; appends only when value is non-empty
+	[ -n "$2" ] && EXTRA_ARGS="${EXTRA_ARGS} $1 $2"
+	return 0
+}
+add_flag --code "${PLAYGROUND_CODE:-}"
+add_flag --model-base-url "${PLAYGROUND_MODEL_BASE_URL:-}"
+add_flag --model "${PLAYGROUND_MODEL:-}"
+add_flag --model-max-steps "${PLAYGROUND_MODEL_MAX_STEPS:-}"
+add_flag --daily-turn-budget "${PLAYGROUND_DAILY_TURN_BUDGET:-}"
+add_flag --session-ttl "${PLAYGROUND_SESSION_TTL:-}"
+add_flag --max-messages-per-session "${PLAYGROUND_MAX_MESSAGES:-}"
+
+# --- 4. Serve. One session per VM (--concurrency 1); "$@" allows extra overrides. -
 log "containment proven; starting server on ${LISTEN}"
-# shellcheck disable=SC2086  # word-splitting of the optional key args is intended
+# shellcheck disable=SC2086  # word-splitting of the optional flag args is intended
 exec "${BIN}" serve \
 	--self-managed-containment \
 	--listen "${LISTEN}" \
 	--proxy-port "${PROXY_PORT}" \
+	--concurrency 1 \
 	--toyagent-bin "${TOYAGENT_BIN}" \
 	--webtool-bin "${WEBTOOL_BIN}" \
 	--llm-agent-bin "${LLM_AGENT_BIN}" \
 	${ORCH_KEY_ARGS} \
 	${MODEL_KEY_ARGS} \
+	${EXTRA_ARGS} \
 	"$@"
