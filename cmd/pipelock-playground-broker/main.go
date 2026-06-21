@@ -48,6 +48,7 @@ type serveFlags struct {
 	provider              string
 	flyApp                string
 	flyTokenFile          string
+	flyTokenEnv           string
 	image                 string
 	region                string
 	memoryMB              int
@@ -120,6 +121,7 @@ func newServeCmd() *cobra.Command {
 	fl.StringVar(&f.provider, "provider", "fly", "machine provider")
 	fl.StringVar(&f.flyApp, "fly-app", "", "Fly app that owns per-visitor machines")
 	fl.StringVar(&f.flyTokenFile, "fly-token-file", "", "path to the Fly API token file")
+	fl.StringVar(&f.flyTokenEnv, "fly-token-env", "", "environment variable holding the Fly API token (for Fly secrets; alternative to --fly-token-file)")
 	fl.StringVar(&f.image, "image", "", "per-visitor VM image")
 	fl.StringVar(&f.region, "region", "", "provider region")
 	fl.IntVar(&f.memoryMB, "memory-mb", 512, "per-visitor VM memory in MiB")
@@ -206,7 +208,7 @@ func buildServer(ctx context.Context, out io.Writer, f *serveFlags) (*broker.Ser
 	if err != nil {
 		return nil, nil, err
 	}
-	token, err := readRequiredFile(f.flyTokenFile, "--fly-token-file")
+	token, err := resolveFlyToken(f)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -272,8 +274,8 @@ func validateFlags(f *serveFlags) error {
 	if strings.TrimSpace(f.flyApp) == "" {
 		return errors.New("--fly-app is required")
 	}
-	if strings.TrimSpace(f.flyTokenFile) == "" {
-		return errors.New("--fly-token-file is required")
+	if strings.TrimSpace(f.flyTokenFile) == "" && strings.TrimSpace(f.flyTokenEnv) == "" {
+		return errors.New("a Fly API token is required: pass --fly-token-file or --fly-token-env")
 	}
 	if f.concurrency <= 0 {
 		return errors.New("--concurrency must be > 0")
@@ -332,6 +334,19 @@ func validateAllowOrigin(raw string) error {
 		return errors.New("must be an origin only, like https://pipelab.org")
 	}
 	return nil
+}
+
+// resolveFlyToken reads the Fly API token from the configured file or env var.
+// The file path wins when both are set. The token is never logged.
+func resolveFlyToken(f *serveFlags) (string, error) {
+	if strings.TrimSpace(f.flyTokenFile) != "" {
+		return readRequiredFile(f.flyTokenFile, "--fly-token-file")
+	}
+	v := strings.TrimSpace(os.Getenv(f.flyTokenEnv))
+	if v == "" {
+		return "", fmt.Errorf("%s is empty or unset", f.flyTokenEnv)
+	}
+	return v, nil
 }
 
 func resolveGateSecret(file, envName string) ([]byte, error) {
