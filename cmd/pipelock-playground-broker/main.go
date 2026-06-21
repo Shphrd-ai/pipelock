@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,8 +20,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/spf13/cobra"
 
 	"github.com/luckyPipewrench/pipelock/internal/cliutil"
@@ -38,6 +42,8 @@ const (
 	defaultIPBurst     = 5
 	defaultCodeRate    = 0.5
 	defaultCodeBurst   = 10
+	cfAccessJWTHeader  = "Cf-Access-Jwt-Assertion"
+	cfAccessKeysTTL    = 5 * time.Minute
 
 	envModelKey        = "PLAYGROUND_MODEL_" + "KEY"
 	envOrchestratorKey = "PLAYGROUND_ORCHESTRATOR_" + "KEY"
@@ -70,6 +76,10 @@ type serveFlags struct {
 	sessionTTL            time.Duration
 	deadlineGrace         time.Duration
 	allowOrigin           string
+	publicHosts           []string
+	cfAccessTeamDomain    string
+	cfAccessAUD           string
+	cfAccessCertsURL      string
 	trustForwardedFor     bool
 	modelKeyFile          string
 	modelKeyEnv           string
@@ -144,6 +154,10 @@ func newServeCmd() *cobra.Command {
 	fl.DurationVar(&f.sessionTTL, "session-ttl", defaultSessionTTL, "VM session token TTL")
 	fl.DurationVar(&f.deadlineGrace, "deadline-grace", defaultGrace, "lease teardown grace after VM session expiry")
 	fl.StringVar(&f.allowOrigin, "allow-origin", "", "Access-Control-Allow-Origin for the browser")
+	fl.StringArrayVar(&f.publicHosts, "public-host", nil, "allowed public Host header for the broker (repeatable); defaults to the --allow-origin host when set")
+	fl.StringVar(&f.cfAccessTeamDomain, "cf-access-team-domain", "", "Cloudflare Access team domain, e.g. https://team.cloudflareaccess.com; enables origin-side Access JWT validation when set with --cf-access-aud")
+	fl.StringVar(&f.cfAccessAUD, "cf-access-aud", "", "Cloudflare Access application AUD tag expected in Cf-Access-Jwt-Assertion")
+	fl.StringVar(&f.cfAccessCertsURL, "cf-access-certs-url", "", "override Cloudflare Access JWKS URL (tests/dev only; defaults to <team-domain>/cdn-cgi/access/certs)")
 	fl.BoolVar(&f.trustForwardedFor, "trust-forwarded-for", false, "read client IP from X-Forwarded-For behind a trusted proxy")
 	fl.StringVar(&f.modelKeyFile, "model-key-file", "", "path to the model key file passed to the VM env")
 	fl.StringVar(&f.modelKeyEnv, "model-key-env", "", "environment variable holding the model key passed to the VM env")
@@ -267,6 +281,22 @@ func buildServer(ctx context.Context, out io.Writer, f *serveFlags) (*broker.Ser
 		handler = mux
 		_, _ = fmt.Fprintf(out, "serving static UI from %s at /\n", f.staticDir)
 	}
+	hosts, err := brokerPublicHosts(f)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(hosts) > 0 {
+		handler = hostGuard(handler, hosts)
+		_, _ = fmt.Fprintf(out, "broker public host guard enabled for %s\n", strings.Join(hosts, ", "))
+	}
+	cfAccess, err := newCFAccessVerifier(f)
+	if err != nil {
+		return nil, nil, err
+	}
+	if cfAccess != nil {
+		handler = cfAccessGuard(handler, cfAccess)
+		_, _ = fmt.Fprintf(out, "broker Cloudflare Access JWT guard enabled for %s\n", cfAccess.issuer)
+	}
 	return srv, handler, nil
 }
 
@@ -323,6 +353,9 @@ func validateFlags(f *serveFlags) error {
 	if err := validateAllowOrigin(f.allowOrigin); err != nil {
 		return fmt.Errorf("--allow-origin: %w", err)
 	}
+	if err := validateCFAccessFlags(f); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -350,6 +383,254 @@ func validateAllowOrigin(raw string) error {
 		return errors.New("must be an origin only, like https://pipelab.org")
 	}
 	return nil
+}
+
+func brokerPublicHosts(f *serveFlags) ([]string, error) {
+	seen := make(map[string]struct{})
+	var hosts []string
+	add := func(raw string) error {
+		host, err := normalizePublicHost(raw)
+		if err != nil {
+			return err
+		}
+		if host == "" {
+			return nil
+		}
+		if _, ok := seen[host]; ok {
+			return nil
+		}
+		seen[host] = struct{}{}
+		hosts = append(hosts, host)
+		return nil
+	}
+	for _, h := range f.publicHosts {
+		if err := add(h); err != nil {
+			return nil, fmt.Errorf("--public-host: %w", err)
+		}
+	}
+	if len(hosts) == 0 && f.allowOrigin != "" {
+		u, err := url.Parse(f.allowOrigin)
+		if err != nil {
+			return nil, fmt.Errorf("--allow-origin: parse: %w", err)
+		}
+		if err := add(u.Host); err != nil {
+			return nil, fmt.Errorf("--allow-origin host: %w", err)
+		}
+	}
+	return hosts, nil
+}
+
+func normalizePublicHost(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	if strings.Contains(raw, "://") {
+		return "", errors.New("must be a host, not a URL")
+	}
+	host := raw
+	if h, _, err := net.SplitHostPort(raw); err == nil {
+		host = h
+	}
+	host = strings.Trim(strings.TrimSuffix(host, "."), "[]")
+	host = strings.ToLower(host)
+	if host == "" || strings.ContainsAny(host, "/?# \t\r\n") {
+		return "", fmt.Errorf("invalid host %q", raw)
+	}
+	return host, nil
+}
+
+func hostGuard(next http.Handler, allowed []string) http.Handler {
+	set := make(map[string]struct{}, len(allowed))
+	for _, h := range allowed {
+		if norm, err := normalizePublicHost(h); err == nil && norm != "" {
+			set[norm] = struct{}{}
+		}
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host, err := normalizePublicHost(r.Host)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if _, ok := set[host]; !ok {
+			http.NotFound(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+type cfAccessVerifier struct {
+	issuer   string
+	audience string
+	certsURL string
+	client   *http.Client
+	now      func() time.Time
+
+	mu      sync.RWMutex
+	keys    *jose.JSONWebKeySet
+	keysExp time.Time
+}
+
+func validateCFAccessFlags(f *serveFlags) error {
+	team := strings.TrimSpace(f.cfAccessTeamDomain)
+	aud := strings.TrimSpace(f.cfAccessAUD)
+	if team == "" && aud == "" {
+		if strings.TrimSpace(f.cfAccessCertsURL) != "" {
+			return errors.New("--cf-access-certs-url requires --cf-access-team-domain and --cf-access-aud")
+		}
+		return nil
+	}
+	if team == "" || aud == "" {
+		return errors.New("--cf-access-team-domain and --cf-access-aud must be set together")
+	}
+	if _, err := normalizeCFAccessTeamDomain(team); err != nil {
+		return fmt.Errorf("--cf-access-team-domain: %w", err)
+	}
+	if strings.ContainsAny(aud, " \t\r\n") {
+		return errors.New("--cf-access-aud must not contain whitespace")
+	}
+	if raw := strings.TrimSpace(f.cfAccessCertsURL); raw != "" {
+		u, err := url.Parse(raw)
+		if err != nil {
+			return fmt.Errorf("--cf-access-certs-url: parse: %w", err)
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			return errors.New("--cf-access-certs-url must be http(s)")
+		}
+		if u.Host == "" {
+			return errors.New("--cf-access-certs-url host is required")
+		}
+	}
+	return nil
+}
+
+func newCFAccessVerifier(f *serveFlags) (*cfAccessVerifier, error) {
+	team := strings.TrimSpace(f.cfAccessTeamDomain)
+	aud := strings.TrimSpace(f.cfAccessAUD)
+	if team == "" && aud == "" {
+		return nil, nil
+	}
+	issuer, err := normalizeCFAccessTeamDomain(team)
+	if err != nil {
+		return nil, fmt.Errorf("--cf-access-team-domain: %w", err)
+	}
+	certsURL := strings.TrimSpace(f.cfAccessCertsURL)
+	if certsURL == "" {
+		certsURL = issuer + "/cdn-cgi/access/certs"
+	}
+	return &cfAccessVerifier{
+		issuer:   issuer,
+		audience: aud,
+		certsURL: certsURL,
+		client: &http.Client{
+			Timeout: 5 * time.Second,
+		},
+		now: time.Now,
+	}, nil
+}
+
+func normalizeCFAccessTeamDomain(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", errors.New("required")
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("parse: %w", err)
+	}
+	if u.Scheme != "https" {
+		return "", errors.New("must use https")
+	}
+	if u.Host == "" {
+		return "", errors.New("host is required")
+	}
+	if u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
+		return "", errors.New("must be only the Access team domain")
+	}
+	host := strings.ToLower(strings.TrimSuffix(u.Host, "."))
+	return "https://" + host, nil
+}
+
+func cfAccessGuard(next http.Handler, verifier *cfAccessVerifier) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := strings.TrimSpace(r.Header.Get(cfAccessJWTHeader))
+		if token == "" {
+			http.Error(w, "missing Cloudflare Access JWT", http.StatusForbidden)
+			return
+		}
+		if err := verifier.verify(r.Context(), token); err != nil {
+			http.Error(w, "invalid Cloudflare Access JWT", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (v *cfAccessVerifier) verify(ctx context.Context, raw string) error {
+	tok, err := jwt.ParseSigned(raw, []jose.SignatureAlgorithm{jose.RS256})
+	if err != nil {
+		return fmt.Errorf("parse access jwt: %w", err)
+	}
+	keys, err := v.keySet(ctx)
+	if err != nil {
+		return err
+	}
+	var claims jwt.Claims
+	if err := tok.Claims(keys, &claims); err != nil {
+		return fmt.Errorf("verify access jwt signature: %w", err)
+	}
+	if err := claims.ValidateWithLeeway(jwt.Expected{
+		Issuer:      v.issuer,
+		AnyAudience: jwt.Audience{v.audience},
+		Time:        v.now(),
+	}, 30*time.Second); err != nil {
+		return fmt.Errorf("validate access jwt claims: %w", err)
+	}
+	return nil
+}
+
+func (v *cfAccessVerifier) keySet(ctx context.Context) (*jose.JSONWebKeySet, error) {
+	now := v.now()
+	v.mu.RLock()
+	if v.keys != nil && now.Before(v.keysExp) {
+		defer v.mu.RUnlock()
+		return v.keys, nil
+	}
+	v.mu.RUnlock()
+
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	now = v.now()
+	if v.keys != nil && now.Before(v.keysExp) {
+		return v.keys, nil
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, v.certsURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build Cloudflare Access JWKS request: %w", err)
+	}
+	resp, err := v.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch Cloudflare Access JWKS: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetch Cloudflare Access JWKS: status %d", resp.StatusCode)
+	}
+	var keys jose.JSONWebKeySet
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&keys); err != nil {
+		return nil, fmt.Errorf("decode Cloudflare Access JWKS: %w", err)
+	}
+	if len(keys.Keys) == 0 {
+		return nil, errors.New("cloudflare access jwks is empty")
+	}
+	v.keys = &keys
+	v.keysExp = now.Add(cfAccessKeysTTL)
+	return v.keys, nil
 }
 
 // resolveFlyToken reads the Fly API token from the configured file or env var.

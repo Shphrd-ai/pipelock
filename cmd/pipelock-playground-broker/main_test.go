@@ -6,7 +6,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -16,6 +19,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 
 	"github.com/luckyPipewrench/pipelock/internal/playground/broker"
 	"github.com/luckyPipewrench/pipelock/internal/playground/livechat"
@@ -158,6 +164,191 @@ func TestBuildServerStaticDir(t *testing.T) {
 	t.Cleanup(ts2.Close)
 	if _, status := httpGetStatus(t, ts2.URL+"/"); status != http.StatusNotFound {
 		t.Fatalf("GET / without --static-dir = %d, want 404", status)
+	}
+}
+
+func TestBuildServerHostGuardFromAllowOrigin(t *testing.T) {
+	dir := t.TempDir()
+	uiDir := filepath.Join(dir, "ui")
+	if err := os.MkdirAll(uiDir, 0o750); err != nil {
+		t.Fatalf("mkdir ui: %v", err)
+	}
+	writeTestFile(t, uiDir, "index.html", "<html><body>live demo ui</body></html>")
+	flyTokenFile := writeTestFile(t, dir, "fly.token", "fly-file-token\n")
+	gateSecret := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	gateSecretFile := writeTestFile(t, dir, "gate.b64", gateSecret+"\n")
+
+	oldFactory := newMachineProvider
+	newMachineProvider = func(_ context.Context, _ *serveFlags, _ string) (broker.MachineProvider, error) {
+		return fakeProvider{}, nil
+	}
+	t.Cleanup(func() { newMachineProvider = oldFactory })
+
+	srv, handler, err := buildServer(context.Background(), &bytes.Buffer{}, &serveFlags{
+		listen: defaultListen, provider: "fake", flyApp: "playground-test",
+		flyTokenFile: flyTokenFile, image: "registry.example/playground:test",
+		staticDir: uiDir, internalPort: 8080, concurrency: 2,
+		codes: []string{"outer-code"}, maxPerCode: defaultMaxPerCode,
+		gateSecretFile: gateSecretFile, ipRate: defaultIPRate, ipBurst: defaultIPBurst,
+		codeRate: defaultCodeRate, codeBurst: defaultCodeBurst,
+		sessionTTL: defaultSessionTTL, deadlineGrace: defaultGrace,
+		allowOrigin:           "https://playground.pipelab.org",
+		requireSessionSecrets: false,
+	})
+	if err != nil {
+		t.Fatalf("buildServer: %v", err)
+	}
+	t.Cleanup(srv.Close)
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "http://pipelab-playground.fly.dev/", nil)
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("direct Fly host status = %d, want 404", rr.Code)
+	}
+
+	rr = httptest.NewRecorder()
+	req = httptest.NewRequestWithContext(context.Background(), http.MethodGet, "http://playground.pipelab.org/", nil)
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "live demo ui") {
+		t.Fatalf("public host status/body = %d %q, want UI", rr.Code, rr.Body.String())
+	}
+}
+
+func TestBuildServerCFAccessGuard(t *testing.T) {
+	dir := t.TempDir()
+	uiDir := filepath.Join(dir, "ui")
+	if err := os.MkdirAll(uiDir, 0o750); err != nil {
+		t.Fatalf("mkdir ui: %v", err)
+	}
+	writeTestFile(t, uiDir, "index.html", "<html><body>live demo ui</body></html>")
+	flyTokenFile := writeTestFile(t, dir, "fly.token", "fly-file-token\n")
+	gateSecret := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	gateSecretFile := writeTestFile(t, dir, "gate.b64", gateSecret+"\n")
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate rsa key: %v", err)
+	}
+	const kid = "cf-access-test-key"
+	issuer := "https://team.cloudflareaccess.com"
+	aud := "playground-aud"
+	jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{
+		Key:       &priv.PublicKey,
+		KeyID:     kid,
+		Algorithm: string(jose.RS256),
+		Use:       "sig",
+	}}}
+	keyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(jwks); err != nil {
+			t.Fatalf("encode jwks: %v", err)
+		}
+	}))
+	t.Cleanup(keyServer.Close)
+
+	oldFactory := newMachineProvider
+	newMachineProvider = func(_ context.Context, _ *serveFlags, _ string) (broker.MachineProvider, error) {
+		return fakeProvider{}, nil
+	}
+	t.Cleanup(func() { newMachineProvider = oldFactory })
+
+	srv, handler, err := buildServer(context.Background(), &bytes.Buffer{}, &serveFlags{
+		listen: defaultListen, provider: "fake", flyApp: "playground-test",
+		flyTokenFile: flyTokenFile, image: "registry.example/playground:test",
+		staticDir: uiDir, internalPort: 8080, concurrency: 2,
+		codes: []string{"outer-code"}, maxPerCode: defaultMaxPerCode,
+		gateSecretFile: gateSecretFile, ipRate: defaultIPRate, ipBurst: defaultIPBurst,
+		codeRate: defaultCodeRate, codeBurst: defaultCodeBurst,
+		sessionTTL: defaultSessionTTL, deadlineGrace: defaultGrace,
+		allowOrigin:           "https://playground.pipelab.org",
+		cfAccessTeamDomain:    issuer,
+		cfAccessAUD:           aud,
+		cfAccessCertsURL:      keyServer.URL,
+		requireSessionSecrets: false,
+	})
+	if err != nil {
+		t.Fatalf("buildServer: %v", err)
+	}
+	t.Cleanup(srv.Close)
+
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "http://playground.pipelab.org/", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("missing Access JWT status = %d, want 403", rr.Code)
+	}
+
+	req = httptest.NewRequestWithContext(context.Background(), http.MethodGet, "http://playground.pipelab.org/", nil)
+	req.Header.Set(cfAccessJWTHeader, "not-a-jwt")
+	rr = httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("bad Access JWT status = %d, want 403", rr.Code)
+	}
+
+	token := signedCFAccessTestJWT(t, priv, kid, issuer, aud, time.Now())
+	req = httptest.NewRequestWithContext(context.Background(), http.MethodGet, "http://playground.pipelab.org/", nil)
+	req.Header.Set(cfAccessJWTHeader, token)
+	rr = httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "live demo ui") {
+		t.Fatalf("valid Access JWT status/body = %d %q, want UI", rr.Code, rr.Body.String())
+	}
+}
+
+func signedCFAccessTestJWT(t *testing.T, priv *rsa.PrivateKey, kid, issuer, aud string, now time.Time) string {
+	t.Helper()
+	signer, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.RS256, Key: priv},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", kid),
+	)
+	if err != nil {
+		t.Fatalf("new signer: %v", err)
+	}
+	raw, err := jwt.Signed(signer).Claims(jwt.Claims{
+		Issuer:    issuer,
+		Subject:   "dylan@example.com",
+		Audience:  jwt.Audience{aud},
+		IssuedAt:  jwt.NewNumericDate(now.Add(-time.Minute)),
+		NotBefore: jwt.NewNumericDate(now.Add(-time.Minute)),
+		Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+	}).Serialize()
+	if err != nil {
+		t.Fatalf("sign access jwt: %v", err)
+	}
+	return raw
+}
+
+func TestNormalizePublicHost(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    string
+		wantErr bool
+	}{
+		{in: "Playground.Pipelab.Org.", want: "playground.pipelab.org"},
+		{in: "playground.pipelab.org:443", want: "playground.pipelab.org"},
+		{in: "[2001:db8::1]:443", want: "2001:db8::1"},
+		{in: "https://playground.pipelab.org", wantErr: true},
+		{in: "bad/host", wantErr: true},
+		{in: "bad host", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			got, err := normalizePublicHost(tt.in)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("normalizePublicHost succeeded, want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("normalizePublicHost: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("normalizePublicHost = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
