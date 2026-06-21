@@ -21,7 +21,12 @@ const bundleTSLayout = "15:04:05"
 // agent column shows what the agent actually requested rather than a placeholder.
 func hydrateAgentActs(narr scenarioNarrative, receipts []receipt.Receipt, hcw *HostContainmentWitness) []BundleAgentAct {
 	allowR, hasAllow := findReceipt(receipts, liveDemoAllowedVerdict, "")
-	blockR, hasBlock := findReceipt(receipts, liveDemoExpectedVerdict, liveDemoExpectedBlockLayer)
+	// Layer-agnostic: the block beat is whatever layer caught the exfil. The
+	// deterministic/replay paths block at body_dlp/core_dlp; the live model path
+	// (drop box not allowlisted) blocks at the allowlist (destination). The
+	// per-run verify predicate enforces the path-specific semantics; the bundle
+	// only displays the block that occurred (its real layer rides in the meta).
+	blockR, hasBlock := findReceipt(receipts, liveDemoExpectedVerdict, "")
 
 	out := make([]BundleAgentAct, 0, len(narr.agent))
 	for _, a := range narr.agent {
@@ -93,7 +98,9 @@ func buildDecisions(narr scenarioNarrative, receipts []receipt.Receipt, rep Veri
 	}
 
 	// --- BLOCK (mediated, with the signed receipt envelope) ---
-	if blockR, ok := findReceipt(receipts, liveDemoExpectedVerdict, liveDemoExpectedBlockLayer); ok {
+	// Layer-agnostic (see hydrateAgentActs): live model runs block the exfil at the
+	// allowlist (destination), not body_dlp. The real layer is shown in meta below.
+	if blockR, ok := findReceipt(receipts, liveDemoExpectedVerdict, ""); ok {
 		ar := blockR.ActionRecord
 		meta := fmt.Sprintf("verdict=block · layer=%s", ar.Layer)
 		if ar.Pattern != "" {

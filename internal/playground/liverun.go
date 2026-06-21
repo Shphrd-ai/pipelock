@@ -280,16 +280,21 @@ func StartLiveRun(ctx context.Context, opts LiveRunOpts) (*LiveRun, error) {
 	// Trust the .test hosts so they pass the domain check
 	cfg.TrustedDomains = append(cfg.TrustedDomains, liveRunSafeHost, liveRunExfilHost)
 
-	// Model-agent runs enforce a strict host allowlist: a jailbroken model must
-	// not reach any host beyond the two lab targets and its own model API. The
-	// model host is the single real-egress destination (tool calls to the .test
-	// hosts stay loopback; a test override resolves the model host to a loopback
-	// fake, absent an override it resolves for real). Allowlist enforcement is
-	// gated to strict mode in the scanner, so model runs run strict; the
-	// deterministic IntentAgent path (no ModelBaseURL) keeps its balanced config
-	// unchanged. HTTPS model traffic may be an opaque CONNECT tunnel, so the
-	// subprocess tool runtime also refuses the model host as a tool target; the
-	// allowlist entry is for model API traffic only, not lab exfil actions.
+	// Model-agent runs enforce a strict host allowlist: a jailbroken model (which
+	// has a real shell, so tool-runtime host guards are bypassable by curl) must
+	// not be able to reach any host the operator did not approve. The ONLY approved
+	// egress destinations are the benign lab read target and the model's own API.
+	//
+	// CRITICAL: the allowlist is ASSIGNED, never appended to config.Defaults(). The
+	// defaults ship general third-party hosts (github/openai/telegram/slack/discord/
+	// npm) which ARE enforced as reachable in strict mode -- appending would
+	// silently approve real exfil channels (e.g. a visitor's own Telegram bot). The
+	// drop-box/collector host (liveRunExfilHost) is also intentionally NOT approved:
+	// an exfil attempt to it is blocked at the allowlist (destination control, before
+	// DNS), which encoding cannot bypass; the collector still runs as the independent
+	// "received nothing" witness. Allowlist enforcement is gated to strict mode, so
+	// model runs run strict; the deterministic IntentAgent path (no ModelBaseURL)
+	// keeps its balanced config (collector reachable, content-scan beat) unchanged.
 	if opts.ModelBaseURL != "" {
 		modelHost, mhErr := modelHostname(opts.ModelBaseURL)
 		if mhErr != nil {
@@ -301,7 +306,7 @@ func StartLiveRun(ctx context.Context, opts LiveRunOpts) (*LiveRun, error) {
 			cfg.DNS.HostOverrides[modelHost] = opts.ModelHostOverride
 		}
 		cfg.Mode = config.ModeStrict
-		cfg.APIAllowlist = append(cfg.APIAllowlist, liveRunSafeHost, liveRunExfilHost, modelHost)
+		cfg.APIAllowlist = []string{liveRunSafeHost, modelHost}
 		cfg.Suppress = append(cfg.Suppress, modelProviderAuthSuppressions(opts.ModelBaseURL)...)
 	}
 
