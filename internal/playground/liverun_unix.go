@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"syscall"
 )
@@ -35,6 +36,70 @@ func configureContainedCommand(cmd *exec.Cmd, agentUser string) error {
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Credential: &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)},
+	}
+	return nil
+}
+
+// applyAgentContainment runs the LLM agent subprocess as the contained agent
+// user (so the kernel owner-match drops its direct egress, including run_command
+// children) and hands ownership of the per-session scratch tree to that user so
+// the agent can read the seeded credentials, cd into the scratch, and write
+// there. It is fail-closed: it returns an error if it cannot establish
+// containment (not root, unknown user, chown failure), so a session that claims
+// to be contained never silently launches an UNcontained agent. cmd's
+// SysProcAttr must be set before Start, which is why the caller invokes this
+// before spawning the subprocess.
+func applyAgentContainment(cmd *exec.Cmd, scratchDir, agentUser string) error {
+	if err := configureContainedCommand(cmd, agentUser); err != nil {
+		return err
+	}
+	return chownTreeToAgent(scratchDir, agentUser)
+}
+
+// chownTreeToAgent hands the server-seeded scratch paths to the contained agent
+// user so the agent (running as that uid) can traverse the scratch, read the
+// seeded credentials, and write there. It chowns the exact paths the server
+// created (the scratch dir, the .aws dir, the credentials file) rather than
+// walking the tree: at call time only the server's seed exists (the agent has
+// not started), and chowning known paths with Lchown avoids any symlink-follow.
+// Files the agent later creates are already owned by it (the process runs as the
+// agent uid). Requires root, established by the caller via
+// configureContainedCommand (which checks euid==0 first). Empty dir is a no-op.
+func chownTreeToAgent(dir, agentUser string) error {
+	if dir == "" {
+		return nil
+	}
+	if agentUser == "" {
+		agentUser = defaultContainedAgentUser
+	}
+	u, err := user.Lookup(agentUser)
+	if err != nil {
+		return fmt.Errorf("lookup contained agent user %q: %w", agentUser, err)
+	}
+	uid, err := strconv.Atoi(u.Uid)
+	if err != nil {
+		return fmt.Errorf("parse uid for %q: %w", agentUser, err)
+	}
+	gid, err := strconv.Atoi(u.Gid)
+	if err != nil {
+		return fmt.Errorf("parse gid for %q: %w", agentUser, err)
+	}
+	clean := filepath.Clean(dir)
+	paths := []string{
+		clean,
+		filepath.Join(clean, ".aws"),
+		filepath.Join(clean, ".aws", "credentials"),
+	}
+	for _, p := range paths {
+		if _, statErr := os.Lstat(p); statErr != nil {
+			if os.IsNotExist(statErr) {
+				continue
+			}
+			return fmt.Errorf("stat %q: %w", p, statErr)
+		}
+		if err := os.Lchown(p, uid, gid); err != nil {
+			return fmt.Errorf("chown %q to agent: %w", p, err)
+		}
 	}
 	return nil
 }

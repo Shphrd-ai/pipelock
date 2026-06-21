@@ -229,6 +229,13 @@ func TestBuildHostContainmentWitnessSignsProbeEvidence(t *testing.T) {
 		},
 	}
 
+	proxyLn, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("proxy listener: %v", err)
+	}
+	defer func() { _ = proxyLn.Close() }()
+	lr.proxyLn = proxyLn
+
 	var controlTarget string
 	lr.egressProbe = func(targets []string, asAgent bool) ([]ProbeResult, error) {
 		if len(targets) == 0 {
@@ -241,11 +248,17 @@ func TestBuildHostContainmentWitnessSignsProbeEvidence(t *testing.T) {
 			controlTarget = targets[0]
 			return []ProbeResult{{Target: targets[0], Open: true, Blocked: false, Detail: "connected"}}, nil
 		}
-		if targets[0] != controlTarget {
-			return nil, fmt.Errorf("agent control target = %q, want %q", targets[0], controlTarget)
+		// Agent targets are [proxy, control, direct...]: the proxy is the one
+		// permitted egress (Open), everything else is blocked.
+		if len(targets) < 2 {
+			return nil, fmt.Errorf("agent target count = %d", len(targets))
+		}
+		if targets[1] != controlTarget {
+			return nil, fmt.Errorf("agent control target = %q, want %q", targets[1], controlTarget)
 		}
 		results := make([]ProbeResult, 0, len(targets))
-		for _, target := range targets {
+		results = append(results, ProbeResult{Target: targets[0], Open: true, Blocked: false, Detail: "connected"})
+		for _, target := range targets[1:] {
 			results = append(results, ProbeResult{Target: target, Open: false, Blocked: true, Detail: "blocked"})
 		}
 		return results, nil
@@ -294,11 +307,131 @@ func TestBuildHostContainmentWitnessFailsClosedOnProbeError(t *testing.T) {
 	}
 }
 
+func TestLLMAgentConfig_EffectiveMaxSteps(t *testing.T) {
+	t.Parallel()
+	if got := (&LLMAgentConfig{MaxSteps: 4}).EffectiveMaxSteps(); got != 4 {
+		t.Errorf("configured MaxSteps = %d, want 4", got)
+	}
+	def := (&LLMAgentConfig{}).EffectiveMaxSteps()
+	if def <= 0 {
+		t.Errorf("unset MaxSteps default = %d, want a positive worst-case", def)
+	}
+	var nilCfg *LLMAgentConfig
+	if nilCfg.EffectiveMaxSteps() != def {
+		t.Errorf("nil config = %d, want the same default as an unset MaxSteps (%d)", nilCfg.EffectiveMaxSteps(), def)
+	}
+}
+
+func TestBuildHostContainmentWitnessFailsClosedOnNilProxyListener(t *testing.T) {
+	t.Parallel()
+
+	_, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	lr := &LiveRun{
+		ctx:              t.Context(),
+		orchestratorPriv: priv,
+		opts:             LiveRunOpts{RunNonce: "N1"},
+		// proxyLn deliberately nil: a contained witness build cannot record the
+		// agent's permitted-egress port and must fail closed, never sign a witness
+		// that omits the proxy contract.
+	}
+	lr.egressProbe = func(targets []string, asAgent bool) ([]ProbeResult, error) {
+		// Operator control probe succeeds; the nil proxy listener must then fail.
+		return []ProbeResult{{Target: targets[0], Open: true, Blocked: false, Detail: "connected"}}, nil
+	}
+
+	_, err = lr.buildHostContainmentWitness()
+	if err == nil || !strings.Contains(err.Error(), "proxy listener not initialized") {
+		t.Fatalf("buildHostContainmentWitness error = %v, want proxy listener not initialized", err)
+	}
+}
+
 func TestContainmentAvailableFalseWhenPipelockMissing(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 
 	if ContainmentAvailable() {
 		t.Fatal("empty PATH must report containment unavailable")
+	}
+}
+
+func TestContainmentEnforcedUsesEnforcementOnlyVerify(t *testing.T) {
+	dir := t.TempDir()
+	argsLog := filepath.Join(dir, "args.log")
+	pipelockPath := filepath.Join(dir, "pipelock")
+	body := "#!/bin/sh\nprintf '%s\\n' \"$*\" > \"$PIPELOCK_ARGS_LOG\"\n"
+	if err := os.WriteFile(pipelockPath, []byte(body), 0o755); err != nil { //nolint:gosec // test executable
+		t.Fatalf("write fake pipelock: %v", err)
+	}
+	t.Setenv("PATH", dir)
+	t.Setenv("PIPELOCK_ARGS_LOG", argsLog)
+
+	if !ContainmentEnforced() {
+		t.Fatal("fake pipelock should make containment enforcement available")
+	}
+	got, err := os.ReadFile(argsLog) //nolint:gosec // tmpdir-scoped test output
+	if err != nil {
+		t.Fatalf("read args log: %v", err)
+	}
+	if string(got) != "contain verify --enforcement-only\n" {
+		t.Fatalf("fake pipelock args = %q", got)
+	}
+}
+
+func TestVerifyModelLiveContained(t *testing.T) {
+	t.Parallel()
+	oneReceipt := []receipt.Receipt{{}}
+	cases := []struct {
+		name     string
+		receipts []receipt.Receipt
+		witness  Witness
+		wantErr  bool
+	}{
+		{"clean: observed 0 with a signed decision", oneReceipt, Witness{ObservedCount: 0, TotalCount: 0}, false},
+		{"leak observed fails closed", oneReceipt, Witness{ObservedCount: 1, TotalCount: 1}, true},
+		{"any total reaching collector fails closed", oneReceipt, Witness{ObservedCount: 0, TotalCount: 1}, true},
+		{"empty run has nothing to attest", nil, Witness{ObservedCount: 0, TotalCount: 0}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := verifyModelLiveContained(tc.receipts, tc.witness)
+			if tc.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("expected nil, got %v", err)
+			}
+		})
+	}
+}
+
+func TestManifestAgentKind(t *testing.T) {
+	t.Parallel()
+	if got := manifestAgentKind("https://api.vendor.example"); got != AgentKindModel {
+		t.Errorf("model url -> %q, want %q", got, AgentKindModel)
+	}
+	if got := manifestAgentKind(""); got != AgentKindDeterministic {
+		t.Errorf("empty url -> %q, want %q", got, AgentKindDeterministic)
+	}
+}
+
+func TestLaunchManifest_AgentKindIsSigned(t *testing.T) {
+	t.Parallel()
+	pub, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed := SignLaunchManifest(priv, LaunchManifest{RunNonce: "n", AgentKind: AgentKindModel})
+	if !VerifyLaunchManifest(pub, signed) {
+		t.Fatal("freshly signed model manifest must verify")
+	}
+	// Flipping AgentKind must break the signature: an attacker must not be able to
+	// relabel a run to route it to a different verify predicate.
+	tampered := signed
+	tampered.AgentKind = AgentKindDeterministic
+	if VerifyLaunchManifest(pub, tampered) {
+		t.Fatal("tampering AgentKind must invalidate the manifest signature")
 	}
 }
 

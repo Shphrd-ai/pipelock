@@ -302,6 +302,18 @@ func (h *RealContainmentHook) Teardown(runDir string) error {
 // ContainmentAvailable checks whether `pipelock contain verify` can be run
 // successfully. Used by tests to gate host-only containment tests.
 func ContainmentAvailable() bool {
+	return runContainVerify("verify")
+}
+
+// ContainmentEnforced checks whether the containment boundary is active without
+// requiring the stock pipelock service or loopback listener to be running. The
+// live playground owns the proxy lifecycle for each session, so its start gate
+// needs the kernel/user/wrapper enforcement probes, not proxy liveness.
+func ContainmentEnforced() bool {
+	return runContainVerify("verify", "--enforcement-only")
+}
+
+func runContainVerify(args ...string) bool {
 	// Quick check: is pipelock in PATH?
 	_, err := exec.LookPath("pipelock")
 	if err != nil {
@@ -311,7 +323,7 @@ func ContainmentAvailable() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "pipelock", "contain", "verify")
+	cmd := exec.CommandContext(ctx, "pipelock", append([]string{"contain"}, args...)...)
 	if err := cmd.Run(); err != nil {
 		return false
 	}

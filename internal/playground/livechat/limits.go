@@ -235,7 +235,13 @@ const (
 	maxMaxInputBytes     = 16384
 	defaultSessionTTL    = 90 * time.Second
 	minSessionTTL        = 10 * time.Second
-	maxSessionTTL        = 10 * time.Minute
+	// maxSessionTTL is the ceiling an operator may set via --session-ttl. It is the
+	// max wall-clock one session may hold the (concurrency-capped) slot, not a spend
+	// control: the per-IP / per-code / global daily turn budgets bound model spend
+	// regardless of session length. Set high enough for a real multi-step attack
+	// chain to be driven to completion in one sitting; public deployments still set
+	// a shorter --session-ttl to free the slot faster.
+	maxSessionTTL = 30 * time.Minute
 )
 
 // Limits holds the per-session value caps (input size and wall-clock). It is a

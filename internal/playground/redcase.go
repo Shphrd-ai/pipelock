@@ -71,8 +71,17 @@ func runRedCaseCalibrationCore(ctx context.Context, colPriv ed25519.PrivateKey, 
 
 	// POST the canary value DIRECTLY to the collector (no proxy -- this is
 	// the deliberate "Pipelock OFF" leak that makes the witness go red).
+	//
+	// Use a FRESH bounded context, not the caller's: this calibration runs at
+	// session-seal time, and a slow model turn can leave the session context
+	// near-expired or cancelled. Inheriting it made this fast loopback POST
+	// spuriously hit "context deadline exceeded", failing the whole bundle seal.
+	// WithoutCancel drops the parent deadline/cancellation (keeping values) and a
+	// short fresh timeout bounds the local op.
+	postCtx, cancelPost := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancelPost()
 	body := strings.NewReader("payload=" + sentValue)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, srv.URL+"/?run="+calibNonce, body)
+	req, err := http.NewRequestWithContext(postCtx, http.MethodPost, srv.URL+"/?run="+calibNonce, body)
 	if err != nil {
 		return RedCaseResult{}, Witness{}, fmt.Errorf("red-case calibration: build request: %w", err)
 	}

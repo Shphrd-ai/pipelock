@@ -62,6 +62,14 @@ linters:
       - path: internal/playground/live_llm_internal_test\.go
         linters: [gosec]
         text: "G204"
+      # shell_tools.go's run_command intentionally executes an arbitrary,
+      # model-supplied shell command. That is the demo's whole point: the agent
+      # has a real shell and Pipelock plus host kernel containment are the only
+      # controls. run_command is gated (AllowExec) so it is only ever offered on
+      # a host whose kernel contains the agent's egress.
+      - path: internal/playground/llmagent/shell_tools\.go
+        linters: [gosec]
+        text: "G204"
       - path: internal/playground/orchestrate\.go
         linters: [gosec]
         text: "G204"

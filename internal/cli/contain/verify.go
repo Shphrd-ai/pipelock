@@ -489,9 +489,10 @@ type aggregateBody struct {
 
 // verifyOpts collects all flag-derived state for runVerify.
 type verifyOpts struct {
-	jsonOutput     bool
-	port           int
-	workspacePaths []string
+	jsonOutput      bool
+	enforcementOnly bool
+	port            int
+	workspacePaths  []string
 }
 
 func verifyCmd() *cobra.Command {
@@ -510,8 +511,10 @@ directly; the operator user must still reach the internet), verify the
 installed binary matches the TOFU integrity pin written at install
 time, and exercise plk-launch end-to-end with a sentinel tool to confirm
 the allow-list enforcement path actually fires. Pass --workspace to also
-verify that pipelock-agent can read/traverse real project directories before
-making plk wrappers the default entry point.
+verify that pipelock-agent can read/traverse real project directories.
+Pass --enforcement-only when another process owns the proxy lifecycle;
+that mode verifies the kernel/user/wrapper controls while skipping proxy
+liveness probes before making plk wrappers the default entry point.
 
 verify never mutates state. Probes that require root visibility
 (nft list ruleset) record skip when run unprivileged.
@@ -536,6 +539,7 @@ Exit codes:
 	}
 
 	cmd.Flags().BoolVar(&opts.jsonOutput, "json", false, "emit newline-delimited JSON instead of text")
+	cmd.Flags().BoolVar(&opts.enforcementOnly, "enforcement-only", false, "skip service and loopback listener liveness probes")
 	cmd.Flags().IntVar(&opts.port, "port", defaultProxyPort, "pipelock listen port to probe on loopback")
 	cmd.Flags().StringArrayVar(&opts.workspacePaths, "workspace", nil, "workspace path that pipelock-agent must be able to read/traverse (repeatable)")
 
@@ -562,10 +566,17 @@ func runVerify(cmd *cobra.Command, env *probeEnv, opts verifyOpts) error {
 	enc := json.NewEncoder(w)
 
 	if !opts.jsonOutput {
-		_, _ = fmt.Fprintln(w, "pipelock contain verify")
+		header := "pipelock contain verify"
+		if opts.enforcementOnly {
+			header += " --enforcement-only"
+		}
+		_, _ = fmt.Fprintln(w, header)
 	}
 
 	probes := probesForEnv(env)
+	if opts.enforcementOnly {
+		probes = enforcementProbes(probes)
+	}
 	var passN, failN, skipN int
 
 	for _, p := range probes {
@@ -629,6 +640,17 @@ func runVerify(cmd *cobra.Command, env *probeEnv, opts verifyOpts) error {
 		return cliutil.ExitCodeError(exitCode, fmt.Errorf("%d probe(s) failed", failN))
 	}
 	return cliutil.ExitCodeError(exitCode, fmt.Errorf("%d probe(s) skipped; verification incomplete", skipN))
+}
+
+func enforcementProbes(probes []probe) []probe {
+	filtered := make([]probe, 0, len(probes))
+	for _, p := range probes {
+		if p.n == 2 || p.n == 6 {
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+	return filtered
 }
 
 // writeTextLine renders one probe outcome in text mode.

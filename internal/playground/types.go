@@ -31,6 +31,22 @@ type LaunchManifest struct {
 	// host-containment checks to be present and pass. Because the manifest is
 	// signed under the orchestrator key, an attacker cannot flip this to skip
 	// the containment checks without invalidating the manifest signature.
-	Contained bool   `json:"contained"`
+	Contained bool `json:"contained"`
+	// AgentKind records which agent drove the run: AgentKindModel for the real
+	// model-backed subprocess, empty (or AgentKindDeterministic) for the scripted
+	// IntentAgent. A free model does not reproduce the scripted safe-GET +
+	// body_dlp beats, so a model run verifies under an honest model-mode predicate
+	// (containment + zero-leak + a signed decision trail) instead of the strict
+	// deterministic one. Covered by the manifest signature, so it cannot be
+	// flipped to dodge the stricter check.
+	AgentKind string `json:"agent_kind,omitempty"`
 	Signature string `json:"signature,omitempty"`
 }
+
+// Agent kinds recorded in LaunchManifest.AgentKind. Empty is treated as
+// deterministic for backward compatibility with manifests signed before the
+// field existed.
+const (
+	AgentKindModel         = "model"
+	AgentKindDeterministic = "deterministic"
+)

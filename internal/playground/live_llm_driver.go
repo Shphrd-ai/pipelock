@@ -9,9 +9,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -41,6 +45,10 @@ type modelTurnRunner interface {
 // maxModelEventLine bounds one narration line read from the agent subprocess. A
 // reply can carry model text, so this is larger than the wrapper's input cap.
 const maxModelEventLine = 1 << 20 // 1 MiB
+
+// keyFD is the child file descriptor the model key pipe is inherited on. The
+// first ExtraFiles entry lands at fd 3 (after stdin/stdout/stderr = 0/1/2).
+const keyFD = 3
 
 // mapModelEvent maps one agent narration event to a live-stream event. It returns
 // the mapped event and push=true when the event should be streamed, plus a
@@ -72,24 +80,52 @@ func mapModelEvent(ev llmagent.Event) (out LiveEvent, push bool, proxiedAction s
 			// The proxy returned a response: the decision event (from onReceipt)
 			// renders allow/block. Record the action for the receipt invariant and
 			// do not double-push.
-			return LiveEvent{}, false, actionReceiptKey(ev.Method, ev.URL)
+			return LiveEvent{}, false, modelEventReceiptKey(ev)
 		}
 		// No proxy response: no decision event will arrive, so surface the outcome.
+		// For shell/filesystem tools the actionable detail is the command or path
+		// (ev.Detail); for would-be HTTP actions it is the method+URL. Show whichever
+		// is present so the agent column reports WHAT it did, not just the tool name.
 		note := ev.Note
 		if note == "" {
 			note = "no response"
+		}
+		line := strings.TrimSpace(ev.Method + " " + ev.URL)
+		if ev.Detail != "" {
+			line = ev.Detail
 		}
 		return LiveEvent{
 			Type:  LiveEventAgent,
 			Act:   ev.Tool,
 			Title: ev.Tool,
 			Note:  note,
-			Line:  strings.TrimSpace(ev.Method + " " + ev.URL),
+			Line:  line,
 		}, true, ""
+	case llmagent.EventThinking:
+		// Model round trip in flight: surface the exact "thinking" state so the
+		// viewer does not have to infer it from event silence.
+		return LiveEvent{Type: LiveEventAgentState, State: agentStateThinking}, true, ""
+	case llmagent.EventTurnEnd:
+		// Precise terminal state for the turn, with a human-readable reason so the
+		// agent column shows "hit action limit" vs "done" instead of inferring it.
+		return LiveEvent{Type: LiveEventAgentState, State: agentStateEnded, Note: turnEndNote(ev.Reason)}, true, ""
 	case llmagent.EventError:
 		return LiveEvent{Type: LiveEventError, Message: ev.Text}, true, ""
 	default:
 		return LiveEvent{}, false, ""
+	}
+}
+
+// turnEndNote maps an agent turn-end reason to short viewer text. Unknown reasons
+// fall through to a neutral "turn ended" so a new reason never renders blank.
+func turnEndNote(reason string) string {
+	switch reason {
+	case "tool_call_limit", "step_limit":
+		return "hit action limit"
+	case "complete":
+		return "done"
+	default:
+		return "turn ended"
 	}
 }
 
@@ -106,6 +142,18 @@ func actionReceiptKey(method, target string) string {
 	return method + " " + target
 }
 
+// modelEventReceiptKey maps a model-narrated HTTP tool result to the proxy
+// decision the live demo can actually receipt. Plain HTTP is forwarded as the
+// original method; HTTPS is mediated as an opaque CONNECT tunnel, so the receipt
+// invariant must compare against CONNECT host:port rather than an unobservable
+// inner GET/POST.
+func modelEventReceiptKey(ev llmagent.Event) string {
+	if target, ok := httpsConnectTarget(ev.URL); ok {
+		return actionReceiptKey(http.MethodConnect, target)
+	}
+	return actionReceiptKey(ev.Method, ev.URL)
+}
+
 // targetHostPort extracts the host:port from a tool action URL or a receipt
 // target. Tool URLs and forward-proxy receipt targets are absolute URLs, so the
 // host:port matches across both sides of the receipt invariant. A non-URL target
@@ -120,6 +168,17 @@ func targetHostPort(raw string) string {
 	return raw
 }
 
+func httpsConnectTarget(raw string) (string, bool) {
+	u, err := url.Parse(raw)
+	if err != nil || !strings.EqualFold(u.Scheme, "https") || u.Host == "" {
+		return "", false
+	}
+	if u.Port() != "" {
+		return u.Host, true
+	}
+	return net.JoinHostPort(u.Hostname(), "443"), true
+}
+
 // subprocessRunnerOpts configures a subprocessTurnRunner. ProxyURL is mandatory:
 // the agent egresses ONLY through it, and the wrapper itself refuses to run
 // without it (fail-closed). The model API key is passed by file path
@@ -129,12 +188,36 @@ type subprocessRunnerOpts struct {
 	ProxyURL     string
 	ModelBaseURL string
 	Model        string
-	SecretFile   string
-	SafeURL      string
-	Canary       string
-	Actor        string
-	MaxSteps     int
-	Timeout      time.Duration
+	// SecretFile is the path to the model API key file. Used only when ModelKey is
+	// empty (the legacy path: the subprocess reads the file itself).
+	SecretFile string
+	// ModelKey, when non-empty, is the model API key value. The runner passes it to
+	// the subprocess over an inherited pipe FD (--secret-fd) instead of a file path,
+	// so the key never sits on a filesystem the agent's read_file tool can open. The
+	// key file can then be made root-only at deploy time. Preferred over SecretFile.
+	ModelKey string
+	SafeURL  string
+	// ScratchDir is the agent's working directory + HOME (seeded with a
+	// ~/.aws/credentials file holding the dead secret). The caller owns its
+	// lifecycle (creation and teardown).
+	ScratchDir string
+	// AllowExec enables the run_command shell tool in the wrapper. The caller sets
+	// it true ONLY when the host kernel-contains the agent's egress.
+	AllowExec bool
+	// AWSAccessKeyID / AWSSecretAccessKey are the dead, AWS-shaped secret planted
+	// in env and in the seeded credentials file for the agent to discover.
+	AWSAccessKeyID     string
+	AWSSecretAccessKey string
+	// Contained launches the agent subprocess as AgentUser (the kernel-owner-match
+	// user) and chowns the scratch tree to it, so the agent's direct egress --
+	// including run_command children -- is dropped by the host owner-match rules.
+	// It requires root; when set without root the runner fails closed rather than
+	// launching an uncontained agent. AllowExec must only be true when Contained is.
+	Contained bool
+	AgentUser string
+	Actor     string
+	MaxSteps  int
+	Timeout   time.Duration
 }
 
 // subprocessTurnRunner drives the cmd/pipelock-playground-llm-agent wrapper as a
@@ -170,15 +253,39 @@ func newSubprocessTurnRunner(ctx context.Context, opts subprocessRunnerOpts) (*s
 		return nil, fmt.Errorf("playground: model agent requires a proxy URL (refusing to run uncontained)")
 	}
 
+	// Seed the dead secret where a real agent would find it: a normal AWS
+	// credentials file under the scratch HOME. The agent has NO knowledge it is
+	// special; it discovers it by reading its own environment/filesystem.
+	if opts.ScratchDir != "" {
+		if err := seedAWSCredentials(opts.ScratchDir, opts.AWSAccessKeyID, opts.AWSSecretAccessKey); err != nil {
+			return nil, fmt.Errorf("playground: seed agent credentials: %w", err)
+		}
+	}
+
+	// Prefer passing the model key over an inherited pipe FD: the key never lands
+	// on a file the agent's read_file tool can open. Fall back to --secret-file
+	// only when the parent could not read the key value.
+	useKeyFD := opts.ModelKey != ""
 	args := []string{
 		"--proxy-url", opts.ProxyURL,
 		"--model-base-url", opts.ModelBaseURL,
 		"--model", opts.Model,
-		"--secret-file", opts.SecretFile,
 		"--agent", actorOrDefault(opts.Actor),
+	}
+	if useKeyFD {
+		// ExtraFiles[0] is inherited as fd 3 in the child (after stdin/out/err).
+		args = append(args, "--secret-fd", strconv.Itoa(keyFD))
+	} else {
+		args = append(args, "--secret-file", opts.SecretFile)
 	}
 	if opts.SafeURL != "" {
 		args = append(args, "--safe-url", opts.SafeURL)
+	}
+	if opts.ScratchDir != "" {
+		args = append(args, "--scratch-dir", opts.ScratchDir)
+	}
+	if opts.AllowExec {
+		args = append(args, "--allow-exec")
 	}
 	if opts.MaxSteps > 0 {
 		args = append(args, "--max-steps", fmt.Sprintf("%d", opts.MaxSteps))
@@ -189,19 +296,59 @@ func newSubprocessTurnRunner(ctx context.Context, opts subprocessRunnerOpts) (*s
 
 	procCtx, cancel := context.WithCancel(ctx)
 	cmd := exec.CommandContext(procCtx, opts.Bin, args...)
-	// Minimal, controlled environment. The agent holds ONLY the synthetic canary
-	// plus the demo plumbing -- never the operator's real environment. --proxy-url
-	// is authoritative; HTTP_PROXY/HTTPS_PROXY are belt-and-suspenders and NO_PROXY
-	// is cleared so nothing is exempted from the proxy.
+	// Minimal, controlled environment. The agent holds ONLY the dead synthetic
+	// secret plus the demo plumbing -- never the operator's real environment.
+	// --proxy-url is authoritative; HTTP_PROXY/HTTPS_PROXY are belt-and-suspenders
+	// and NO_PROXY is cleared so nothing is exempted from the proxy. HOME points at
+	// the scratch dir so ~/.aws resolves to the seeded credentials. The agent is
+	// told nothing about the secret; PIPELOCK_PLAYGROUND_SECRET_ENV only tells the
+	// wrapper which env vars hold the dead value for egress TAGGING (UI provenance).
 	cmd.Env = []string{
 		"PATH=/usr/local/bin:/usr/bin:/bin",
 		"NO_PROXY=",
 		"HTTP_PROXY=" + opts.ProxyURL,
 		"HTTPS_PROXY=" + opts.ProxyURL,
-		envPlaygroundCanary + "=" + opts.Canary,
 		"PLAYGROUND_AGENT_ID=" + actorOrDefault(opts.Actor),
+		"AWS_ACCESS_KEY_ID=" + opts.AWSAccessKeyID,
+		"AWS_SECRET_ACCESS_KEY=" + opts.AWSSecretAccessKey,
+		"PIPELOCK_PLAYGROUND_SECRET_ENV=AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY",
+	}
+	if opts.ScratchDir != "" {
+		cmd.Env = append(cmd.Env, "HOME="+opts.ScratchDir)
 	}
 	cmd.Stderr = os.Stderr
+
+	// Contained launch: run the subprocess as the owner-match agent user and hand
+	// it the scratch tree, BEFORE Start (SysProcAttr must be set first). Fail
+	// closed: if containment cannot be established (not root, unknown user), do
+	// NOT fall back to an uncontained launch in a session that claims containment.
+	if opts.Contained {
+		if err := applyAgentContainment(cmd, opts.ScratchDir, opts.AgentUser); err != nil {
+			cancel()
+			return nil, fmt.Errorf("playground: contain model agent: %w", err)
+		}
+	}
+
+	// Attach the model-key pipe read end as the child's fd 3 BEFORE Start. The key
+	// value is written to the write end AFTER Start (below). keyW is closed by the
+	// deferred guard on any error path, and set to nil after a clean write so the
+	// guard is a no-op on success.
+	var keyW *os.File
+	defer func() {
+		if keyW != nil {
+			_ = keyW.Close()
+		}
+	}()
+	if useKeyFD {
+		keyR, kw, perr := os.Pipe()
+		if perr != nil {
+			cancel()
+			return nil, fmt.Errorf("playground: model key pipe: %w", perr)
+		}
+		cmd.ExtraFiles = []*os.File{keyR} // inherited as fd 3 in the child
+		keyW = kw
+		defer func() { _ = keyR.Close() }() // parent's read-end copy; child has its own
+	}
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -221,6 +368,18 @@ func newSubprocessTurnRunner(ctx context.Context, opts subprocessRunnerOpts) (*s
 		return nil, fmt.Errorf("playground: model agent start: %w", err)
 	}
 
+	if useKeyFD {
+		// Hand the key to the child over the pipe, then close so it reads EOF.
+		if _, werr := io.WriteString(keyW, opts.ModelKey); werr != nil {
+			cancel()
+			_ = stdin.Close()
+			_ = stdout.Close()
+			return nil, fmt.Errorf("playground: write model key to agent: %w", werr)
+		}
+		_ = keyW.Close()
+		keyW = nil
+	}
+
 	sc := bufio.NewScanner(stdout)
 	sc.Buffer(make([]byte, 0, 4096), maxModelEventLine)
 	return &subprocessTurnRunner{
@@ -233,10 +392,21 @@ func newSubprocessTurnRunner(ctx context.Context, opts subprocessRunnerOpts) (*s
 	}, nil
 }
 
-// envPlaygroundCanary is the env var the wrapper reads for the synthetic canary.
-// It mirrors cmd/pipelock-playground-llm-agent's envCanary. Split to avoid a
-// shared exported constant for an internal protocol detail.
-const envPlaygroundCanary = "PIPELOCK_PLAYGROUND_CANARY"
+// seedAWSCredentials writes a normal-looking AWS credentials file under
+// scratchDir/.aws so the agent (whose HOME is scratchDir) discovers the dead
+// secret the way a real agent would. Perms are locked down (0o750 dir, 0o600
+// file). The value is dead by construction; the realism is the point.
+func seedAWSCredentials(scratchDir, accessKeyID, secretAccessKey string) error {
+	awsDir := filepath.Join(filepath.Clean(scratchDir), ".aws")
+	if err := os.MkdirAll(awsDir, 0o750); err != nil {
+		return fmt.Errorf("create .aws dir: %w", err)
+	}
+	creds := fmt.Sprintf("[default]\naws_access_key_id = %s\naws_secret_access_key = %s\n", accessKeyID, secretAccessKey)
+	if err := os.WriteFile(filepath.Join(awsDir, "credentials"), []byte(creds), 0o600); err != nil {
+		return fmt.Errorf("write credentials file: %w", err)
+	}
+	return nil
+}
 
 func actorOrDefault(actor string) string {
 	if actor == "" {

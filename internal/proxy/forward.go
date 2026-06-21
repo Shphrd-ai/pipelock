@@ -160,12 +160,13 @@ func (p *Proxy) handleConnect(w http.ResponseWriter, r *http.Request) {
 	// Synthesize a URL for scanner pipeline. The scanner expects a full URL,
 	// but CONNECT only gives us host:port. Use https:// as the tunnel is
 	// typically used for TLS traffic.
-	host, _, _ := net.SplitHostPort(target)
+	host, targetPort, _ := net.SplitHostPort(target)
 	syntheticHost := host
 	if strings.Contains(host, ":") { // IPv6 literal needs brackets in URL
 		syntheticHost = "[" + host + "]"
 	}
 	syntheticURL := "https://" + syntheticHost + "/"
+	connectReceiptTarget := "https://" + net.JoinHostPort(host, targetPort) + "/"
 	targetCtx := newConnectAuditContext(p.logger, target, clientIP, requestID, agent)
 	headerCtx := targetCtx
 
@@ -304,7 +305,7 @@ func (p *Proxy) handleConnect(w http.ResponseWriter, r *http.Request) {
 				Pattern:   result.Reason,
 				Transport: "connect",
 				Method:    http.MethodConnect,
-				Target:    syntheticURL,
+				Target:    connectReceiptTarget,
 				RequestID: requestID,
 				Agent:     agent,
 			})
@@ -431,7 +432,7 @@ func (p *Proxy) handleConnect(w http.ResponseWriter, r *http.Request) {
 		Headers:     r.Header,
 		BodyRead:    true,
 		Transport:   TransportConnect,
-		Target:      syntheticURL,
+		Target:      connectReceiptTarget,
 		RequestID:   requestID,
 		Agent:       agent,
 		AuditCtx:    targetCtx,
@@ -472,7 +473,7 @@ func (p *Proxy) handleConnect(w http.ResponseWriter, r *http.Request) {
 			Pattern:   reason,
 			Transport: TransportConnect,
 			Method:    http.MethodConnect,
-			Target:    syntheticURL,
+			Target:    connectReceiptTarget,
 			RequestID: requestID,
 			Agent:     agent,
 		}))
@@ -531,7 +532,7 @@ func (p *Proxy) handleConnect(w http.ResponseWriter, r *http.Request) {
 		Verdict:   config.ActionAllow,
 		Transport: "connect",
 		Method:    http.MethodConnect,
-		Target:    syntheticURL,
+		Target:    connectReceiptTarget,
 		RequestID: requestID,
 		Agent:     agent,
 	}

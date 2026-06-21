@@ -95,3 +95,54 @@ func TestAllAgentBlocked_HappyAndEmpty(t *testing.T) {
 		t.Error("empty suite must not report AllAgentBlocked=true")
 	}
 }
+
+func TestStatusEvent(t *testing.T) {
+	t.Parallel()
+
+	modelBacked := statusEvent(LiveStateContained, "run-1", true)
+	if modelBacked.Type != LiveEventStatus || modelBacked.State != LiveStateContained || modelBacked.RunID != "run-1" {
+		t.Fatalf("unexpected status event: %+v", modelBacked)
+	}
+	if modelBacked.Disclaimer != ThirdPartyModelDisclaimer {
+		t.Errorf("model-backed status must carry the third-party disclaimer, got %q", modelBacked.Disclaimer)
+	}
+
+	deterministic := statusEvent(LiveStateDev, "run-2", false)
+	if deterministic.Disclaimer != "" {
+		t.Errorf("deterministic status must omit the disclaimer, got %q", deterministic.Disclaimer)
+	}
+}
+
+func TestProxyBindAddrFor(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		port    int
+		want    string
+		wantErr bool
+	}{
+		{name: "zero is ephemeral", port: 0, want: "127.0.0.1:0"},
+		{name: "fixed port", port: 8888, want: "127.0.0.1:8888"},
+		{name: "high port", port: 65535, want: "127.0.0.1:65535"},
+		{name: "negative rejected", port: -1, wantErr: true},
+		{name: "out of range rejected", port: 70000, wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := proxyBindAddrFor(tc.port)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("proxyBindAddrFor(%d) error = nil, want error", tc.port)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("proxyBindAddrFor(%d) unexpected error: %v", tc.port, err)
+			}
+			if got != tc.want {
+				t.Fatalf("proxyBindAddrFor(%d) = %q, want %q", tc.port, got, tc.want)
+			}
+		})
+	}
+}

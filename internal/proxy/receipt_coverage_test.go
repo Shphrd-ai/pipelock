@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1280,6 +1281,54 @@ func TestReceiptCoverage_FetchBlocklist_EmitsReceipt(t *testing.T) {
 	}
 }
 
+func TestReceiptCoverage_FetchAllowlistBlock_EmitsReceiptBeforeEgress(t *testing.T) {
+	t.Parallel()
+
+	hit := make(chan struct{}, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hit <- struct{}{}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	rph := newReceiptProxyHelper(t)
+	handler := setupFetchProxyWithReceipts(t, rph, func(cfg *config.Config) {
+		cfg.Enforce = ptrBool(true)
+		cfg.Mode = config.ModeStrict
+		cfg.APIAllowlist = []string{"allowed.example.test"}
+	})
+
+	target := upstream.URL + "/grab"
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/fetch?url="+url.QueryEscape(target), nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403; body: %s", w.Code, w.Body.String())
+	}
+	select {
+	case <-hit:
+		t.Fatal("non-allowlisted fetch target was reached")
+	default:
+	}
+
+	r := rph.requireReceipt(t, "allowlist")
+	if err := receipt.VerifyWithKey(r, rph.pubHex); err != nil {
+		t.Fatalf("VerifyWithKey failed: %v", err)
+	}
+	if r.ActionRecord.Transport != TransportFetch {
+		t.Errorf("transport = %q, want %q", r.ActionRecord.Transport, TransportFetch)
+	}
+	if r.ActionRecord.Method != http.MethodGet {
+		t.Errorf("method = %q, want %q", r.ActionRecord.Method, http.MethodGet)
+	}
+	if r.ActionRecord.Target != target {
+		t.Errorf("target = %q, want %q", r.ActionRecord.Target, target)
+	}
+	if r.ActionRecord.Verdict != config.ActionBlock {
+		t.Errorf("verdict = %q, want %q", r.ActionRecord.Verdict, config.ActionBlock)
+	}
+}
+
 // TestReceiptCoverage_WSBlockedDomain_EmitsReceipt boots a WS proxy with a
 // receipt emitter and sends a WS connect to a blocklisted domain. The URL scan
 // blocks before upgrading, so a receipt with the scanner layer is emitted.
@@ -1684,6 +1733,130 @@ func TestReceiptCoverage_ForwardBlocklist_EmitsReceipt(t *testing.T) {
 	}
 	if r.ActionRecord.Transport != TransportConnect {
 		t.Errorf("transport = %q, want %q", r.ActionRecord.Transport, TransportConnect)
+	}
+	if r.ActionRecord.Verdict != config.ActionBlock {
+		t.Errorf("verdict = %q, want %q", r.ActionRecord.Verdict, config.ActionBlock)
+	}
+}
+
+func TestReceiptCoverage_ForwardAllowlistBlock_EmitsReceiptBeforeEgress(t *testing.T) {
+	t.Parallel()
+
+	hit := make(chan struct{}, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hit <- struct{}{}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	rph := newReceiptProxyHelper(t)
+	proxyAddr, cleanup := setupForwardProxyWithReceipts(t, rph, func(cfg *config.Config) {
+		cfg.Enforce = ptrBool(true)
+		cfg.Mode = config.ModeStrict
+		cfg.APIAllowlist = []string{"allowed.example.test"}
+	})
+	defer cleanup()
+
+	proxyURL, err := url.Parse("http://" + proxyAddr)
+	if err != nil {
+		t.Fatalf("parse proxy URL: %v", err)
+	}
+	client := &http.Client{
+		Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)},
+		Timeout:   5 * time.Second,
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, upstream.URL+"/grab", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("GET through proxy: %v", err)
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", resp.StatusCode)
+	}
+	select {
+	case <-hit:
+		t.Fatal("non-allowlisted forward target was reached")
+	default:
+	}
+
+	r := rph.requireReceipt(t, "allowlist")
+	if err := receipt.VerifyWithKey(r, rph.pubHex); err != nil {
+		t.Fatalf("VerifyWithKey failed: %v", err)
+	}
+	if r.ActionRecord.Transport != TransportForward {
+		t.Errorf("transport = %q, want %q", r.ActionRecord.Transport, TransportForward)
+	}
+	if r.ActionRecord.Method != http.MethodGet {
+		t.Errorf("method = %q, want %q", r.ActionRecord.Method, http.MethodGet)
+	}
+	if r.ActionRecord.Target != upstream.URL+"/grab" {
+		t.Errorf("target = %q, want %q", r.ActionRecord.Target, upstream.URL+"/grab")
+	}
+	if r.ActionRecord.Verdict != config.ActionBlock {
+		t.Errorf("verdict = %q, want %q", r.ActionRecord.Verdict, config.ActionBlock)
+	}
+}
+
+func TestReceiptCoverage_ConnectAllowlistBlock_EmitsReceiptBeforeEgress(t *testing.T) {
+	t.Parallel()
+
+	hit := make(chan struct{}, 1)
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hit <- struct{}{}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	rph := newReceiptProxyHelper(t)
+	proxyAddr, cleanup := setupForwardProxyWithReceipts(t, rph, func(cfg *config.Config) {
+		cfg.Enforce = ptrBool(true)
+		cfg.Mode = config.ModeStrict
+		cfg.APIAllowlist = []string{"allowed.example.test"}
+	})
+	defer cleanup()
+
+	proxyURL, err := url.Parse("http://" + proxyAddr)
+	if err != nil {
+		t.Fatalf("parse proxy URL: %v", err)
+	}
+	client := &http.Client{
+		Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)},
+		Timeout:   5 * time.Second,
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, upstream.URL+"/grab", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	resp, err := client.Do(req)
+	if err == nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+		t.Fatalf("GET through proxy unexpectedly completed with status %d", resp.StatusCode)
+	}
+	select {
+	case <-hit:
+		t.Fatal("non-allowlisted CONNECT target was reached")
+	default:
+	}
+
+	r := rph.requireReceipt(t, "allowlist")
+	if err := receipt.VerifyWithKey(r, rph.pubHex); err != nil {
+		t.Fatalf("VerifyWithKey failed: %v", err)
+	}
+	if r.ActionRecord.Transport != TransportConnect {
+		t.Errorf("transport = %q, want %q", r.ActionRecord.Transport, TransportConnect)
+	}
+	if r.ActionRecord.Method != http.MethodConnect {
+		t.Errorf("method = %q, want %q", r.ActionRecord.Method, http.MethodConnect)
+	}
+	wantTarget := upstream.URL + "/"
+	if r.ActionRecord.Target != wantTarget {
+		t.Errorf("target = %q, want %q", r.ActionRecord.Target, wantTarget)
 	}
 	if r.ActionRecord.Verdict != config.ActionBlock {
 		t.Errorf("verdict = %q, want %q", r.ActionRecord.Verdict, config.ActionBlock)

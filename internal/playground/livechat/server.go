@@ -47,11 +47,21 @@ type ServerConfig struct {
 	CodeRate RateConfig
 	// MaxConcurrent caps simultaneous live sessions (global). Never unlimited.
 	MaxConcurrent int
-	// DailyTurnBudget is the hard global ceiling on total visitor turns (model
-	// calls) per UTC day -- the spend kill switch. 0 = unlimited (dev/local only;
-	// public exposure MUST set a positive value). When the day's budget is spent,
-	// further messages are refused until the next UTC day.
+	// DailyTurnBudget is the hard global ceiling on total model ROUND TRIPS per
+	// UTC day -- the spend kill switch. Each visitor message reserves its
+	// worst-case round trips (the model loop's max steps) up front, so the cap
+	// bounds real model spend, not visitor-message count. 0 = unlimited (dev/local
+	// only; public exposure MUST set a positive value). When the day's budget is
+	// spent, further messages are refused until the next UTC day.
 	DailyTurnBudget int
+	// PerIPDailyBudget and PerCodeDailyBudget cap model round trips per client IP
+	// and per invite code per UTC day, so one identity cannot drain the global
+	// DailyTurnBudget alone (the global cap and the per-key rate limiters do not
+	// stop a single identity spending the whole day's budget below the rate). 0 =
+	// no per-identity cap. Like the global budget they are denominated in model
+	// round trips and reserve each message's worst case.
+	PerIPDailyBudget   int
+	PerCodeDailyBudget int
 	// MaxMessagesPerSession caps how many messages one session may send (each is a
 	// real model call). 0 = the conservative default applied in NewServer.
 	MaxMessagesPerSession int
@@ -64,6 +74,14 @@ type ServerConfig struct {
 	OrchestratorKeyPath string
 	ToyAgentBin         string
 	WebToolBin          string
+	// ProxyPort is the fixed loopback port each session's in-process proxy binds.
+	// It must match the single port the kernel owner-match rule allows the
+	// contained agent uid to reach (`pipelock contain install --proxy-port`). 0 =
+	// ephemeral (dev/test); the command layer defaults contained serves to the
+	// stock port before constructing ServerConfig.
+	// With MaxConcurrent > 1 a single fixed port collides, so public contained
+	// exposure pins MaxConcurrent: 1 (or a future reserved port range).
+	ProxyPort int
 	// LLMAgent, when non-nil, drives every session with the model-backed agent
 	// subprocess instead of the deterministic IntentAgent. The same config is
 	// reused for each session (static model/binary/secret settings).
@@ -137,7 +155,14 @@ type Server struct {
 	codeRate         *RateLimiter
 	conc             *ConcurrencyLimiter
 	budget           *DailyBudget
+	perIP            *KeyedDailyBudget
+	perCode          *KeyedDailyBudget
 	maxMsgPerSession int
+	// roundTripsPerMsg is the worst-case model round trips one visitor message can
+	// drive (the model loop's max steps). The daily budget is denominated in model
+	// round trips, so each message reserves this many units up front -- the safe
+	// over-count for a spend kill switch. 1 for the deterministic agent.
+	roundTripsPerMsg int
 
 	// killed is the operator emergency stop. Unlike the daily budget (which caps
 	// spend by refusing new charges), tripping this terminates every ACTIVE
@@ -162,15 +187,34 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	if cfg.RequireContainment && cfg.Containment == nil {
 		return nil, errors.New("livechat: RequireContainment set but no ContainmentVerifier supplied")
 	}
-	if cfg.DailyTurnBudget < 0 {
-		return nil, errors.New("livechat: DailyTurnBudget must be >= 0")
-	}
 	if cfg.MaxMessagesPerSession < 0 {
 		return nil, errors.New("livechat: MaxMessagesPerSession must be >= 0")
 	}
 	maxMsg := cfg.MaxMessagesPerSession
 	if maxMsg == 0 {
 		maxMsg = defaultMaxMessagesPerSession
+	}
+	// The daily budget counts model ROUND TRIPS, not visitor messages: a
+	// model-backed message can drive up to MaxSteps model calls, so reserve that
+	// many per message. The deterministic agent makes no model calls; charge 1.
+	roundTripsPerMsg := 1
+	if cfg.LLMAgent != nil {
+		roundTripsPerMsg = cfg.LLMAgent.EffectiveMaxSteps()
+	}
+	for _, c := range []struct {
+		name string
+		v    int
+	}{
+		{"DailyTurnBudget", cfg.DailyTurnBudget},
+		{"PerIPDailyBudget", cfg.PerIPDailyBudget},
+		{"PerCodeDailyBudget", cfg.PerCodeDailyBudget},
+	} {
+		if c.v < 0 {
+			return nil, fmt.Errorf("livechat: %s must be >= 0", c.name)
+		}
+		if c.v > 0 && c.v < roundTripsPerMsg {
+			return nil, fmt.Errorf("livechat: %s (%d) is below one message's worst-case model round trips (%d); raise the budget or lower --model-max-steps", c.name, c.v, roundTripsPerMsg)
+		}
 	}
 	return &Server{
 		cfg:              cfg,
@@ -179,7 +223,10 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 		codeRate:         NewRateLimiter(cfg.CodeRate),
 		conc:             NewConcurrencyLimiter(cfg.MaxConcurrent),
 		budget:           NewDailyBudget(cfg.DailyTurnBudget),
+		perIP:            NewKeyedDailyBudget(cfg.PerIPDailyBudget, 0),
+		perCode:          NewKeyedDailyBudget(cfg.PerCodeDailyBudget, 0),
 		maxMsgPerSession: maxMsg,
+		roundTripsPerMsg: roundTripsPerMsg,
 		sessions:         make(map[string]*liveEntry),
 	}, nil
 }
@@ -309,6 +356,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		OrchestratorKeyPath: s.cfg.OrchestratorKeyPath,
 		ToyAgentBin:         s.cfg.ToyAgentBin,
 		WebToolBin:          s.cfg.WebToolBin,
+		ProxyPort:           s.cfg.ProxyPort,
 		LLMAgent:            s.cfg.LLMAgent,
 	})
 	if err != nil {
@@ -482,21 +530,50 @@ func (s *Server) handleMessage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "session not found")
 		return
 	}
-	// Per-session message cap: each message is a real model call.
+	// Spend caps, charged in order through a rollback stack so any downstream
+	// refusal returns every upstream reservation exactly once (no leak, no mint).
+	// Each layer reserves this message's worst-case model round trips: per-session
+	// (each message is a real model call), then per-IP and per-code daily caps so
+	// one client or one invite code cannot drain the global budget alone, then the
+	// global daily kill switch.
+	units := s.roundTripsPerMsg
+	var rollback []func()
+	undo := func() {
+		for i := len(rollback) - 1; i >= 0; i-- {
+			rollback[i]()
+		}
+	}
+
 	if !entry.tryMessage(s.maxMsgPerSession) {
 		writeErr(w, http.StatusTooManyRequests, "session message limit reached")
 		return
 	}
-	// Global daily spend kill switch: hard ceiling on total turns per UTC day.
-	if !s.budget.Charge() {
-		entry.refundMessage(s.maxMsgPerSession)
+	rollback = append(rollback, func() { entry.refundMessage(s.maxMsgPerSession) })
+
+	if !s.perIP.Charge("ip:"+ip, units) {
+		undo()
+		writeErr(w, http.StatusTooManyRequests, "daily limit reached for your address")
+		return
+	}
+	rollback = append(rollback, func() { s.perIP.Refund("ip:"+ip, units) })
+
+	if !s.perCode.Charge("code:"+claims.CodeID, units) {
+		undo()
+		writeErr(w, http.StatusTooManyRequests, "daily limit reached for this code")
+		return
+	}
+	rollback = append(rollback, func() { s.perCode.Refund("code:"+claims.CodeID, units) })
+
+	if !s.budget.Charge(units) {
+		undo()
 		writeErr(w, http.StatusServiceUnavailable, "daily limit reached, the demo is paused until tomorrow")
 		return
 	}
+	rollback = append(rollback, func() { s.budget.Refund(units) })
+
 	if err := entry.sess.Send(r.Context(), body.Message); err != nil {
 		if errors.Is(err, playground.ErrSessionClosed) {
-			entry.refundMessage(s.maxMsgPerSession)
-			s.budget.Refund()
+			undo()
 			writeErr(w, http.StatusConflict, "session is closed")
 			return
 		}
@@ -563,11 +640,15 @@ func (s *Server) seal(entry *liveEntry) error {
 	entry.sealOnce.Do(func() {
 		if _, err := entry.sess.Finalize(entry.runDir); err != nil {
 			entry.sealErr = err
+			// Server-side observability: a seal failure surfaces to the client only
+			// as a generic 503, so log the real cause for the operator.
+			_, _ = fmt.Fprintf(os.Stderr, "livechat: session seal failed at finalize: %v\n", err)
 			return
 		}
 		arc, err := playground.ArchiveRunForDownload(entry.runDir, entry.sess.OrchestratorPubHex())
 		if err != nil {
 			entry.sealErr = fmt.Errorf("archive session bundle: %w", err)
+			_, _ = fmt.Fprintf(os.Stderr, "livechat: session seal failed at archive: %v\n", err)
 			return
 		}
 		entry.bundle = arc
