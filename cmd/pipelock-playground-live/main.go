@@ -274,7 +274,7 @@ func buildServer(out io.Writer, f *serveFlags) (*livechat.Server, http.Handler, 
 	if f.staticDir != "" {
 		// Same-origin demo: API under /api/live/, viewer at /. No CORS needed.
 		mux := http.NewServeMux()
-		mux.Handle("/api/live/", srv.Handler())
+		mux.Handle(livechat.RouteAPIPrefix, srv.Handler())
 		mux.Handle("/", http.FileServer(http.Dir(f.staticDir)))
 		handler = mux
 		_, _ = fmt.Fprintf(out, "serving viewer from %s at /\n", f.staticDir)

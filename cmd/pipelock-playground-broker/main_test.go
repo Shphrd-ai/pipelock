@@ -8,6 +8,9 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +18,7 @@ import (
 	"time"
 
 	"github.com/luckyPipewrench/pipelock/internal/playground/broker"
+	"github.com/luckyPipewrench/pipelock/internal/playground/livechat"
 )
 
 type fakeProvider struct{}
@@ -97,6 +101,82 @@ func TestBuildServerWithInjectedProvider(t *testing.T) {
 	if strings.Contains(out.String(), gotToken) || strings.Contains(out.String(), "model-file-value") {
 		t.Fatalf("operator output leaked secret material: %q", out.String())
 	}
+}
+
+func TestBuildServerStaticDir(t *testing.T) {
+	dir := t.TempDir()
+	uiDir := filepath.Join(dir, "ui")
+	if err := os.MkdirAll(uiDir, 0o750); err != nil {
+		t.Fatalf("mkdir ui: %v", err)
+	}
+	writeTestFile(t, uiDir, "index.html", "<html><body>live demo ui</body></html>")
+	flyTokenFile := writeTestFile(t, dir, "fly.token", "fly-file-token\n")
+	gateSecret := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	gateSecretFile := writeTestFile(t, dir, "gate.b64", gateSecret+"\n")
+
+	oldFactory := newMachineProvider
+	newMachineProvider = func(_ context.Context, _ *serveFlags, _ string) (broker.MachineProvider, error) {
+		return fakeProvider{}, nil
+	}
+	t.Cleanup(func() { newMachineProvider = oldFactory })
+
+	flags := func(staticDir string) *serveFlags {
+		return &serveFlags{
+			listen: defaultListen, provider: "fake", flyApp: "playground-test",
+			flyTokenFile: flyTokenFile, image: "registry.example/playground:test",
+			staticDir: staticDir, internalPort: 8080, concurrency: 2,
+			codes: []string{"outer-code"}, maxPerCode: defaultMaxPerCode,
+			gateSecretFile: gateSecretFile, ipRate: defaultIPRate, ipBurst: defaultIPBurst,
+			codeRate: defaultCodeRate, codeBurst: defaultCodeBurst,
+			sessionTTL: defaultSessionTTL, deadlineGrace: defaultGrace,
+			requireSessionSecrets: false,
+		}
+	}
+
+	// With --static-dir: / serves the UI AND the API still routes on the same origin.
+	srv, handler, err := buildServer(context.Background(), &bytes.Buffer{}, flags(uiDir))
+	if err != nil {
+		t.Fatalf("buildServer(static): %v", err)
+	}
+	t.Cleanup(srv.Close)
+	ts := httptest.NewServer(handler)
+	t.Cleanup(ts.Close)
+	if body, status := httpGetStatus(t, ts.URL+"/"); status != http.StatusOK || !strings.Contains(body, "live demo ui") {
+		t.Fatalf("GET / = %d %q, want 200 serving the UI", status, body)
+	}
+	if _, status := httpGetStatus(t, ts.URL+livechat.RouteHealth); status != http.StatusOK {
+		t.Fatalf("GET %s = %d, want 200 (API served alongside static)", livechat.RouteHealth, status)
+	}
+
+	// Without --static-dir: / is 404 (broker is API-only).
+	srv2, handler2, err := buildServer(context.Background(), &bytes.Buffer{}, flags(""))
+	if err != nil {
+		t.Fatalf("buildServer(no static): %v", err)
+	}
+	t.Cleanup(srv2.Close)
+	ts2 := httptest.NewServer(handler2)
+	t.Cleanup(ts2.Close)
+	if _, status := httpGetStatus(t, ts2.URL+"/"); status != http.StatusNotFound {
+		t.Fatalf("GET / without --static-dir = %d, want 404", status)
+	}
+}
+
+func httpGetStatus(t *testing.T, rawURL string) (string, int) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, rawURL, nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET %s: %v", rawURL, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	return string(b), resp.StatusCode
 }
 
 func TestBuildServerValidation(t *testing.T) {

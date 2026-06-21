@@ -45,6 +45,7 @@ const (
 
 type serveFlags struct {
 	listen                string
+	staticDir             string
 	provider              string
 	flyApp                string
 	flyTokenFile          string
@@ -118,6 +119,7 @@ func newServeCmd() *cobra.Command {
 	}
 	fl := cmd.Flags()
 	fl.StringVar(&f.listen, "listen", defaultListen, "address to listen on")
+	fl.StringVar(&f.staticDir, "static-dir", "", "directory of static UI files to serve at / (the /api/live/* API is unaffected); empty disables static serving")
 	fl.StringVar(&f.provider, "provider", "fly", "machine provider")
 	fl.StringVar(&f.flyApp, "fly-app", "", "Fly app that owns per-visitor machines")
 	fl.StringVar(&f.flyTokenFile, "fly-token-file", "", "path to the Fly API token file")
@@ -251,7 +253,21 @@ func buildServer(ctx context.Context, out io.Writer, f *serveFlags) (*broker.Ser
 		return nil, nil, err
 	}
 	_, _ = fmt.Fprintf(out, "broker configured: %d code(s), capacity %d, image %s\n", len(codes), f.concurrency, f.image)
-	return srv, srv.Handler(), nil
+
+	// The broker API lives under /api/live/*. When a static UI directory is
+	// configured, serve it at / on the SAME origin so the live viewer's
+	// relative /api/live/* calls reach the broker and one CF Access gate covers
+	// both. The API mux is mounted at the /api/live/ prefix; everything else is
+	// static files. Mirrors the per-VM server's static-dir handling.
+	handler := srv.Handler()
+	if strings.TrimSpace(f.staticDir) != "" {
+		mux := http.NewServeMux()
+		mux.Handle(livechat.RouteAPIPrefix, srv.Handler())
+		mux.Handle("/", http.FileServer(http.Dir(f.staticDir)))
+		handler = mux
+		_, _ = fmt.Fprintf(out, "serving static UI from %s at /\n", f.staticDir)
+	}
+	return srv, handler, nil
 }
 
 func defaultMachineProvider(_ context.Context, f *serveFlags, flyToken string) (broker.MachineProvider, error) {
