@@ -1,0 +1,411 @@
+// Copyright 2026 Josh Waldrep
+// SPDX-License-Identifier: Apache-2.0
+
+// Package main is the entry point for pipelock-playground-broker, the public
+// playground front door that leases one private per-visitor VM and reverse
+// proxies the /api/live/* session API to it.
+package main
+
+import (
+	"context"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	"github.com/luckyPipewrench/pipelock/internal/cliutil"
+	"github.com/luckyPipewrench/pipelock/internal/playground/broker"
+	"github.com/luckyPipewrench/pipelock/internal/playground/livechat"
+)
+
+const (
+	defaultListen      = "127.0.0.1:8100"
+	defaultConcurrency = 3
+	defaultMaxPerCode  = 25
+	defaultSessionTTL  = 10 * time.Minute
+	defaultGrace       = 30 * time.Second
+	defaultIPRate      = 0.5
+	defaultIPBurst     = 5
+	defaultCodeRate    = 0.5
+	defaultCodeBurst   = 10
+
+	envModelKey        = "PLAYGROUND_MODEL_" + "KEY"
+	envOrchestratorKey = "PLAYGROUND_ORCHESTRATOR_" + "KEY"
+)
+
+type serveFlags struct {
+	listen                string
+	provider              string
+	flyApp                string
+	flyTokenFile          string
+	image                 string
+	region                string
+	memoryMB              int
+	cpus                  int
+	internalPort          int
+	concurrency           int
+	codes                 []string
+	maxPerCode            int
+	gateSecretFile        string
+	gateSecretEnv         string
+	ipRate                float64
+	ipBurst               float64
+	codeRate              float64
+	codeBurst             float64
+	perIPDailyBudget      int
+	perCodeDailyBudget    int
+	globalDailyBudget     int
+	sessionTTL            time.Duration
+	deadlineGrace         time.Duration
+	allowOrigin           string
+	trustForwardedFor     bool
+	modelKeyFile          string
+	modelKeyEnv           string
+	orchestratorKeyFile   string
+	orchestratorKeyEnv    string
+	requireSessionSecrets bool
+}
+
+type providerFactory func(context.Context, *serveFlags, string) (broker.MachineProvider, error)
+
+var newMachineProvider providerFactory = defaultMachineProvider
+
+func main() {
+	if err := newRootCmd().Execute(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func newRootCmd() *cobra.Command {
+	root := &cobra.Command{
+		Use:           "pipelock-playground-broker",
+		Short:         "Public playground broker front door",
+		SilenceUsage:  true,
+		SilenceErrors: false,
+		Version:       cliutil.Version,
+	}
+	root.AddCommand(newServeCmd())
+	return root
+}
+
+func newServeCmd() *cobra.Command {
+	f := &serveFlags{}
+	cmd := &cobra.Command{
+		Use:   "serve",
+		Short: "Run the playground broker HTTP server",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runServe(cmd, f)
+		},
+	}
+	fl := cmd.Flags()
+	fl.StringVar(&f.listen, "listen", defaultListen, "address to listen on")
+	fl.StringVar(&f.provider, "provider", "fly", "machine provider")
+	fl.StringVar(&f.flyApp, "fly-app", "", "Fly app that owns per-visitor machines")
+	fl.StringVar(&f.flyTokenFile, "fly-token-file", "", "path to the Fly API token file")
+	fl.StringVar(&f.image, "image", "", "per-visitor VM image")
+	fl.StringVar(&f.region, "region", "", "provider region")
+	fl.IntVar(&f.memoryMB, "memory-mb", 512, "per-visitor VM memory in MiB")
+	fl.IntVar(&f.cpus, "cpus", 1, "per-visitor VM shared CPUs")
+	fl.IntVar(&f.internalPort, "internal-port", 8080, "per-visitor VM internal HTTP port")
+	fl.IntVar(&f.concurrency, "concurrency", defaultConcurrency, "global cap on live per-visitor machines")
+	fl.StringArrayVar(&f.codes, "code", nil, "public invite code (repeatable)")
+	fl.IntVar(&f.maxPerCode, "max-per-code", defaultMaxPerCode, "max broker sessions per invite code (0 = unlimited)")
+	fl.StringVar(&f.gateSecretFile, "gate-secret-file", "", "path to base64 broker gate secret")
+	fl.StringVar(&f.gateSecretEnv, "gate-secret-env", "", "environment variable containing base64 broker gate secret")
+	fl.Float64Var(&f.ipRate, "ip-rate", defaultIPRate, "per-IP sustained request rate (tokens/sec)")
+	fl.Float64Var(&f.ipBurst, "ip-burst", defaultIPBurst, "per-IP burst")
+	fl.Float64Var(&f.codeRate, "code-rate", defaultCodeRate, "per-code sustained request rate (tokens/sec)")
+	fl.Float64Var(&f.codeBurst, "code-burst", defaultCodeBurst, "per-code burst")
+	fl.IntVar(&f.perIPDailyBudget, "per-ip-daily-budget", 0, "per-IP session starts per UTC day (0 = unlimited)")
+	fl.IntVar(&f.perCodeDailyBudget, "per-code-daily-budget", 0, "per-code session starts per UTC day (0 = unlimited)")
+	fl.IntVar(&f.globalDailyBudget, "global-daily-budget", 0, "global session starts per UTC day (0 = unlimited)")
+	fl.DurationVar(&f.sessionTTL, "session-ttl", defaultSessionTTL, "VM session token TTL")
+	fl.DurationVar(&f.deadlineGrace, "deadline-grace", defaultGrace, "lease teardown grace after VM session expiry")
+	fl.StringVar(&f.allowOrigin, "allow-origin", "", "Access-Control-Allow-Origin for the browser")
+	fl.BoolVar(&f.trustForwardedFor, "trust-forwarded-for", false, "read client IP from X-Forwarded-For behind a trusted proxy")
+	fl.StringVar(&f.modelKeyFile, "model-key-file", "", "path to the model key file passed to the VM env")
+	fl.StringVar(&f.modelKeyEnv, "model-key-env", "", "environment variable holding the model key passed to the VM env")
+	fl.StringVar(&f.orchestratorKeyFile, "orchestrator-key-file", "", "path to the orchestrator key file passed to the VM env")
+	fl.StringVar(&f.orchestratorKeyEnv, "orchestrator-key-env", "", "environment variable holding the orchestrator key passed to the VM env")
+	fl.BoolVar(&f.requireSessionSecrets, "require-session-secrets", true, "require model and orchestrator keys from file/env")
+	return cmd
+}
+
+func runServe(cmd *cobra.Command, f *serveFlags) error {
+	ctx := cmd.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	srv, handler, err := buildServer(ctx, cmd.OutOrStdout(), f)
+	if err != nil {
+		return err
+	}
+	defer srv.Close()
+
+	httpSrv := &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    16 << 10,
+	}
+	lc := net.ListenConfig{}
+	ln, err := lc.Listen(ctx, "tcp", f.listen)
+	if err != nil {
+		return fmt.Errorf("listen %s: %w", f.listen, err)
+	}
+	defer func() { _ = ln.Close() }()
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "pipelock-playground-broker serving on %s with provider %s\n", f.listen, f.provider)
+	if err := httpSrv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
+}
+
+func buildServer(ctx context.Context, out io.Writer, f *serveFlags) (*broker.Server, http.Handler, error) {
+	if err := validateFlags(f); err != nil {
+		return nil, nil, err
+	}
+	secret, err := resolveGateSecret(f.gateSecretFile, f.gateSecretEnv)
+	if err != nil {
+		return nil, nil, err
+	}
+	codes, err := resolveCodes(f.codes, f.maxPerCode)
+	if err != nil {
+		return nil, nil, err
+	}
+	gate, err := livechat.NewGate(livechat.GateConfig{
+		Secret:   secret,
+		Codes:    codes,
+		TokenTTL: f.sessionTTL,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	token, err := readRequiredFile(f.flyTokenFile, "--fly-token-file")
+	if err != nil {
+		return nil, nil, err
+	}
+	provider, err := newMachineProvider(ctx, f, token)
+	if err != nil {
+		return nil, nil, err
+	}
+	sessionEnv, err := resolveSessionEnv(f)
+	if err != nil {
+		return nil, nil, err
+	}
+	lm, err := broker.NewLeaseManager(broker.LeaseConfig{
+		Provider:     provider,
+		Concurrency:  livechat.NewConcurrencyLimiter(f.concurrency),
+		Image:        f.image,
+		Region:       f.region,
+		MemoryMB:     f.memoryMB,
+		CPUs:         f.cpus,
+		InternalPort: f.internalPort,
+		BaseEnv:      map[string]string{"PLAYGROUND_LISTEN": fmt.Sprintf("0.0.0.0:%d", f.internalPort)},
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	srv, err := broker.NewServer(broker.ServerConfig{
+		Leases:             lm,
+		Gate:               gate,
+		IPRate:             livechat.RateConfig{RefillPerSec: f.ipRate, Burst: f.ipBurst},
+		CodeRate:           livechat.RateConfig{RefillPerSec: f.codeRate, Burst: f.codeBurst},
+		PerIPDailyBudget:   f.perIPDailyBudget,
+		PerCodeDailyBudget: f.perCodeDailyBudget,
+		GlobalDailyBudget:  f.globalDailyBudget,
+		SessionEnv:         sessionEnv,
+		InternalPort:       f.internalPort,
+		DeadlineGrace:      f.deadlineGrace,
+		TrustForwardedFor:  f.trustForwardedFor,
+		AllowOrigin:        f.allowOrigin,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	_, _ = fmt.Fprintf(out, "broker configured: %d code(s), capacity %d, image %s\n", len(codes), f.concurrency, f.image)
+	return srv, srv.Handler(), nil
+}
+
+func defaultMachineProvider(_ context.Context, f *serveFlags, flyToken string) (broker.MachineProvider, error) {
+	if f.provider != "fly" {
+		return nil, fmt.Errorf("--provider %q is not supported", f.provider)
+	}
+	return &broker.FlyMachines{
+		AppName: f.flyApp,
+		Token:   flyToken,
+	}, nil
+}
+
+func validateFlags(f *serveFlags) error {
+	if f == nil {
+		return errors.New("nil serve flags")
+	}
+	if strings.TrimSpace(f.image) == "" {
+		return errors.New("--image is required")
+	}
+	if strings.TrimSpace(f.flyApp) == "" {
+		return errors.New("--fly-app is required")
+	}
+	if strings.TrimSpace(f.flyTokenFile) == "" {
+		return errors.New("--fly-token-file is required")
+	}
+	if f.concurrency <= 0 {
+		return errors.New("--concurrency must be > 0")
+	}
+	if f.maxPerCode < 0 {
+		return errors.New("--max-per-code must be >= 0")
+	}
+	if len(f.codes) == 0 {
+		return errors.New("no invite codes: pass --code CODE")
+	}
+	if f.internalPort < 1 || f.internalPort > 65535 {
+		return errors.New("--internal-port must be 1-65535")
+	}
+	if f.memoryMB < 0 {
+		return errors.New("--memory-mb must be >= 0")
+	}
+	if f.cpus < 0 {
+		return errors.New("--cpus must be >= 0")
+	}
+	if f.perIPDailyBudget < 0 || f.perCodeDailyBudget < 0 || f.globalDailyBudget < 0 {
+		return errors.New("daily budgets must be >= 0")
+	}
+	if f.sessionTTL <= 0 {
+		return errors.New("--session-ttl must be > 0")
+	}
+	if f.deadlineGrace < 0 {
+		return errors.New("--deadline-grace must be >= 0")
+	}
+	if err := validateAllowOrigin(f.allowOrigin); err != nil {
+		return fmt.Errorf("--allow-origin: %w", err)
+	}
+	return nil
+}
+
+func validateAllowOrigin(raw string) error {
+	if raw == "" {
+		return nil
+	}
+	if strings.TrimSpace(raw) != raw {
+		return errors.New("must not contain surrounding whitespace")
+	}
+	if raw == "*" {
+		return errors.New("wildcard is not allowed")
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("parse: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return errors.New("must be an http(s) origin")
+	}
+	if u.Host == "" {
+		return errors.New("host is required")
+	}
+	if u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" {
+		return errors.New("must be an origin only, like https://pipelab.org")
+	}
+	return nil
+}
+
+func resolveGateSecret(file, envName string) ([]byte, error) {
+	var raw string
+	var err error
+	switch {
+	case file != "":
+		raw, err = readRequiredFile(file, "--gate-secret-file")
+	case envName != "":
+		raw = strings.TrimSpace(os.Getenv(envName))
+		if raw == "" {
+			err = fmt.Errorf("%s is empty or unset", envName)
+		}
+	default:
+		return livechat.NewSecret()
+	}
+	if err != nil {
+		return nil, err
+	}
+	secret, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil {
+		return nil, fmt.Errorf("decode broker gate secret: %w", err)
+	}
+	return secret, nil
+}
+
+func resolveCodes(codes []string, maxPerCode int) ([]livechat.CodeSpec, error) {
+	if len(codes) == 0 {
+		return nil, errors.New("no invite codes: pass --code CODE")
+	}
+	specs := make([]livechat.CodeSpec, 0, len(codes))
+	for _, code := range codes {
+		if strings.TrimSpace(code) == "" {
+			return nil, errors.New("invite code cannot be empty or whitespace")
+		}
+		specs = append(specs, livechat.CodeSpec{Code: code, MaxSessions: maxPerCode})
+	}
+	return specs, nil
+}
+
+func resolveSessionEnv(f *serveFlags) (map[string]string, error) {
+	model, err := resolveSessionSecret(f.modelKeyFile, f.modelKeyEnv, "--model-key-file", envModelKey, f.requireSessionSecrets)
+	if err != nil {
+		return nil, err
+	}
+	orchestrator, err := resolveSessionSecret(f.orchestratorKeyFile, f.orchestratorKeyEnv, "--orchestrator-key-file", envOrchestratorKey, f.requireSessionSecrets)
+	if err != nil {
+		return nil, err
+	}
+	env := make(map[string]string)
+	if model != "" {
+		env[envModelKey] = model
+	}
+	if orchestrator != "" {
+		env[envOrchestratorKey] = orchestrator
+	}
+	return env, nil
+}
+
+func resolveSessionSecret(file, envName, flagName, defaultEnv string, required bool) (string, error) {
+	switch {
+	case file != "":
+		return readRequiredFile(file, flagName)
+	case envName != "":
+		v := strings.TrimSpace(os.Getenv(envName))
+		if v == "" {
+			return "", fmt.Errorf("%s is empty or unset", envName)
+		}
+		return v, nil
+	default:
+		v := strings.TrimSpace(os.Getenv(defaultEnv))
+		if v != "" {
+			return v, nil
+		}
+		if required {
+			return "", fmt.Errorf("%s or --%s-env is required", flagName, strings.TrimPrefix(strings.TrimPrefix(flagName, "--"), "-"))
+		}
+		return "", nil
+	}
+}
+
+func readRequiredFile(path, name string) (string, error) {
+	data, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return "", fmt.Errorf("read %s: %w", name, err)
+	}
+	value := strings.TrimSpace(string(data))
+	if value == "" {
+		return "", fmt.Errorf("%s is empty", name)
+	}
+	return value, nil
+}
