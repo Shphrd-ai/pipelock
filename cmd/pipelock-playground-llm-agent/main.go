@@ -107,6 +107,14 @@ func main() {
 		fmt.Fprintln(os.Stderr, "config:", err)
 		os.Exit(2)
 	}
+	// Make this process non-dumpable BEFORE the model key is read, so a same-uid
+	// run_command shell child cannot recover the in-memory key via /proc/<pid>/mem
+	// or ptrace. Fail closed on a contained run: if hardening fails we must not
+	// serve the agent with the key exposed. (No-op / allowed off Linux and in dev.)
+	if err := hardenProcess(); err != nil && !cfg.dev {
+		fmt.Fprintln(os.Stderr, "harden:", err)
+		os.Exit(2)
+	}
 	// SECURITY INVARIANT (load-bearing, do not reorder): resolveAPIKey reads the
 	// model key from the inherited pipe (--secret-fd, fd 3) and CLOSES that fd
 	// here, BEFORE buildAgent/runLoop can spawn any run_command shell child. A
