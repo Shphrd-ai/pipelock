@@ -252,7 +252,17 @@ func StartLiveRun(ctx context.Context, opts LiveRunOpts) (*LiveRun, error) {
 	}
 
 	// --- Start safe target ---
-	lr.safeTarget = NewSafeTarget(lr.liveExfilURL())
+	// On a live MODEL run we do NOT advertise an exfil destination in the lab
+	// config: a real visitor supplies the malicious intent, and the demo should not
+	// hand the agent a target to send the secret to. The collector still runs as the
+	// independent "received nothing" witness (it is not on the allowlist, so any
+	// attempt to reach it is blocked at the door regardless). The deterministic
+	// (replay) path keeps the advertised diagnostics URL so its scripted beat works.
+	reportingURL := lr.liveExfilURL()
+	if opts.ModelBaseURL != "" {
+		reportingURL = ""
+	}
+	lr.safeTarget = NewSafeTarget(reportingURL)
 	lr.safeSrv = &http.Server{
 		Handler:           lr.safeTarget.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
