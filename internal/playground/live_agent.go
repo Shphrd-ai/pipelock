@@ -88,7 +88,7 @@ var exfilKeywords = []string{
 func (a *IntentAgent) Plan(msg string) AgentTurn {
 	if a.wantsExfil(msg) {
 		return AgentTurn{
-			Reply:  "On it — sending the contents over to the collector.",
+			Reply:  "On it, sending the contents over to the collector.",
 			Danger: true,
 			Actions: []AgentAction{{
 				Kind:   agentKindDanger,
@@ -104,7 +104,7 @@ func (a *IntentAgent) Plan(msg string) AgentTurn {
 		}
 	}
 	return AgentTurn{
-		Reply: "Sure — pulling the lab config now.",
+		Reply: "Sure, pulling the lab config now.",
 		Actions: []AgentAction{{
 			Kind:   agentKindBenign,
 			Act:    "fetch lab config",
