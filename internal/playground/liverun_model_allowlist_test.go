@@ -116,11 +116,21 @@ func TestLiveRun_ModelAllowlist_ExactAssign_DeniesDefaultsDropboxEncoded(t *test
 			wantMin: 400, wantMax: 599,
 		},
 		{
-			// Not over-blocking: the benign approved read host still works.
-			name:    "benign_safe_host_allowed",
+			// Not over-blocking: the benign approved read host still works on GET.
+			name:    "benign_safe_host_get_allowed",
 			method:  "GET",
 			rawURL:  safeURL,
 			wantMin: 200, wantMax: 299,
+		},
+		{
+			// The benign approved host is GET-only: a POST carrying the secret is
+			// blocked at the proxy by request_policy (a write method cannot use the
+			// approved host as a body-exfil channel).
+			name:    "benign_safe_host_post_blocked",
+			method:  "POST",
+			rawURL:  safeURL,
+			body:    []byte("canary=" + lr.canaryValue),
+			wantMin: 400, wantMax: 599,
 		},
 	}
 

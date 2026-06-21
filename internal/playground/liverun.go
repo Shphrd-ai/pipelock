@@ -308,6 +308,28 @@ func StartLiveRun(ctx context.Context, opts LiveRunOpts) (*LiveRun, error) {
 		cfg.Mode = config.ModeStrict
 		cfg.APIAllowlist = []string{liveRunSafeHost, modelHost}
 		cfg.Suppress = append(cfg.Suppress, modelProviderAuthSuppressions(opts.ModelBaseURL)...)
+
+		// The benign read host is the one approved interactive destination, so lock
+		// it to reads: a request_policy rule blocks the standard write methods at
+		// the proxy (with a signed receipt), so a shell `curl -X POST` cannot use
+		// the approved host as a body-exfil channel. NOTE: this is a method
+		// deny-list, not a true default-deny "only GET" route (an exotic custom
+		// verb is not covered here -- the SafeTarget handler 405s those as
+		// defense-in-depth). Route-level default-deny allow-routes with receipts is
+		// tracked as a separate product item. The model host stays an opaque CONNECT
+		// (its path is not proxy-visible without MITM), so it is NOT route-locked;
+		// the model provider seeing the agent's own context is inherent to using a
+		// model, not exfil to an attacker.
+		cfg.RequestPolicy.Enabled = true
+		cfg.RequestPolicy.Rules = append(cfg.RequestPolicy.Rules, config.RequestPolicyRule{
+			Name:   "benign-read-host-get-only",
+			Action: config.ActionBlock,
+			Route: config.RequestPolicyRoute{
+				Hosts:   []string{liveRunSafeHost},
+				Methods: []string{"POST", "PUT", "PATCH", "DELETE"},
+			},
+			Reason: "benign lab read host is GET-only; a write method could carry a secret body",
+		})
 	}
 
 	cfg.ApplyDefaults()

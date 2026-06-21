@@ -501,7 +501,17 @@ func buildSafeTargetConfig(reportingURL string) []byte {
 // synthetic config so the agent finds it on the first read regardless of the path
 // it guesses.
 func (s *SafeTarget) Handler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The benign read target is GET-only. Pipelock's request_policy blocks the
+		// standard write methods at the proxy (with a signed receipt); this 405 is
+		// defense-in-depth for any exotic verb that slips a method deny-list, so the
+		// site can never accept a posted body (a potential exfil channel) even for
+		// a request that reached this loopback handler.
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			http.Error(w, "method not allowed: this is a read-only target", http.StatusMethodNotAllowed)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(s.body)
 	})
