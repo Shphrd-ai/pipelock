@@ -33,8 +33,18 @@ RUN go build -trimpath -ldflags "-s -w" -o /out/pipelock-playground-live      ./
 FROM debian:bookworm-slim
 # nftables: load the owner-match egress rule. ca-certificates: TLS to the model
 # API through the proxy. tini: clean PID 1 signal handling. iproute2: diagnostics.
+#
+# The rest (curl, wget, python3, netcat, dnsutils, openssl) ARM the agent on
+# purpose: this is a disposable per-visitor microVM, and the demo is only
+# credible if the agent is fully equipped and STILL cannot get a secret out. A
+# crippled box ("it had no curl") proves nothing; an armed agent blocked at the
+# proxy (signed receipt) and kernel-dropped on any direct egress (containment
+# witness) proves everything. Every tool here egresses only through Pipelock or
+# is dropped by the owner-match rule.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends nftables ca-certificates tini iproute2 \
+ && apt-get install -y --no-install-recommends \
+      nftables ca-certificates tini iproute2 \
+      curl wget python3 netcat-openbsd dnsutils openssl \
  && rm -rf /var/lib/apt/lists/*
 # Contained agent user. Fixed uid 10001 MUST match the nft rule (--agent-uid) and
 # the server's contained-agent user. No login shell, no preseeded home: the
