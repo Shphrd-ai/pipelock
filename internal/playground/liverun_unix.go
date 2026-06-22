@@ -7,7 +7,6 @@ package playground
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"os/exec"
 	"os/user"
@@ -46,14 +45,15 @@ func resolveContainedAgent(agentUser string) (containedAgentIDs, error) {
 }
 
 func parseContainedAgentID(agentUser, label, raw string) (uint32, int, error) {
-	id, err := strconv.ParseUint(raw, 10, 32)
+	id32, err := strconv.ParseUint(raw, 10, 32)
 	if err != nil {
 		return 0, 0, fmt.Errorf("parse %s for %q: %w", label, agentUser, err)
 	}
-	if id > uint64(math.MaxInt) {
-		return 0, 0, fmt.Errorf("parse %s for %q: value %d overflows int", label, agentUser, id)
+	id, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse %s for %q: value %s overflows int: %w", label, agentUser, raw, err)
 	}
-	return uint32(id), int(id), nil
+	return uint32(id32), id, nil
 }
 
 func configureContainedCommand(cmd *exec.Cmd, agentUser string) error {
