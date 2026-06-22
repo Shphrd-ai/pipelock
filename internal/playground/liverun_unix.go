@@ -15,29 +15,41 @@ import (
 	"syscall"
 )
 
-func configureContainedCommand(cmd *exec.Cmd, agentUser string) error {
+func resolveContainedAgent(agentUser string) (uint32, uint32, error) {
 	if os.Geteuid() != 0 {
-		return fmt.Errorf("contained toy-agent execution requires root (euid=%d)", os.Geteuid())
+		return 0, 0, fmt.Errorf("contained toy-agent execution requires root (euid=%d)", os.Geteuid())
 	}
 	if agentUser == "" {
 		agentUser = defaultContainedAgentUser
 	}
 	u, err := user.Lookup(agentUser)
 	if err != nil {
-		return fmt.Errorf("lookup contained agent user %q: %w", agentUser, err)
+		return 0, 0, fmt.Errorf("lookup contained agent user %q: %w", agentUser, err)
 	}
 	uid, err := strconv.ParseUint(u.Uid, 10, 32)
 	if err != nil {
-		return fmt.Errorf("parse uid for %q: %w", agentUser, err)
+		return 0, 0, fmt.Errorf("parse uid for %q: %w", agentUser, err)
 	}
 	gid, err := strconv.ParseUint(u.Gid, 10, 32)
 	if err != nil {
-		return fmt.Errorf("parse gid for %q: %w", agentUser, err)
+		return 0, 0, fmt.Errorf("parse gid for %q: %w", agentUser, err)
 	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Credential: &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)},
+	return uint32(uid), uint32(gid), nil
+}
+
+func configureContainedCommand(cmd *exec.Cmd, agentUser string) error {
+	uid, gid, err := resolveContainedAgent(agentUser)
+	if err != nil {
+		return err
 	}
+	configureContainedCommandID(cmd, uid, gid)
 	return nil
+}
+
+func configureContainedCommandID(cmd *exec.Cmd, uid, gid uint32) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Credential: &syscall.Credential{Uid: uid, Gid: gid},
+	}
 }
 
 // applyAgentContainment runs the LLM agent subprocess as the contained agent
@@ -50,10 +62,12 @@ func configureContainedCommand(cmd *exec.Cmd, agentUser string) error {
 // SysProcAttr must be set before Start, which is why the caller invokes this
 // before spawning the subprocess.
 func applyAgentContainment(cmd *exec.Cmd, scratchDir, agentUser string) error {
-	if err := configureContainedCommand(cmd, agentUser); err != nil {
+	uid, gid, err := resolveContainedAgent(agentUser)
+	if err != nil {
 		return err
 	}
-	return chownTreeToAgent(scratchDir, agentUser)
+	configureContainedCommandID(cmd, uid, gid)
+	return chownTreeToAgentID(scratchDir, uid, gid)
 }
 
 // chownTreeToAgent hands the server-seeded scratch paths to the contained agent
@@ -69,20 +83,16 @@ func chownTreeToAgent(dir, agentUser string) error {
 	if dir == "" {
 		return nil
 	}
-	if agentUser == "" {
-		agentUser = defaultContainedAgentUser
-	}
-	u, err := user.Lookup(agentUser)
+	uid, gid, err := resolveContainedAgent(agentUser)
 	if err != nil {
-		return fmt.Errorf("lookup contained agent user %q: %w", agentUser, err)
+		return err
 	}
-	uid, err := strconv.Atoi(u.Uid)
-	if err != nil {
-		return fmt.Errorf("parse uid for %q: %w", agentUser, err)
-	}
-	gid, err := strconv.Atoi(u.Gid)
-	if err != nil {
-		return fmt.Errorf("parse gid for %q: %w", agentUser, err)
+	return chownTreeToAgentID(dir, uid, gid)
+}
+
+func chownTreeToAgentID(dir string, uid, gid uint32) error {
+	if dir == "" {
+		return nil
 	}
 	clean := filepath.Clean(dir)
 	paths := []string{
@@ -97,7 +107,7 @@ func chownTreeToAgent(dir, agentUser string) error {
 			}
 			return fmt.Errorf("stat %q: %w", p, statErr)
 		}
-		if err := os.Lchown(p, uid, gid); err != nil {
+		if err := os.Lchown(p, int(uid), int(gid)); err != nil {
 			return fmt.Errorf("chown %q to agent: %w", p, err)
 		}
 	}

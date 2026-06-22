@@ -509,11 +509,20 @@ func TestContainedProxyPort(t *testing.T) {
 
 func TestValidateServeSafety_RejectsBadProxyPort(t *testing.T) {
 	t.Parallel()
-	for _, port := range []int{-1, 70000} {
-		f := devServeFlags()
-		f.proxyPort = port
-		if err := validateServeSafety(f, false); err == nil {
-			t.Errorf("--proxy-port %d should be rejected", port)
-		}
+	for _, tc := range []struct {
+		name string
+		port int
+	}{
+		{name: "negative", port: -1},
+		{name: "too_large", port: 70000},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f := devServeFlags()
+			f.proxyPort = tc.port
+			if err := validateServeSafety(f, false); err == nil {
+				t.Fatalf("--proxy-port %d should be rejected", tc.port)
+			}
+		})
 	}
 }

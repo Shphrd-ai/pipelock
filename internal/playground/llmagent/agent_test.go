@@ -318,13 +318,13 @@ func TestRun_StepCapStops(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 	// The turn always ends with a final answer now (a forced summary), even at the
-	// step cap, so a follow-up like "continue" has context. The loop still stopped
-	// at MaxSteps: 3 tool-producing steps + 1 tool-less summary call = 4 model calls.
+	// step cap, so a follow-up like "continue" has context. The forced summary
+	// consumes one reserved model-call slot, so MaxSteps remains the total cap.
 	if final == "" {
 		t.Fatalf("final must be non-empty (forced summary), got empty")
 	}
-	if model.calls != 4 {
-		t.Fatalf("model calls = %d, want 4 (MaxSteps + 1 forced summary)", model.calls)
+	if model.calls != 3 {
+		t.Fatalf("model calls = %d, want 3 (MaxSteps includes forced summary)", model.calls)
 	}
 }
 
@@ -688,8 +688,6 @@ func TestRun_ForceFinalAnswerSyntheticPromptNotPersisted(t *testing.T) {
 
 	model := &scriptedModel{responses: []chatMessage{
 		toolMsg("c1", ToolFetchURL, `{"url":"`+loop.URL+`"}`),
-		toolMsg("c2", ToolFetchURL, `{"url":"`+loop.URL+`"}`),
-		toolMsg("c3", ToolFetchURL, `{"url":"`+loop.URL+`"}`),
 		textMsg("forced summary"), // the forced tool-less completion
 		textMsg("turn two reply"),
 	}}

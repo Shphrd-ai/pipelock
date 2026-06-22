@@ -108,6 +108,20 @@ func prefixMatches(prefix, args []string) bool {
 	return true
 }
 
+func TestEnforcementProbesSkipsByStableName(t *testing.T) {
+	t.Parallel()
+	filtered := enforcementProbes(allProbes())
+	for _, p := range filtered {
+		switch p.name {
+		case "pipelock_systemd_unit", "pipelock_listening_loopback":
+			t.Fatalf("enforcement probe filter kept liveness probe %d/%s", p.n, p.name)
+		}
+	}
+	if got, want := len(filtered), len(allProbes())-2; got != want {
+		t.Fatalf("filtered probe count = %d, want %d", got, want)
+	}
+}
+
 // makeProbeEnv builds a probeEnv with sane defaults plus overrides.
 // The pure-Go probes (1, 4, 5, 6, 7) get filesystem and lookup stubs;
 // the shell-out probes (2, 3, 8, 9) get runCmd.

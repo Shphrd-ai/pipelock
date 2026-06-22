@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 )
 
 // TestLiveRun_TransformedCanaryCountsAsReceivedNotObserved drives a transformed
@@ -35,7 +36,7 @@ func TestLiveRun_TransformedCanaryCountsAsReceivedNotObserved(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proxy URL: %v", err)
 	}
-	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
+	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}, Timeout: 5 * time.Second}
 
 	reversed := reverseString(lr.canaryValue)
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, lr.liveExfilURL(), bytes.NewReader([]byte("field="+reversed)))

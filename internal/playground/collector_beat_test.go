@@ -5,6 +5,7 @@ package playground
 
 import (
 	"context"
+	"net/http"
 	"testing"
 )
 
@@ -63,7 +64,7 @@ func TestLiveRun_CollectorBeat_AllowlistDoesNotBypassContentScanning(t *testing.
 			// the allowlisted collector must hard-block even though the host is
 			// trusted, because allowlist must not bypass content scanning.
 			name:    "raw_canary_to_allowlisted_collector_blocked",
-			method:  "POST",
+			method:  http.MethodPost,
 			rawURL:  collectorURL,
 			body:    []byte("file_contents=config\ncanary=" + lr.canaryValue + "\n"),
 			wantMin: 400,
@@ -73,7 +74,7 @@ func TestLiveRun_CollectorBeat_AllowlistDoesNotBypassContentScanning(t *testing.
 			// (c) No allowlist regression: an arbitrary host outside the trusted
 			// set is refused (a jailbroken agent cannot reach arbitrary egress).
 			name:    "non_allowlisted_host_blocked",
-			method:  "GET",
+			method:  http.MethodGet,
 			rawURL:  "http://evil.attacker.test/grab",
 			wantMin: 400,
 			wantMax: 599,
@@ -82,7 +83,7 @@ func TestLiveRun_CollectorBeat_AllowlistDoesNotBypassContentScanning(t *testing.
 			// (d) No over-block: the DLP-clean lab config read on the allowlisted
 			// safe host still succeeds.
 			name:    "allowlisted_safe_host_allowed",
-			method:  "GET",
+			method:  http.MethodGet,
 			rawURL:  safeURL,
 			wantMin: 200,
 			wantMax: 299,

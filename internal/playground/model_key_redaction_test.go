@@ -15,14 +15,29 @@ func TestReadTrimmedFile(t *testing.T) {
 	if err := os.WriteFile(p, []byte("  sk-trimmed-value\n\t"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got := readTrimmedFile(p); got != "sk-trimmed-value" {
+	got, err := readTrimmedFile(p)
+	if err != nil {
+		t.Fatalf("readTrimmedFile: %v", err)
+	}
+	if got != "sk-trimmed-value" {
 		t.Fatalf("readTrimmedFile = %q, want %q", got, "sk-trimmed-value")
 	}
-	if got := readTrimmedFile(""); got != "" {
+	got, err = readTrimmedFile("")
+	if err != nil {
+		t.Fatalf("readTrimmedFile(empty path): %v", err)
+	}
+	if got != "" {
 		t.Fatalf("readTrimmedFile(empty path) = %q, want \"\"", got)
 	}
-	if got := readTrimmedFile(filepath.Join(dir, "missing")); got != "" {
-		t.Fatalf("readTrimmedFile(missing) = %q, want \"\" (degrade, not error)", got)
+	if _, err := readTrimmedFile(filepath.Join(dir, "missing")); err == nil {
+		t.Fatal("readTrimmedFile(missing) must fail closed")
+	}
+	empty := filepath.Join(dir, "empty")
+	if err := os.WriteFile(empty, []byte(" \n\t"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readTrimmedFile(empty); err == nil {
+		t.Fatal("readTrimmedFile(empty file) must fail closed")
 	}
 }
 

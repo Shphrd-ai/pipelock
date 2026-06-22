@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -136,9 +137,9 @@ func runCommandInvoke(ctx context.Context, scratchDir string, timeout time.Durat
 	// forked/backgrounded children stay in that group and cannot outlive the
 	// bounded run_command.
 	boundToProcessGroup(cmd)
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
+	outBuf := newCappedCapture(maxCommandOutputBytes)
+	cmd.Stdout = outBuf
+	cmd.Stderr = outBuf
 	runErr := cmd.Run()
 
 	note := "ran"
@@ -149,8 +150,7 @@ func runCommandInvoke(ctx context.Context, scratchDir string, timeout time.Durat
 		note = "exited nonzero"
 	}
 
-	out := capBytes(buf.Bytes(), maxCommandOutputBytes)
-	result := string(out)
+	result := string(outBuf.Bytes())
 	if strings.TrimSpace(result) == "" {
 		result = fmt.Sprintf("(no output; command %s)", note)
 	}
@@ -158,7 +158,7 @@ func runCommandInvoke(ctx context.Context, scratchDir string, timeout time.Durat
 		Kind:   EventToolResult,
 		Tool:   ToolRunCommand,
 		Note:   note,
-		Detail: truncateDetail(args.Command),
+		Detail: "shell command",
 	}
 }
 
@@ -176,14 +176,13 @@ func readFileInvoke(scratchDir string, raw json.RawMessage) (string, Event) {
 		}
 	}
 	path := resolveScratchPath(scratchDir, args.Path)
-	data, err := os.ReadFile(filepath.Clean(path))
+	data, err := readFileCapped(filepath.Clean(path), maxReadFileBytes)
 	if err != nil {
 		return fmt.Sprintf("error: could not read %s: %v", args.Path, err), Event{
 			Kind: EventToolResult, Tool: ToolReadFile, Note: "read error", Detail: truncateDetail(args.Path),
 		}
 	}
-	out := capBytes(data, maxReadFileBytes)
-	return string(out), Event{
+	return string(data), Event{
 		Kind: EventToolResult, Tool: ToolReadFile, Note: "read", Detail: truncateDetail(args.Path),
 	}
 }
@@ -208,8 +207,15 @@ func listDirInvoke(scratchDir string, raw json.RawMessage) (string, Event) {
 	if dir == "" {
 		dir = "."
 	}
-	entries, err := os.ReadDir(filepath.Clean(dir))
+	f, err := os.Open(filepath.Clean(dir)) //nolint:gosec // G304: tool intentionally reads caller-chosen sandbox-visible paths.
 	if err != nil {
+		return fmt.Sprintf("error: could not list %s: %v", dir, err), Event{
+			Kind: EventToolResult, Tool: ToolListDir, Note: "list error", Detail: truncateDetail(dir),
+		}
+	}
+	defer func() { _ = f.Close() }()
+	entries, err := f.Readdir(maxListDirEntries + 1)
+	if err != nil && !errors.Is(err, io.EOF) {
 		return fmt.Sprintf("error: could not list %s: %v", dir, err), Event{
 			Kind: EventToolResult, Tool: ToolListDir, Note: "list error", Detail: truncateDetail(dir),
 		}
@@ -260,6 +266,52 @@ func resolveScratchPath(scratchDir, p string) string {
 	default:
 		return filepath.Join(scratchDir, p)
 	}
+}
+
+type cappedCapture struct {
+	buf       bytes.Buffer
+	limit     int
+	truncated bool
+}
+
+func newCappedCapture(limit int) *cappedCapture {
+	return &cappedCapture{limit: limit}
+}
+
+func (c *cappedCapture) Write(p []byte) (int, error) {
+	written := len(p)
+	if c.limit > c.buf.Len() {
+		remaining := c.limit - c.buf.Len()
+		if len(p) > remaining {
+			p = p[:remaining]
+			c.truncated = true
+		}
+		_, _ = c.buf.Write(p)
+	} else if len(p) > 0 {
+		c.truncated = true
+	}
+	return written, nil
+}
+
+func (c *cappedCapture) Bytes() []byte {
+	out := c.buf.Bytes()
+	if !c.truncated {
+		return out
+	}
+	return append(append([]byte(nil), out...), "…"...)
+}
+
+func readFileCapped(path string, limit int) ([]byte, error) {
+	f, err := os.Open(path) //nolint:gosec // G304: tool intentionally reads caller-chosen sandbox-visible paths.
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	data, err := io.ReadAll(io.LimitReader(f, int64(limit+1)))
+	if err != nil {
+		return nil, err
+	}
+	return capBytes(data, limit), nil
 }
 
 // capBytes truncates b to limit, appending a marker so the model sees the output

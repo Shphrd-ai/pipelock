@@ -67,9 +67,9 @@ type Event struct {
 	Reason string `json:"reason,omitempty"` // turn-end reason (EventTurnEnd): complete / tool_call_limit / step_limit
 }
 
-// DefaultMaxSteps bounds the model<->tool loop so a stuck or adversarial model
-// cannot spin forever. Each step is one model round trip, so it is also the
-// worst-case model-call count per visitor message that spend accounting reserves.
+// DefaultMaxSteps bounds all model round trips for one visitor message, including
+// the forced final answer used when the model hits an action ceiling. That makes
+// this value the worst-case model-call count spend accounting reserves.
 const DefaultMaxSteps = 6
 
 // defaultMaxToolCalls bounds the TOTAL tool calls a single turn may execute,
@@ -323,10 +323,16 @@ func (a *Agent) Run(ctx context.Context, userMsg string) (string, error) {
 
 	toolsUsed := 0
 	maxTools := a.cfg.maxToolCalls()
+	maxModelCalls := a.cfg.maxSteps()
+	actionStepLimit := maxModelCalls
+	reserveFinalCall := maxModelCalls > 1
+	if reserveFinalCall {
+		actionStepLimit = maxModelCalls - 1
+	}
 	finalText := ""
 	finished := false
 	endReason := turnEndComplete
-	for step := 0; step < a.cfg.maxSteps() && !finished; step++ {
+	for step := 0; step < actionStepLimit && !finished; step++ {
 		// A model round trip is about to start: signal "thinking" so the UI shows
 		// model-call-in-flight exactly, not by inferring it from event silence.
 		a.emit(Event{Kind: EventThinking})
@@ -375,9 +381,16 @@ func (a *Agent) Run(ctx context.Context, userMsg string) (string, error) {
 		}
 	}
 
-	if !finished {
-		// Hit the step cap with the model still wanting to act.
+	if !finished && reserveFinalCall {
+		// Hit the step cap with the model still wanting to act. The forced final
+		// answer consumes the one model call reserved above, so MaxSteps remains a
+		// true worst-case model-call cap.
 		finalText, messages = a.forceFinalAnswer(ctx, messages, "step")
+		endReason = turnEndStepLimit
+	} else if !finished {
+		finalText = "I reached this turn's action limit. Ask me to continue and I'll keep going."
+		a.emit(Event{Kind: EventReply, Text: finalText})
+		messages = append(messages, chatMessage{Role: roleAssistant, Content: finalText})
 		endReason = turnEndStepLimit
 	}
 

@@ -82,6 +82,9 @@ func TestParseFlags(t *testing.T) {
 	if _, err := parseFlags([]string{"--model-base-url", "http://m", "--model", "m", "--safe-url", "://bad"}, noEnv); err == nil {
 		t.Fatal("want error on invalid safe URL")
 	}
+	if _, err := parseFlags([]string{"--model-base-url", "http://m", "--model", "m", "--dev", "--allow-exec"}, noEnv); err == nil {
+		t.Fatal("want error when --dev and --allow-exec are combined")
+	}
 }
 
 func TestResolveAPIKey(t *testing.T) {
@@ -115,6 +118,11 @@ func TestResolveAPIKey(t *testing.T) {
 	// Missing both.
 	if _, err := resolveAPIKey(-1, "", noEnv); err == nil {
 		t.Fatal("want error when no key source")
+	}
+	for _, fd := range []int{0, 1, 2} {
+		if _, err := resolveAPIKey(fd, "", noEnv); err == nil {
+			t.Fatalf("want error when secret fd is stdio fd %d", fd)
+		}
 	}
 	// Unreadable file.
 	if _, err := resolveAPIKey(-1, filepath.Join(dir, "nope"), noEnv); err == nil {

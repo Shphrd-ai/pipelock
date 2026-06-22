@@ -598,6 +598,10 @@ func TestSendViaModel_StrictAllowlistBlocksNonAllowlistedHTTPAndHTTPSWithReceipt
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer httpsTarget.Close()
+	httpsHostPort, ok := httpsConnectTarget(httpsTarget.URL)
+	if !ok {
+		t.Fatalf("https CONNECT target for %s", httpsTarget.URL)
+	}
 
 	runner.run = func(ctx context.Context, _ string, onEvent func(llmagent.Event)) error {
 		onEvent(llmagent.Event{Kind: llmagent.EventToolCall, Tool: llmagent.ToolPostData})
@@ -643,7 +647,7 @@ func TestSendViaModel_StrictAllowlistBlocksNonAllowlistedHTTPAndHTTPSWithReceipt
 		switch {
 		case strings.HasPrefix(ev.Target, httpTarget.URL):
 			forwardBlock = true
-		case strings.HasPrefix(ev.Target, httpsTarget.URL):
+		case strings.Contains(ev.Target, httpsHostPort):
 			connectBlock = true
 		}
 	}

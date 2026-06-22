@@ -577,8 +577,8 @@ func (s *Server) handleMessage(w http.ResponseWriter, r *http.Request) {
 	rollback = append(rollback, func() { s.budget.Refund(units) })
 
 	if err := entry.sess.Send(r.Context(), body.Message); err != nil {
+		undo()
 		if errors.Is(err, playground.ErrSessionClosed) {
-			undo()
 			writeErr(w, http.StatusConflict, "session is closed")
 			return
 		}

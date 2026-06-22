@@ -409,7 +409,7 @@ func StartLiveRun(ctx context.Context, opts LiveRunOpts) (*LiveRun, error) {
 	// host-containment witness and the contained agent must reach exactly it.
 	proxyBindAddr, err := proxyBindAddrFor(opts.ProxyPort)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("resolve proxy bind address: %w", err)
 	}
 	lr.proxyLn, err = (&net.ListenConfig{}).Listen(ctx, "tcp", proxyBindAddr)
 	if err != nil {

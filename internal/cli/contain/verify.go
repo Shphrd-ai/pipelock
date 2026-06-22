@@ -643,9 +643,13 @@ func runVerify(cmd *cobra.Command, env *probeEnv, opts verifyOpts) error {
 }
 
 func enforcementProbes(probes []probe) []probe {
+	skip := map[string]struct{}{
+		"pipelock_systemd_unit":       {},
+		"pipelock_listening_loopback": {},
+	}
 	filtered := make([]probe, 0, len(probes))
 	for _, p := range probes {
-		if p.n == 2 || p.n == 6 {
+		if _, ok := skip[p.name]; ok {
 			continue
 		}
 		filtered = append(filtered, p)

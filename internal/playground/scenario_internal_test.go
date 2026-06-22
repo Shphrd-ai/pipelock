@@ -65,13 +65,20 @@ func TestLiveSecretAccessKey(t *testing.T) {
 			t.Fatalf("secret key has out-of-charset rune %q", r)
 		}
 	}
-	if k2, _ := liveSecretAccessKey(); k == k2 {
+	k2, err := liveSecretAccessKey()
+	if err != nil {
+		t.Fatalf("liveSecretAccessKey: %v", err)
+	}
+	if k == k2 {
 		t.Fatal("secret keys must be random per call")
 	}
 }
 
 func TestIsCanaryShape(t *testing.T) {
-	good, _ := liveCanaryValue()
+	good, err := liveCanaryValue()
+	if err != nil {
+		t.Fatalf("liveCanaryValue: %v", err)
+	}
 	cases := []struct {
 		name string
 		in   string
