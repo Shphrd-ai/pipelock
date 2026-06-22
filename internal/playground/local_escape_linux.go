@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 
 	"golang.org/x/sys/unix"
@@ -65,9 +66,16 @@ func probeMountCapability(target string) ProbeResult {
 }
 
 func probeUserNamespaceMountCapability(target string) ProbeResult {
+	runtime.LockOSThread()
 	if err := unix.Unshare(unix.CLONE_NEWUSER | unix.CLONE_NEWNS); err != nil {
+		runtime.UnlockOSThread()
 		return ProbeResult{Target: target, Open: false, Blocked: true, Detail: fmt.Sprintf("blocked/unavailable: unshare: %v", err)}
 	}
+	// Do not unlock this OS thread after a successful unshare. The uid/gid map and
+	// Setresuid/Setresgid calls below permanently mutate this thread's namespace
+	// and credentials. LocalEscapeTargets keeps this probe last, so the toy-agent
+	// process records the result and exits instead of returning the mutated thread
+	// to the Go scheduler.
 
 	if err := os.WriteFile("/proc/self/setgroups", []byte("deny\n"), 0o600); err != nil && !os.IsNotExist(err) {
 		return ProbeResult{Target: target, Open: false, Blocked: true, Detail: fmt.Sprintf("blocked/unavailable: setgroups map: %v", err)}
