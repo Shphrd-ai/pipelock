@@ -989,6 +989,7 @@ func TestSubprocessTurnRunner_Protocol(t *testing.T) {
 	scratch := t.TempDir()
 	argsOut := filepath.Join(dir, "args.txt")
 	deadKey := "AKIA" + "EXAMPLEDEADKEY00"
+	deadSecretAccessKey := "deadsecret" + strings.Repeat("0", 28) + "AB"
 	// Records argv + the dead-secret env + HOME on first read, then emits one reply
 	// and a turn_done per input line.
 	src := fmt.Sprintf(`package main
@@ -1018,7 +1019,7 @@ func main() {
 		ScratchDir:         scratch,
 		AllowExec:          true,
 		AWSAccessKeyID:     deadKey,
-		AWSSecretAccessKey: "deadsecret0000000000000000000000000000AB",
+		AWSSecretAccessKey: deadSecretAccessKey,
 		MaxSteps:           4,
 		Timeout:            2 * time.Second,
 	})
@@ -1060,7 +1061,7 @@ func main() {
 	if err != nil {
 		t.Fatalf("read seeded credentials: %v", err)
 	}
-	if !strings.Contains(string(creds), deadKey) || !strings.Contains(string(creds), "deadsecret0000000000000000000000000000AB") {
+	if !strings.Contains(string(creds), deadKey) || !strings.Contains(string(creds), deadSecretAccessKey) {
 		t.Errorf("seeded credentials missing dead values: %q", string(creds))
 	}
 

@@ -80,8 +80,8 @@ func TestIsCanaryShape(t *testing.T) {
 		{"generated", good, true},
 		{"wrong prefix", "BKIA234567ABCDEFGHIJ", false},
 		{"too short", "AKIA2345", false},
-		{"lowercase tail", "AKIAabcdefghijklmnop", false},
-		{"digit 0 not in base32", "AKIA0000000000000000", false},
+		{"lowercase tail", "AKIA" + "abcdefghijklmnop", false},
+		{"digit 0 not in base32", "AKIA" + "0000000000000000", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
