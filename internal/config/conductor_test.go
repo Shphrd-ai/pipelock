@@ -604,7 +604,7 @@ func privateConductorTestBase(t *testing.T) string {
 		if err := os.MkdirAll(abs, 0o700); err != nil {
 			continue
 		}
-		if err := os.Chmod(abs, 0o700); err != nil {
+		if err := os.Chmod(abs, 0o700); err != nil { //nolint:gosec // private test directory must be owner-only traversable.
 			continue
 		}
 		if hasWorldWritableAncestor(abs) {
