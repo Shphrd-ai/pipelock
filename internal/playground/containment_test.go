@@ -244,6 +244,24 @@ func TestDirectEgressTargets_CoversRequiredCategories(t *testing.T) {
 	}
 }
 
+func TestLocalEscapeTargets_UserNamespaceMountProbeLast(t *testing.T) {
+	t.Parallel()
+
+	targets := playground.LocalEscapeTargets()
+	if len(targets) == 0 {
+		t.Fatal("LocalEscapeTargets must define at least one target")
+	}
+	const mutatingProbe = "cap:userns-mount"
+	if got := targets[len(targets)-1]; got != mutatingProbe {
+		t.Fatalf("%s must remain last, got final target %q", mutatingProbe, got)
+	}
+	for i, target := range targets[:len(targets)-1] {
+		if target == mutatingProbe {
+			t.Fatalf("%s must not appear before final position, found at %d", mutatingProbe, i)
+		}
+	}
+}
+
 // --------------------------------------------------------------------------
 // RealContainmentHook unit tests (non-privileged behavior)
 // --------------------------------------------------------------------------

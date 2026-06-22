@@ -119,11 +119,12 @@ func probeUnixSocket(ctx context.Context, target, path string) ProbeResult {
 
 	conn, err := (&net.Dialer{Timeout: probeTimeout}).DialContext(dialCtx, "unix", path)
 	if err != nil {
+		blocked := !isConnectionRefusedError(err)
 		return ProbeResult{
 			Target:  target,
 			Open:    false,
-			Blocked: true,
-			Detail:  fmt.Sprintf("blocked/unavailable: %v", err),
+			Blocked: blocked,
+			Detail:  localProbeErrorDetail(err, blocked),
 		}
 	}
 	_ = conn.Close()
@@ -133,6 +134,20 @@ func probeUnixSocket(ctx context.Context, target, path string) ProbeResult {
 		Blocked: false,
 		Detail:  "connected to local unix socket",
 	}
+}
+
+func localProbeErrorDetail(err error, blocked bool) string {
+	if isConnectionRefusedError(err) {
+		return fmt.Sprintf("reachable: connection refused: %v", err)
+	}
+	if blocked {
+		return fmt.Sprintf("blocked/unavailable: %v", err)
+	}
+	return fmt.Sprintf("not blocked: %v", err)
+}
+
+func isConnectionRefusedError(err error) bool {
+	return strings.Contains(strings.ToLower(err.Error()), "connection refused")
 }
 
 func probeDeviceNode(target, path string) ProbeResult {
@@ -172,7 +187,7 @@ func isEgressBlockError(err error) bool {
 }
 
 func probeErrorDetail(err error, blocked bool) string {
-	if strings.Contains(strings.ToLower(err.Error()), "connection refused") {
+	if isConnectionRefusedError(err) {
 		return fmt.Sprintf("reachable: connection refused: %v", err)
 	}
 	if blocked {
