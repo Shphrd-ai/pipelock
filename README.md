@@ -609,7 +609,7 @@ See [LICENSE](LICENSE) for the Apache 2.0 text and [enterprise/LICENSE](enterpri
 ## Shphrd-ai Fork Strategy
 
 This repository is maintained by [Shphrd-ai](https://github.com/Shphrd-ai) as a
-security-research fork of [luckyPipewrench/pipelock](https://github.com/Shphrd-ai/pipelock).
+security-research fork of [luckyPipewrench/pipelock](https://github.com/luckyPipewrench/pipelock).
 
 ### What we extend
 
@@ -633,7 +633,7 @@ We track upstream releases via the `upstream-v*` tags in this repo.
 To pull upstream changes:
 
 ```sh
-git remote add upstream https://github.com/Shphrd-ai/pipelock.git
+git remote add upstream https://github.com/luckyPipewrench/pipelock.git
 git fetch upstream
 git merge upstream/main --no-ff
 ```
