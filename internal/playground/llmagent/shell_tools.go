@@ -207,7 +207,7 @@ func listDirInvoke(scratchDir string, raw json.RawMessage) (string, Event) {
 	if dir == "" {
 		dir = "."
 	}
-	f, err := os.Open(filepath.Clean(dir)) //nolint:gosec // G304: tool intentionally reads caller-chosen sandbox-visible paths.
+	f, err := os.Open(filepath.Clean(dir))
 	if err != nil {
 		return fmt.Sprintf("error: could not list %s: %v", dir, err), Event{
 			Kind: EventToolResult, Tool: ToolListDir, Note: "list error", Detail: truncateDetail(dir),
@@ -302,7 +302,7 @@ func (c *cappedCapture) Bytes() []byte {
 }
 
 func readFileCapped(path string, limit int) ([]byte, error) {
-	f, err := os.Open(path) //nolint:gosec // G304: tool intentionally reads caller-chosen sandbox-visible paths.
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
