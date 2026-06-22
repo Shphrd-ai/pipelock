@@ -288,7 +288,7 @@ func TestRealContainmentHook_Teardown_Succeeds(t *testing.T) {
 // The honest privileged proof is built and verified end-to-end by the demo
 // binary (HostContainmentWitness, signed from a uid-966-dropped probe set) and
 // is exercised by:
-//   - TestHostContainmentWitness_Enforced       (DifferentialProven && ProxyContractProven && DirectSuiteProven && AllAgentBlocked)
+//   - TestHostContainmentWitness_Enforced       (DifferentialProven && ProxyContractProven && DirectSuiteProven && LocalEscapeSuiteProven && AllAgentBlocked)
 //   - TestAllAgentBlocked_HappyAndEmpty          (liverun_internal_test.go)
 //   - TestVerify_Contained_NotEnforced_FailsClosed (containment_verify_test.go)
 //   - `pipelock-playground-demo run --contained` + `... verify` on a real host.

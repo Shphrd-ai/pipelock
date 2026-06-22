@@ -263,6 +263,16 @@ func TestBuildHostContainmentWitnessSignsProbeEvidence(t *testing.T) {
 		}
 		return results, nil
 	}
+	lr.localEscapeProbe = func(asAgent bool) ([]ProbeResult, error) {
+		if !asAgent {
+			return nil, errors.New("local escape probe should run as agent")
+		}
+		results := make([]ProbeResult, 0, len(LocalEscapeTargets()))
+		for _, target := range LocalEscapeTargets() {
+			results = append(results, ProbeResult{Target: target, Open: false, Blocked: true, Detail: "blocked"})
+		}
+		return results, nil
+	}
 
 	w, err := lr.buildHostContainmentWitness()
 	if err != nil {

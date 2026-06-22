@@ -107,6 +107,18 @@ func main() {
 		fmt.Fprintln(os.Stderr, "config:", err)
 		os.Exit(2)
 	}
+	// Harden before the model key is read. The key then never lives in a
+	// dumpable process, and run_command shell children inherit syscall denial for
+	// unshare, mount, and device-node escape attempts. Dev mode may run on
+	// non-contained workstations, so it reports hardening errors but does not
+	// block local iteration.
+	if err := hardenProcess(); err != nil {
+		if !cfg.dev {
+			fmt.Fprintln(os.Stderr, "harden:", err)
+			os.Exit(2)
+		}
+		fmt.Fprintln(os.Stderr, "WARNING: process hardening unavailable:", err)
+	}
 	apiKey, err := resolveAPIKey(cfg.secretFd, cfg.secretFile, os.Getenv)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "api key:", err)

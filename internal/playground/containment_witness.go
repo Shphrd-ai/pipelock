@@ -13,13 +13,15 @@ import (
 
 // HostContainmentWitness is the orchestrator-signed attestation that, for one
 // specific run, the host's kernel containment blocked the contained agent
-// (running as AgentUID) from reaching egress targets while the operator could.
+// (running as AgentUID) from reaching egress targets and local escape surfaces,
+// while the operator could reach the control target.
 //
 // It is the split-proof counterpart to the collector Witness: where the
 // collector witness attests what the lab collector observed for the MEDIATED
-// path, this witness attests the ENFORCED-direct-egress property. The two are
-// orthogonal and are proven where each is actually enforced -- the proxy
-// scans mediated traffic; the kernel owner-match rule blocks direct egress.
+// path, this witness attests the host-enforced containment property. The two are
+// orthogonal and are proven where each is actually enforced -- the proxy scans
+// mediated traffic; the kernel owner-match rule blocks direct egress; process
+// and host hardening block local platform/device/namespace escape surfaces.
 //
 // The honesty hinges on a DIFFERENTIAL: ControlTarget is a host-local listener
 // that is genuinely reachable absent containment. The operator probe of it must
@@ -78,6 +80,13 @@ type HostContainmentWitness struct {
 	// refused, or ambiguous route means containment is not proven.
 	AgentProbes []ProbeResult `json:"agent_probes"`
 
+	// LocalAgentProbes are the contained agent's probes of local, non-network
+	// escape surfaces (platform control sockets, raw device nodes, and
+	// capability-gated local privilege operations). Every one MUST be explicitly
+	// blocked or unavailable. These probes cover paths that never traverse the
+	// HTTP proxy, so destination-control receipts alone cannot prove them.
+	LocalAgentProbes []ProbeResult `json:"local_agent_probes"`
+
 	ProbedAt time.Time `json:"probed_at"`
 
 	Signature string `json:"signature,omitempty"`
@@ -109,20 +118,43 @@ func (w HostContainmentWitness) DirectSuiteProven() bool {
 	return true
 }
 
+// LocalEscapeSuiteProven reports whether LocalAgentProbes covers the exact
+// LocalEscapeTargets suite, in order. This prevents a witness from omitting a
+// known local surface (for example the Fly control socket or raw block device)
+// while still claiming host containment.
+func (w HostContainmentWitness) LocalEscapeSuiteProven() bool {
+	expected := LocalEscapeTargets()
+	if len(w.LocalAgentProbes) != len(expected) {
+		return false
+	}
+	for i, target := range expected {
+		if w.LocalAgentProbes[i].Target != target {
+			return false
+		}
+	}
+	return true
+}
+
 // AllAgentBlocked reports whether every contained-agent probe -- the control
-// target probe AND every direct-egress probe present in the witness -- was
-// explicitly classified as blocked. Open=false alone is not enough: a
-// connection-refused response is reachable-but-closed, not containment. It
-// requires at least one real direct-egress probe so an empty suite cannot pass
-// vacuously. Enforced additionally requires DirectSuiteProven.
+// target probe, every direct-egress probe, and every local escape probe present
+// in the witness -- was explicitly classified as blocked. Open=false alone is
+// not enough for direct egress: a connection-refused response is
+// reachable-but-closed, not containment. It requires at least one real
+// direct-egress probe and at least one local escape probe so empty suites cannot
+// pass vacuously. Enforced additionally requires exact target suites.
 func (w HostContainmentWitness) AllAgentBlocked() bool {
-	if len(w.AgentProbes) == 0 {
+	if len(w.AgentProbes) == 0 || len(w.LocalAgentProbes) == 0 {
 		return false
 	}
 	if w.ControlAgentProbe.Open || !w.ControlAgentProbe.Blocked {
 		return false
 	}
 	for _, p := range w.AgentProbes {
+		if p.Open || !p.Blocked {
+			return false
+		}
+	}
+	for _, p := range w.LocalAgentProbes {
 		if p.Open || !p.Blocked {
 			return false
 		}
@@ -174,13 +206,14 @@ func isIPv4LoopbackHostPort(target string) bool {
 
 // Enforced is the fail-closed gate: containment is proven for this run ONLY when
 // the differential holds, the agent reaches exactly its proxy port (and a
-// different loopback port is blocked), the exact direct-egress suite was probed,
-// and every contained-agent probe was explicitly blocked. Any open, refused, or
-// ambiguous agent route, a missing or substituted target, a missing/unreachable
-// control target, a proxy the agent cannot reach (or a proxy/control collision),
-// or an empty probe suite fails closed.
+// different loopback port is blocked), the exact direct-egress and local escape
+// suites were probed, and every contained-agent probe was explicitly blocked.
+// Any open, refused, or ambiguous agent route, a missing or substituted target,
+// a missing/unreachable control target, a proxy the agent cannot reach (or a
+// proxy/control collision), or an empty probe suite fails closed.
 func (w HostContainmentWitness) Enforced() bool {
-	return w.DifferentialProven() && w.ProxyContractProven() && w.DirectSuiteProven() && w.AllAgentBlocked()
+	return w.DifferentialProven() && w.ProxyContractProven() &&
+		w.DirectSuiteProven() && w.LocalEscapeSuiteProven() && w.AllAgentBlocked()
 }
 
 // SignHostContainmentWitness signs w with the orchestrator private key over its

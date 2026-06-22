@@ -189,7 +189,8 @@ func buildRunDir(t *testing.T, contained bool) (string, string, ed25519.PrivateK
 
 // validHostContainmentWitness builds an unsigned witness that passes Enforced():
 // the control target is operator-reachable and agent-blocked (the differential),
-// and every real direct-egress probe is blocked.
+// every real direct-egress probe is blocked, and every local escape surface is
+// blocked or unavailable.
 func validHostContainmentWitness(nonce, manifestHash string) playground.HostContainmentWitness {
 	const (
 		ctrl  = "127.0.0.1:54321"
@@ -206,6 +207,7 @@ func validHostContainmentWitness(nonce, manifestHash string) playground.HostCont
 		ProxyTarget:          proxy,
 		ProxyAgentProbe:      playground.ProbeResult{Target: proxy, Open: true, Blocked: false, Detail: "connected"},
 		AgentProbes:          blockedDirectProbes(),
+		LocalAgentProbes:     blockedLocalProbes(),
 		ProbedAt:             time.Unix(1_700_000_000, 0).UTC(),
 	}
 }

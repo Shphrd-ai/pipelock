@@ -38,6 +38,20 @@ func blockedDirectProbes() []playground.ProbeResult {
 	return probes
 }
 
+func blockedLocalProbes() []playground.ProbeResult {
+	targets := playground.LocalEscapeTargets()
+	probes := make([]playground.ProbeResult, 0, len(targets))
+	for _, target := range targets {
+		probes = append(probes, playground.ProbeResult{
+			Target:  target,
+			Open:    false,
+			Blocked: true,
+			Detail:  "blocked/unavailable",
+		})
+	}
+	return probes
+}
+
 // validWitness returns a fully-enforced, unsigned witness for the happy path.
 func validWitness() playground.HostContainmentWitness {
 	return playground.HostContainmentWitness{
@@ -51,6 +65,7 @@ func validWitness() playground.HostContainmentWitness {
 		ProxyTarget:          testProxyTarget,
 		ProxyAgentProbe:      playground.ProbeResult{Target: testProxyTarget, Open: true, Blocked: false, Detail: "connected"},
 		AgentProbes:          blockedDirectProbes(),
+		LocalAgentProbes:     blockedLocalProbes(),
 		ProbedAt:             time.Unix(1_700_000_000, 0).UTC(),
 	}
 }
@@ -252,6 +267,14 @@ func TestHostContainmentWitness_Enforced(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "empty local escape suite cannot pass vacuously",
+			mutate: func(w playground.HostContainmentWitness) playground.HostContainmentWitness {
+				w.LocalAgentProbes = nil
+				return w
+			},
+			want: false,
+		},
+		{
 			name: "missing direct-egress suite target",
 			mutate: func(w playground.HostContainmentWitness) playground.HostContainmentWitness {
 				w.AgentProbes = w.AgentProbes[:len(w.AgentProbes)-1]
@@ -263,6 +286,23 @@ func TestHostContainmentWitness_Enforced(t *testing.T) {
 			name: "substituted direct-egress suite target",
 			mutate: func(w playground.HostContainmentWitness) playground.HostContainmentWitness {
 				w.AgentProbes[0].Target = "127.0.0.1:1"
+				return w
+			},
+			want: false,
+		},
+		{
+			name: "local escape surface open",
+			mutate: func(w playground.HostContainmentWitness) playground.HostContainmentWitness {
+				w.LocalAgentProbes[0].Open = true
+				w.LocalAgentProbes[0].Blocked = false
+				return w
+			},
+			want: false,
+		},
+		{
+			name: "substituted local escape suite target",
+			mutate: func(w playground.HostContainmentWitness) playground.HostContainmentWitness {
+				w.LocalAgentProbes[0].Target = "unix:/tmp/not-the-fly-api.sock"
 				return w
 			},
 			want: false,

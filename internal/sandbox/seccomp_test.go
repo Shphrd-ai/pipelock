@@ -380,8 +380,8 @@ func TestConditionalFilters_Structure(t *testing.T) {
 }
 
 func TestCloneNewMask_IncludesAllNamespaceFlags(t *testing.T) {
-	// Verify the mask covers all CLONE_NEW* flags.
-	flags := []struct {
+	// Verify the mask covers all CLONE_NEW* flags and only those flags.
+	namespaceFlags := []struct {
 		name string
 		val  uint32
 	}{
@@ -393,9 +393,23 @@ func TestCloneNewMask_IncludesAllNamespaceFlags(t *testing.T) {
 		{"CLONE_NEWPID", 0x20000000},
 		{"CLONE_NEWNET", 0x40000000},
 	}
-	for _, f := range flags {
+	for _, f := range namespaceFlags {
 		if cloneNewMask&f.val == 0 {
 			t.Errorf("cloneNewMask missing %s (0x%08x)", f.name, f.val)
+		}
+	}
+
+	nonNamespaceFlags := []struct {
+		name string
+		val  uint32
+	}{
+		{"CLONE_CHILD_SETTID", 0x01000000},
+		{"CLONE_SETTLS", 0x00080000},
+		{"CLONE_PARENT_SETTID", 0x00100000},
+	}
+	for _, f := range nonNamespaceFlags {
+		if cloneNewMask&f.val != 0 {
+			t.Errorf("cloneNewMask includes non-namespace %s (0x%08x)", f.name, f.val)
 		}
 	}
 }
