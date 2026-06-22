@@ -9,7 +9,7 @@ sources:
   - https://github.com/Shphrd-ai/pipelock
 maintainers:
   - name: Josh Waldrep
-    url: https://github.com/luckyPipewrench
+    url: https://github.com/Shphrd-ai
 keywords:
   - ai-security
   - agent-firewall

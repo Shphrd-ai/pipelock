@@ -1,6 +1,6 @@
 name: 'Pipelock Agent Security Scan'
 description: 'Scan your project for AI agent security risks. Pattern-based detection of credentials and misconfigurations with tailored config generation. See docs for coverage details.'
-author: 'luckyPipewrench'
+author: 'Shphrd-ai'
 
 branding:
   icon: 'shield'

@@ -131,7 +131,7 @@ changelog:
 brews:
   - ids: [pipelock]
     repository:
-      owner: luckyPipewrench
+      owner: Shphrd-ai
       name: homebrew-tap
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"

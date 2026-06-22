@@ -32,7 +32,7 @@ import (
 
 // GitHub repository coordinates. The host is ours, so naming it is fine.
 const (
-	repoOwner = "luckyPipewrench"
+	repoOwner = "Shphrd-ai"
 	repoName  = "pipelock"
 
 	// defaultAPIBase is the GitHub REST API base for release lookups. Tests
