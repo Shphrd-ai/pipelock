@@ -31,6 +31,14 @@ func allBlockedDirect() []ProbeResult {
 	return out
 }
 
+func allBlockedLocal() []ProbeResult {
+	out := make([]ProbeResult, 0, len(LocalEscapeTargets()))
+	for _, t := range LocalEscapeTargets() {
+		out = append(out, blockedProbe(t))
+	}
+	return out
+}
+
 func TestEvalStartContainment(t *testing.T) {
 	const ctrl = "127.0.0.1:5005"
 
@@ -39,6 +47,7 @@ func TestEvalStartContainment(t *testing.T) {
 		operator    ProbeResult
 		agentCtrl   ProbeResult
 		agentDirect []ProbeResult
+		agentLocal  []ProbeResult
 		wantErr     bool
 	}{
 		{
@@ -46,6 +55,7 @@ func TestEvalStartContainment(t *testing.T) {
 			operator:    openProbe(ctrl),
 			agentCtrl:   blockedProbe(ctrl),
 			agentDirect: allBlockedDirect(),
+			agentLocal:  allBlockedLocal(),
 			wantErr:     false,
 		},
 		{
@@ -53,6 +63,7 @@ func TestEvalStartContainment(t *testing.T) {
 			operator:    blockedProbe(ctrl),
 			agentCtrl:   blockedProbe(ctrl),
 			agentDirect: allBlockedDirect(),
+			agentLocal:  allBlockedLocal(),
 			wantErr:     true,
 		},
 		{
@@ -60,6 +71,7 @@ func TestEvalStartContainment(t *testing.T) {
 			operator:    refusedProbe(ctrl),
 			agentCtrl:   blockedProbe(ctrl),
 			agentDirect: allBlockedDirect(),
+			agentLocal:  allBlockedLocal(),
 			wantErr:     true,
 		},
 		{
@@ -67,6 +79,7 @@ func TestEvalStartContainment(t *testing.T) {
 			operator:    openProbe(ctrl),
 			agentCtrl:   openProbe(ctrl),
 			agentDirect: allBlockedDirect(),
+			agentLocal:  allBlockedLocal(),
 			wantErr:     true,
 		},
 		{
@@ -74,6 +87,7 @@ func TestEvalStartContainment(t *testing.T) {
 			operator:    openProbe(ctrl),
 			agentCtrl:   refusedProbe(ctrl),
 			agentDirect: allBlockedDirect(),
+			agentLocal:  allBlockedLocal(),
 			wantErr:     true,
 		},
 		{
@@ -81,6 +95,15 @@ func TestEvalStartContainment(t *testing.T) {
 			operator:    openProbe(ctrl),
 			agentCtrl:   blockedProbe(ctrl),
 			agentDirect: nil,
+			agentLocal:  allBlockedLocal(),
+			wantErr:     true,
+		},
+		{
+			name:        "empty local suite fails closed (no vacuous pass)",
+			operator:    openProbe(ctrl),
+			agentCtrl:   blockedProbe(ctrl),
+			agentDirect: allBlockedDirect(),
+			agentLocal:  nil,
 			wantErr:     true,
 		},
 		{
@@ -92,7 +115,8 @@ func TestEvalStartContainment(t *testing.T) {
 				d[2] = openProbe(d[2].Target) // a public DNS route is reachable
 				return d
 			}(),
-			wantErr: true,
+			agentLocal: allBlockedLocal(),
+			wantErr:    true,
 		},
 		{
 			name:      "one direct route refused (not blocked) fails closed",
@@ -103,13 +127,26 @@ func TestEvalStartContainment(t *testing.T) {
 				d[0] = refusedProbe(d[0].Target)
 				return d
 			}(),
+			agentLocal: allBlockedLocal(),
+			wantErr:    true,
+		},
+		{
+			name:        "one local escape surface open fails closed",
+			operator:    openProbe(ctrl),
+			agentCtrl:   blockedProbe(ctrl),
+			agentDirect: allBlockedDirect(),
+			agentLocal: func() []ProbeResult {
+				l := allBlockedLocal()
+				l[0] = openProbe(l[0].Target)
+				return l
+			}(),
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := evalStartContainment(tt.operator, tt.agentCtrl, tt.agentDirect)
+			err := evalStartContainment(tt.operator, tt.agentCtrl, tt.agentDirect, tt.agentLocal)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("evalStartContainment: want error, got nil")
@@ -153,5 +190,15 @@ func TestSpawnAgentEgressProbe_RequiresRoot(t *testing.T) {
 	_, err := spawnAgentEgressProbe(context.Background(), "/nonexistent/toyagent", "pipelock-agent", []string{"10.0.0.1:443"})
 	if err == nil {
 		t.Fatalf("spawnAgentEgressProbe without root: want error, got nil")
+	}
+}
+
+func TestSpawnAgentLocalEscapeProbe_RequiresRoot(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("requires non-root to exercise the root-required path")
+	}
+	_, err := spawnAgentLocalEscapeProbe(context.Background(), "/nonexistent/toyagent", "pipelock-agent")
+	if err == nil {
+		t.Fatalf("spawnAgentLocalEscapeProbe without root: want error, got nil")
 	}
 }

@@ -79,6 +79,11 @@ type agentConfig struct {
 	// the contained agent user so the probes run from the contained network
 	// position. No other steps run in probe mode.
 	ProbeTargets string
+	// LocalProbeTargets, when non-empty, switches the agent into local escape
+	// probe mode: it attempts each comma-separated local surface (for example
+	// unix:/.fly/api, device:/dev/vda, cap:mount) from the contained uid and
+	// emits JSON results. No network or scripted demo steps run in this mode.
+	LocalProbeTargets string
 }
 
 func main() {
@@ -113,8 +118,14 @@ agent's stdout, argv, or any URL.`,
 		SilenceErrors: false,
 		Version:       cliutil.Version,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if cfg.ProbeTargets != "" && cfg.LocalProbeTargets != "" {
+				return errors.New("--probe-targets and --probe-local-targets are mutually exclusive")
+			}
 			if cfg.ProbeTargets != "" {
 				return runProbe(cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg.ProbeTargets)
+			}
+			if cfg.LocalProbeTargets != "" {
+				return runLocalProbe(cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg.LocalProbeTargets)
 			}
 			return runAgent(cmd.Context(), cmd.OutOrStdout(), cfg)
 		},
@@ -131,6 +142,7 @@ agent's stdout, argv, or any URL.`,
 	root.Flags().BoolVar(&cfg.DryRun, "dry-run", false, "narrate only, do not invoke the web tool or make network calls")
 	root.Flags().BoolVar(&cfg.ExpectBypassBlocked, "expect-bypass-blocked", false, "fail if the direct-egress bypass connects")
 	root.Flags().StringVar(&cfg.ProbeTargets, "probe-targets", "", "comma-separated host:port list to direct-probe; emits JSON results and exits (used to build the host-containment witness)")
+	root.Flags().StringVar(&cfg.LocalProbeTargets, "probe-local-targets", "", "comma-separated local escape target list to probe; emits JSON results and exits (used to build the host-containment witness)")
 
 	return root
 }
@@ -161,6 +173,34 @@ func runProbe(ctx context.Context, out, errOut io.Writer, targetsCSV string) err
 	enc := json.NewEncoder(out)
 	if err := enc.Encode(results); err != nil {
 		return fmt.Errorf("encode probe results: %w", err)
+	}
+	return nil
+}
+
+// runLocalProbe performs local non-network escape probes and writes a JSON array
+// of playground.ProbeResult to out. Narration goes to errOut so stdout carries
+// ONLY the JSON parsed by the orchestrator.
+func runLocalProbe(ctx context.Context, out, errOut io.Writer, targetsCSV string) error {
+	targets := make([]string, 0)
+	for _, t := range strings.Split(targetsCSV, ",") {
+		if trimmed := strings.TrimSpace(t); trimmed != "" {
+			targets = append(targets, trimmed)
+		}
+	}
+	if len(targets) == 0 {
+		return errors.New("probe-local-targets is empty after trimming")
+	}
+
+	_, _ = fmt.Fprintf(errOut, "[agent] probing %d local escape target(s) from this uid\n", len(targets))
+
+	results := make([]playground.ProbeResult, 0, len(targets))
+	for _, t := range targets {
+		results = append(results, playground.ProbeLocalEscape(ctx, t))
+	}
+
+	enc := json.NewEncoder(out)
+	if err := enc.Encode(results); err != nil {
+		return fmt.Errorf("encode local probe results: %w", err)
 	}
 	return nil
 }

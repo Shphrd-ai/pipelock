@@ -129,9 +129,9 @@ func buildDecisions(narr scenarioNarrative, receipts []receipt.Receipt, rep Veri
 			Class:    string(ClassHostContainment),
 			Color:    narr.containDecision.color,
 			Headline: narr.containDecision.headline,
-			Body: fmt.Sprintf("%d direct-egress routes blocked for the contained agent; the same control target stayed reachable for the operator.",
-				len(hcw.AgentProbes)),
-			Meta:   "owner-match drop · enforced by the host kernel",
+			Body: fmt.Sprintf("%d direct-egress routes and %d local escape surfaces blocked for the contained agent; the same control target stayed reachable for the operator.",
+				len(hcw.AgentProbes), len(hcw.LocalAgentProbes)),
+			Meta:   "owner-match drop · local hardening · enforced by the host kernel",
 			Signer: bundleSignerOrch,
 			Key:    shortKey(rep.OrchestratorKey),
 		})

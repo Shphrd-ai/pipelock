@@ -31,9 +31,10 @@ import (
 // (buildHostContainmentWitness / Enforced), and uses the SAME differential
 // methodology so the two cannot diverge: the operator reaches a host-local
 // control target while the contained agent is blocked from that same target and
-// from the real direct-egress suite. Because only the source uid differs, a
-// block is attributable to the kernel owner-match rule, not to an unroutable or
-// down target.
+// from the real direct-egress suite, then the same contained uid is denied local
+// platform/device/namespace escape surfaces. Because only the source uid differs
+// for network probes, a network block is attributable to the kernel owner-match
+// rule, not to an unroutable or down target.
 //
 // Fail-closed: any non-blocked agent probe, a control target the operator cannot
 // reach (broken probe), missing root, or an unknown agent user is an error, and
@@ -44,7 +45,7 @@ import (
 // not prove the contained agent uid's direct egress is dropped, so a session
 // claiming containment must not begin.
 var ErrInVMContainmentNotProven = errors.New(
-	"playground: in-VM containment not proven: the contained agent uid's direct egress is not blocked; " +
+	"playground: in-VM containment not proven: the contained agent uid's egress/local escape surfaces are not blocked; " +
 		"refusing to start (set the nft owner-match egress rule in the deployment, e.g. the microVM boot entrypoint)")
 
 // evalStartContainment is the pure decision over a start-gate probe set: it
@@ -52,12 +53,13 @@ var ErrInVMContainmentNotProven = errors.New(
 // probe can see "open"), the contained agent was explicitly BLOCKED from that
 // same control target (the differential that isolates the kernel owner-match
 // drop, and the negative proof that the agent cannot reach arbitrary loopback),
-// and every real direct-egress probe was explicitly blocked. Open=false alone is
-// not enough: a connection-refused result is reachable-but-closed, not
-// containment. An empty direct suite fails closed so a vacuous pass is
-// impossible. It mirrors HostContainmentWitness.Enforced minus the proxy-port
-// contract (no proxy exists yet at start-gate time).
-func evalStartContainment(operatorControl, agentControl ProbeResult, agentDirect []ProbeResult) error {
+// every real direct-egress probe was explicitly blocked, and every local escape
+// probe was explicitly blocked or unavailable. Open=false alone is not enough:
+// a connection-refused result is reachable-but-closed, not containment. Empty
+// direct or local suites fail closed so a vacuous pass is impossible. It mirrors
+// HostContainmentWitness.Enforced minus the proxy-port contract (no proxy exists
+// yet at start-gate time).
+func evalStartContainment(operatorControl, agentControl ProbeResult, agentDirect, agentLocal []ProbeResult) error {
 	if !operatorControl.Open || operatorControl.Blocked {
 		return fmt.Errorf("%w: operator could not reach the control target %q (probe mechanism unreliable)",
 			ErrInVMContainmentNotProven, operatorControl.Target)
@@ -75,6 +77,15 @@ func evalStartContainment(operatorControl, agentControl ProbeResult, agentDirect
 				ErrInVMContainmentNotProven, p.Target, p.Detail)
 		}
 	}
+	if len(agentLocal) == 0 {
+		return fmt.Errorf("%w: no local escape probes ran", ErrInVMContainmentNotProven)
+	}
+	for _, p := range agentLocal {
+		if p.Open || !p.Blocked {
+			return fmt.Errorf("%w: contained agent reached local escape target %q (%s)",
+				ErrInVMContainmentNotProven, p.Target, p.Detail)
+		}
+	}
 	return nil
 }
 
@@ -88,8 +99,10 @@ func evalStartContainment(operatorControl, agentControl ProbeResult, agentDirect
 // operation), confirms the agent user exists, stands up a host-local control
 // listener, probes it as the operator (must connect), then probes the SAME
 // control target plus the real direct-egress suite as the contained agent uid
-// (every one must be blocked). Returns ErrInVMContainmentNotProven (wrapped) on
-// any failure so the caller fails closed.
+// (every one must be blocked), and probes local escape surfaces as the contained
+// agent uid (every one must be blocked or unavailable). Returns
+// ErrInVMContainmentNotProven (wrapped) on any failure so the caller fails
+// closed.
 //
 // toyAgentBin is the probe binary (the live command's --toyagent-bin); it is the
 // same binary the finalize-time HostContainmentWitness uses, so the start gate
@@ -130,8 +143,12 @@ func VerifyInVMContainment(ctx context.Context, toyAgentBin, agentUser string) e
 	if err != nil {
 		return fmt.Errorf("%w: contained agent probe: %w", ErrInVMContainmentNotProven, err)
 	}
+	localProbes, err := spawnAgentLocalEscapeProbe(ctx, toyAgentBin, agentUser)
+	if err != nil {
+		return fmt.Errorf("%w: contained agent local escape probe: %w", ErrInVMContainmentNotProven, err)
+	}
 
-	return evalStartContainment(operatorControl, agentProbes[0], agentProbes[1:])
+	return evalStartContainment(operatorControl, agentProbes[0], agentProbes[1:], localProbes)
 }
 
 // spawnAgentEgressProbe runs toyAgentBin in --probe-targets mode dropped to the
@@ -155,6 +172,31 @@ func spawnAgentEgressProbe(ctx context.Context, toyAgentBin, agentUser string, t
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("egress probe exec: %w", err)
+	}
+	return decodeProbeResults(stdout.Bytes(), targets)
+}
+
+// spawnAgentLocalEscapeProbe runs toyAgentBin in --probe-local-targets mode
+// dropped to the contained agent user and returns the parsed, order-validated
+// results. It exercises non-network escape surfaces from the same uid as the
+// live agent before the VM serves traffic.
+func spawnAgentLocalEscapeProbe(ctx context.Context, toyAgentBin, agentUser string) ([]ProbeResult, error) {
+	if os.Geteuid() != 0 {
+		return nil, fmt.Errorf("contained local escape probe requires root (euid=%d)", os.Geteuid())
+	}
+	targets := LocalEscapeTargets()
+	args := []string{"--probe-local-targets", strings.Join(targets, ",")}
+	cmd := exec.CommandContext(ctx, toyAgentBin, args...)
+	cmd.Env = []string{"PATH=/usr/local/bin:/usr/bin:/bin"}
+	if err := configureContainedCommand(cmd, agentUser); err != nil {
+		return nil, err
+	}
+
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("local escape probe exec: %w", err)
 	}
 	return decodeProbeResults(stdout.Bytes(), targets)
 }

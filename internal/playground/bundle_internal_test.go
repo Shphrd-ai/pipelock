@@ -207,7 +207,7 @@ func TestBuildDecisions(t *testing.T) {
 	if dc[2].Class != string(ClassHostContainment) || dc[2].Signer != bundleSignerOrch {
 		t.Fatalf("containment decision = %+v", dc[2])
 	}
-	if !strings.Contains(dc[2].Body, "2 direct-egress routes") {
+	if !strings.Contains(dc[2].Body, "2 direct-egress routes and 0 local escape surfaces") {
 		t.Fatalf("containment body should reflect probe count: %q", dc[2].Body)
 	}
 }

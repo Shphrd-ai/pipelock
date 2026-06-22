@@ -227,8 +227,8 @@ func RunDemo(ctx context.Context, out io.Writer, opts DemoOpts) (VerifyReport, e
 		if hcwData, hcwErr := os.ReadFile(hcwPath); hcwErr == nil {
 			var hcw HostContainmentWitness
 			if json.Unmarshal(hcwData, &hcw) == nil && verified {
-				detail = fmt.Sprintf("%d direct-egress routes blocked for %s; control target reachable for operator",
-					len(hcw.AgentProbes), hcw.AgentUser)
+				detail = fmt.Sprintf("%d direct-egress routes and %d local escape surfaces blocked for %s; control target reachable for operator",
+					len(hcw.AgentProbes), len(hcw.LocalAgentProbes), hcw.AgentUser)
 			}
 		}
 		timeline = append(timeline, ContainmentEvent(verified, detail))

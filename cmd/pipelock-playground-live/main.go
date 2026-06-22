@@ -111,7 +111,7 @@ func newServeCmd() *cobra.Command {
 	fl.IntVar(&f.maxPerCode, "max-per-code", defaultMaxPerCode, "max sessions per invite code (0 = unlimited, opt-in)")
 	fl.IntVar(&f.concurrency, "concurrency", 3, "global cap on simultaneous live sessions")
 	fl.BoolVar(&f.requireContainment, "require-containment", true, "refuse sessions unless kernel containment is established")
-	fl.BoolVar(&f.selfManagedContainment, "self-managed-containment", false, "the deployment sets the nft owner-match egress rule itself (e.g. a per-visitor microVM boot entrypoint) instead of `pipelock contain install`; the server proves the agent-uid egress drop empirically at start and via the signed witness, and does NOT require `pipelock contain verify`")
+	fl.BoolVar(&f.selfManagedContainment, "self-managed-containment", false, "the deployment sets the nft owner-match egress rule itself (e.g. a per-visitor microVM boot entrypoint) instead of `pipelock contain install`; the server proves the agent-uid egress/local escape drops empirically at start and via the signed witness, and does NOT require `pipelock contain verify`")
 	fl.BoolVar(&f.dev, "dev", false, "DEV ONLY: run uncontained (disables --require-containment); never use for public exposure")
 	fl.StringVar(&f.orchestratorKey, "orchestrator-key", "", "path to the published demo signing key (required outside --dev; empty = ephemeral per-run key in --dev)")
 	fl.StringVar(&f.toyAgentBin, "toyagent-bin", "", "toy-agent binary path (needed for the contained host-containment witness)")
@@ -548,12 +548,12 @@ func newVerifyContainmentCmd() *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "verify-containment",
-		Short: "Prove the contained agent uid's direct egress is blocked (fail-closed boot gate for self-managed containment)",
+		Short: "Prove the contained agent uid's egress/local escape surfaces are blocked (fail-closed boot gate for self-managed containment)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := playground.VerifyInVMContainment(cmd.Context(), toyAgentBin, agentUser); err != nil {
 				return err
 			}
-			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "containment verified: contained agent direct egress is blocked; operator + proxy paths intact")
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "containment verified: contained agent egress/local escape surfaces are blocked; operator + proxy paths intact")
 			return nil
 		},
 	}

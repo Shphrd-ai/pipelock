@@ -72,3 +72,35 @@ func TestRunProbe_EmptyTargets(t *testing.T) {
 		t.Fatal("expected error for empty target list")
 	}
 }
+
+func TestRunLocalProbe_UnavailableUnixSocket(t *testing.T) {
+	t.Parallel()
+
+	const target = "unix:/tmp/pipelock-definitely-not-present.sock"
+	var out, errOut bytes.Buffer
+	if err := runLocalProbe(t.Context(), &out, &errOut, target); err != nil {
+		t.Fatalf("runLocalProbe: %v", err)
+	}
+	if strings.Contains(out.String(), "[agent]") {
+		t.Errorf("stdout leaked narration: %q", out.String())
+	}
+
+	var results []playground.ProbeResult
+	if err := json.Unmarshal(out.Bytes(), &results); err != nil {
+		t.Fatalf("parse local probe JSON %q: %v", out.String(), err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("got %d results, want 1", len(results))
+	}
+	if results[0].Target != target || results[0].Open || !results[0].Blocked {
+		t.Fatalf("local probe = %+v, want unavailable socket classified as blocked", results[0])
+	}
+}
+
+func TestRunLocalProbe_EmptyTargets(t *testing.T) {
+	t.Parallel()
+	var out, errOut bytes.Buffer
+	if err := runLocalProbe(t.Context(), &out, &errOut, "  , ,"); err == nil {
+		t.Fatal("expected error for empty local target list")
+	}
+}

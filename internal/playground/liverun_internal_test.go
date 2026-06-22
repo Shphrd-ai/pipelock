@@ -82,6 +82,7 @@ func TestAllAgentBlocked_HappyAndEmpty(t *testing.T) {
 	w := HostContainmentWitness{
 		ControlAgentProbe: ProbeResult{Open: false, Blocked: true},
 		AgentProbes:       []ProbeResult{{Open: false, Blocked: true}, {Open: false, Blocked: true}},
+		LocalAgentProbes:  []ProbeResult{{Open: false, Blocked: true}},
 	}
 	if !w.AllAgentBlocked() {
 		t.Error("all-blocked suite should report AllAgentBlocked=true")

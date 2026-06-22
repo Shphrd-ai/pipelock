@@ -165,6 +165,28 @@ func TestVerify_Contained_NotEnforced_FailsClosed(t *testing.T) {
 				return w
 			},
 		},
+		{
+			name: "local escape surface was open",
+			mutate: func(w playground.HostContainmentWitness) playground.HostContainmentWitness {
+				w.LocalAgentProbes[0].Open = true
+				w.LocalAgentProbes[0].Blocked = false
+				return w
+			},
+		},
+		{
+			name: "local escape suite target omitted",
+			mutate: func(w playground.HostContainmentWitness) playground.HostContainmentWitness {
+				w.LocalAgentProbes = w.LocalAgentProbes[:len(w.LocalAgentProbes)-1]
+				return w
+			},
+		},
+		{
+			name: "local escape suite target substituted",
+			mutate: func(w playground.HostContainmentWitness) playground.HostContainmentWitness {
+				w.LocalAgentProbes[0].Target = "unix:/tmp/substituted.sock"
+				return w
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

@@ -152,7 +152,8 @@ type LiveRun struct {
 	canaryID    string
 	canaryValue string
 
-	egressProbe func(targets []string, asAgent bool) ([]ProbeResult, error)
+	egressProbe      func(targets []string, asAgent bool) ([]ProbeResult, error)
+	localEscapeProbe func(asAgent bool) ([]ProbeResult, error)
 }
 
 // proxyBindAddrFor returns the loopback bind address for the in-process proxy.
@@ -537,6 +538,32 @@ func (lr *LiveRun) runEgressProbe(targets []string, asAgent bool) ([]ProbeResult
 	return decodeProbeResults(stdout.Bytes(), targets)
 }
 
+// runLocalEscapeProbe spawns the toy agent in local escape probe mode and
+// parses its JSON results. When asAgent is true, the probe subprocess is dropped
+// to the contained agent user, so it tests the same local permissions as the
+// live agent. These probes cover non-network surfaces that HTTP receipts cannot
+// mediate.
+func (lr *LiveRun) runLocalEscapeProbe(asAgent bool) ([]ProbeResult, error) {
+	targets := LocalEscapeTargets()
+	args := []string{"--probe-local-targets", strings.Join(targets, ",")}
+	cmd := exec.CommandContext(lr.ctx, lr.agentBin, args...)
+	cmd.Env = []string{"PATH=/usr/local/bin:/usr/bin:/bin"}
+	if asAgent {
+		if err := configureContainedCommand(cmd, lr.opts.AgentUser); err != nil {
+			return nil, err
+		}
+	}
+
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("local escape probe exec: %w", err)
+	}
+
+	return decodeProbeResults(stdout.Bytes(), targets)
+}
+
 // decodeProbeResults parses the toy agent's probe-mode JSON output and verifies
 // it carries exactly the requested target set, in order. Extracted from
 // runEgressProbe so the parsing/validation logic is unit-testable without
@@ -562,12 +589,17 @@ func decodeProbeResults(stdout []byte, expectedTargets []string) ([]ProbeResult,
 // containment), probes it as the operator (must connect) and as the contained
 // agent (must be blocked) -- the differential that isolates the kernel
 // owner-match drop -- then probes the real direct-egress target suite from the
-// contained position (all must be blocked). The witness is signed by the
-// orchestrator key, the run's trust root.
+// contained position (all must be blocked), and probes local non-network escape
+// surfaces (platform sockets, device nodes, namespace/mount capabilities). The
+// witness is signed by the orchestrator key, the run's trust root.
 func (lr *LiveRun) buildHostContainmentWitness() (HostContainmentWitness, error) {
 	runProbe := lr.runEgressProbe
 	if lr.egressProbe != nil {
 		runProbe = lr.egressProbe
+	}
+	runLocalProbe := lr.runLocalEscapeProbe
+	if lr.localEscapeProbe != nil {
+		runLocalProbe = lr.localEscapeProbe
 	}
 
 	ctrlLn, err := (&net.ListenConfig{}).Listen(lr.ctx, "tcp", "127.0.0.1:0")
@@ -609,6 +641,10 @@ func (lr *LiveRun) buildHostContainmentWitness() (HostContainmentWitness, error)
 	if err != nil {
 		return HostContainmentWitness{}, fmt.Errorf("contained agent probe: %w", err)
 	}
+	localProbes, err := runLocalProbe(true)
+	if err != nil {
+		return HostContainmentWitness{}, fmt.Errorf("contained agent local escape probe: %w", err)
+	}
 
 	w := HostContainmentWitness{
 		RunNonce:             lr.opts.RunNonce,
@@ -621,6 +657,7 @@ func (lr *LiveRun) buildHostContainmentWitness() (HostContainmentWitness, error)
 		ProxyTarget:          proxyTarget,
 		ProxyAgentProbe:      agProbes[0],
 		AgentProbes:          agProbes[2:],
+		LocalAgentProbes:     localProbes,
 		ProbedAt:             time.Now().UTC(),
 	}
 	return SignHostContainmentWitness(lr.orchestratorPriv, w), nil

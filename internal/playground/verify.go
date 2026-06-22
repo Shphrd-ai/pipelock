@@ -410,7 +410,10 @@ func hostContainmentEnforcedReason(hcw HostContainmentWitness) string {
 	if hcw.ProxyTarget == "" || hcw.ProxyAgentProbe.Target == "" {
 		return "host-containment witness uses an older format without proxy-contract proof; regenerate the bundle with this release"
 	}
-	return "host-containment not proven: differential failed, proxy contract missing/substituted, target suite missing/substituted, or a direct-egress route was open"
+	if len(hcw.LocalAgentProbes) == 0 {
+		return "host-containment witness uses an older format without local escape probes; regenerate the bundle with this release"
+	}
+	return "host-containment not proven: differential failed, proxy contract missing/substituted, target suite missing/substituted, local escape suite missing/substituted, or a contained-agent route/surface was open"
 }
 
 func verifyRedWitnessArtifact(runDir string, lm LaunchManifest, rc *RedCaseResult) (Witness, []string) {

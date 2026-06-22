@@ -12,11 +12,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -263,6 +265,16 @@ func TestBuildHostContainmentWitnessSignsProbeEvidence(t *testing.T) {
 		}
 		return results, nil
 	}
+	lr.localEscapeProbe = func(asAgent bool) ([]ProbeResult, error) {
+		if !asAgent {
+			return nil, errors.New("local escape probe should run as agent")
+		}
+		results := make([]ProbeResult, 0, len(LocalEscapeTargets()))
+		for _, target := range LocalEscapeTargets() {
+			results = append(results, ProbeResult{Target: target, Open: false, Blocked: true, Detail: "blocked"})
+		}
+		return results, nil
+	}
 
 	w, err := lr.buildHostContainmentWitness()
 	if err != nil {
@@ -363,7 +375,10 @@ func TestContainmentEnforcedUsesEnforcementOnlyVerify(t *testing.T) {
 	argsLog := filepath.Join(dir, "args.log")
 	pipelockPath := filepath.Join(dir, "pipelock")
 	body := "#!/bin/sh\nprintf '%s\\n' \"$*\" > \"$PIPELOCK_ARGS_LOG\"\n"
-	if err := os.WriteFile(pipelockPath, []byte(body), 0o755); err != nil { //nolint:gosec // test executable
+	if err := os.WriteFile(pipelockPath, []byte(body), 0o600); err != nil {
+		t.Fatalf("write fake pipelock: %v", err)
+	}
+	if err := syscall.Chmod(pipelockPath, 0o700); err != nil {
 		t.Fatalf("write fake pipelock: %v", err)
 	}
 	t.Setenv("PATH", dir)
@@ -372,7 +387,7 @@ func TestContainmentEnforcedUsesEnforcementOnlyVerify(t *testing.T) {
 	if !ContainmentEnforced() {
 		t.Fatal("fake pipelock should make containment enforcement available")
 	}
-	got, err := os.ReadFile(argsLog) //nolint:gosec // tmpdir-scoped test output
+	got, err := fs.ReadFile(os.DirFS(dir), "args.log")
 	if err != nil {
 		t.Fatalf("read args log: %v", err)
 	}

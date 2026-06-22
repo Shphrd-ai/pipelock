@@ -27,6 +27,18 @@ LLM_AGENT_BIN=/usr/local/bin/pipelock-playground-llm-agent
 
 log() { printf '[entrypoint] %s\n' "$*" >&2; }
 
+# --- 0. Disable unprivileged user namespaces when the kernel exposes the knob ---
+# The LLM agent has a real shell. It does not need user namespaces, and a visitor
+# can otherwise use them to become root inside a private namespace and mount
+# tmpfs. The local escape probe below remains the authority: if another kernel
+# path still permits that behavior, verify-containment fails closed.
+if [ -w /proc/sys/kernel/unprivileged_userns_clone ]; then
+	log "disabling unprivileged user namespaces"
+	sysctl -w kernel.unprivileged_userns_clone=0 >/dev/null
+else
+	log "kernel.unprivileged_userns_clone sysctl unavailable; local escape probe remains authoritative"
+fi
+
 # --- Secrets: env -> tmpfs file, kept out of argv -------------------------------
 # Fly delivers secrets as env vars; the server wants file paths so the values
 # never land in argv / process listing. Write them 0600 under /run (tmpfs).
@@ -53,7 +65,7 @@ log "loading containment nft rule (agent uid ${AGENT_UID} -> only 127.0.0.1:${PR
 "${BIN}" print-containment-nft --agent-uid "${AGENT_UID}" --proxy-port "${PROXY_PORT}" | nft -f -
 
 # --- 2. Prove the drop is live BEFORE serving (fail-closed boot gate) ------------
-log "proving containment (aborts the VM if the agent uid can still egress)"
+log "proving containment (aborts the VM if the agent uid can still egress or use local escape surfaces)"
 "${BIN}" verify-containment --toyagent-bin "${TOYAGENT_BIN}" --agent-user "${AGENT_USER}"
 
 # --- 3. Per-session serve flags from broker-provided env ------------------------
