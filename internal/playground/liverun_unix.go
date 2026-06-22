@@ -7,6 +7,7 @@ package playground
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"os/user"
@@ -49,7 +50,7 @@ func parseContainedAgentID(agentUser, label, raw string) (uint32, int, error) {
 	if err != nil {
 		return 0, 0, fmt.Errorf("parse %s for %q: %w", label, agentUser, err)
 	}
-	if id > uint64(^uint(0)>>1) {
+	if id > uint64(math.MaxInt) {
 		return 0, 0, fmt.Errorf("parse %s for %q: value %d overflows int", label, agentUser, id)
 	}
 	return uint32(id), int(id), nil
