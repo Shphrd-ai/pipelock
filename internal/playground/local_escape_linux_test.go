@@ -124,6 +124,41 @@ func TestProbeUserNamespaceMountCapabilityWithOps(t *testing.T) {
 		}
 	})
 
+	t.Run("gid map failure blocks", func(t *testing.T) {
+		ops, _, _ := newOps()
+		ops.writeFile = func(name string, _ []byte, _ fs.FileMode) error {
+			if name == "/proc/self/gid_map" {
+				return errors.New("gid denied")
+			}
+			return nil
+		}
+
+		result := probeUserNamespaceMountCapabilityWithOps("cap:userns-mount", *ops)
+		if result.Open || !result.Blocked || !strings.Contains(result.Detail, "gid map") {
+			t.Fatalf("unexpected result: %+v", result)
+		}
+	})
+
+	t.Run("setresgid failure blocks", func(t *testing.T) {
+		ops, _, _ := newOps()
+		ops.setresgid = func(int, int, int) error { return errors.New("setresgid denied") }
+
+		result := probeUserNamespaceMountCapabilityWithOps("cap:userns-mount", *ops)
+		if result.Open || !result.Blocked || !strings.Contains(result.Detail, "setresgid") {
+			t.Fatalf("unexpected result: %+v", result)
+		}
+	})
+
+	t.Run("setresuid failure blocks", func(t *testing.T) {
+		ops, _, _ := newOps()
+		ops.setresuid = func(int, int, int) error { return errors.New("setresuid denied") }
+
+		result := probeUserNamespaceMountCapabilityWithOps("cap:userns-mount", *ops)
+		if result.Open || !result.Blocked || !strings.Contains(result.Detail, "setresuid") {
+			t.Fatalf("unexpected result: %+v", result)
+		}
+	})
+
 	t.Run("mount failure blocks", func(t *testing.T) {
 		ops, _, _ := newOps()
 		ops.mount = func(string, string, string, uintptr, string) error { return errors.New("mount denied") }

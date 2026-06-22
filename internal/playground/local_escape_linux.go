@@ -31,19 +31,21 @@ type userNamespaceMountProbeOps struct {
 	unmount        func(target string, flags int) error
 }
 
-var realUserNamespaceMountProbeOps = userNamespaceMountProbeOps{
-	lockOSThread:   runtime.LockOSThread,
-	unlockOSThread: runtime.UnlockOSThread,
-	unshare:        unix.Unshare,
-	writeFile:      os.WriteFile,
-	getuid:         os.Getuid,
-	getgid:         os.Getgid,
-	setresgid:      unix.Setresgid,
-	setresuid:      unix.Setresuid,
-	mkdirTemp:      os.MkdirTemp,
-	removeAll:      os.RemoveAll,
-	mount:          unix.Mount,
-	unmount:        unix.Unmount,
+func realUserNamespaceMountProbeOps() userNamespaceMountProbeOps {
+	return userNamespaceMountProbeOps{
+		lockOSThread:   runtime.LockOSThread,
+		unlockOSThread: runtime.UnlockOSThread,
+		unshare:        unix.Unshare,
+		writeFile:      os.WriteFile,
+		getuid:         os.Getuid,
+		getgid:         os.Getgid,
+		setresgid:      unix.Setresgid,
+		setresuid:      unix.Setresuid,
+		mkdirTemp:      os.MkdirTemp,
+		removeAll:      os.RemoveAll,
+		mount:          unix.Mount,
+		unmount:        unix.Unmount,
+	}
 }
 
 func probeLocalCapability(target, capability string) ProbeResult {
@@ -97,7 +99,7 @@ func probeMountCapability(target string) ProbeResult {
 }
 
 func probeUserNamespaceMountCapability(target string) ProbeResult {
-	return probeUserNamespaceMountCapabilityWithOps(target, realUserNamespaceMountProbeOps)
+	return probeUserNamespaceMountCapabilityWithOps(target, realUserNamespaceMountProbeOps())
 }
 
 func probeUserNamespaceMountCapabilityWithOps(target string, ops userNamespaceMountProbeOps) ProbeResult {

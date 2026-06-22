@@ -19,22 +19,24 @@ type hardenOps struct {
 	applySeccomp  func() error
 }
 
-var realHardenOps = hardenOps{
-	setDumpable: func() error {
-		return unix.Prctl(unix.PR_SET_DUMPABLE, 0, 0, 0, 0)
-	},
-	setNoNewPrivs: sandbox.SetNoNewPrivs,
-	applySeccomp: func() error {
-		_, err := sandbox.ApplySeccomp(false)
-		return err
-	},
+func realHardenOps() hardenOps {
+	return hardenOps{
+		setDumpable: func() error {
+			return unix.Prctl(unix.PR_SET_DUMPABLE, 0, 0, 0, 0)
+		},
+		setNoNewPrivs: sandbox.SetNoNewPrivs,
+		applySeccomp: func() error {
+			_, err := sandbox.ApplySeccomp(false)
+			return err
+		},
+	}
 }
 
 // hardenProcess locks down the LLM agent process before it reads the model key.
 // The settings are inherited by run_command shell children: no dumpable memory,
 // no setuid-style privilege gain, and no unshare/mount/device-node syscalls.
 func hardenProcess() error {
-	return hardenProcessWithOps(realHardenOps)
+	return hardenProcessWithOps(realHardenOps())
 }
 
 func hardenProcessWithOps(ops hardenOps) error {
