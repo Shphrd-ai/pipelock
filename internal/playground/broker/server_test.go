@@ -103,6 +103,7 @@ type fakeVM struct {
 	messages      chan string
 	streamStarted chan struct{}
 	streamRelease chan struct{}
+	bundleStatus  int
 	server        *httptest.Server
 }
 
@@ -117,6 +118,7 @@ func newFakeVM(t *testing.T, token string) *fakeVM {
 		messages:      make(chan string, 4),
 		streamStarted: make(chan struct{}),
 		streamRelease: make(chan struct{}),
+		bundleStatus:  http.StatusOK,
 	}
 	vm.server = httptest.NewServer(http.HandlerFunc(vm.handle))
 	t.Cleanup(vm.server.Close)
@@ -189,7 +191,7 @@ func (vm *fakeVM) handle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/gzip")
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(vm.bundleStatus)
 		_, _ = w.Write([]byte("bundle-" + vm.token))
 	default:
 		writeBrokerErr(w, http.StatusNotFound, "not found")
@@ -393,6 +395,27 @@ func TestServer_EndToEndProxyAndRelease(t *testing.T) {
 	}
 }
 
+func TestServer_BundlePartialContentDoesNotReleaseLease(t *testing.T) {
+	vm := newFakeVM(t, "vm-token-partial")
+	vm.bundleStatus = http.StatusPartialContent
+	provider := &serverFakeProvider{targets: []string{vm.targetHost(t)}}
+	srv, ts := newBrokerTestServer(t, provider, ServerConfig{})
+
+	status, session := postBrokerSession(t, ts)
+	if status != http.StatusOK {
+		t.Fatalf("session status = %d, want 200", status)
+	}
+	resp := getBroker(t, ts.URL+livechat.RouteBundle+"?token="+url.QueryEscape(session.Token))
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusPartialContent {
+		t.Fatalf("bundle status = %d, want 206", resp.StatusCode)
+	}
+	if got := srv.cfg.Leases.ActiveLeases(); got != 1 {
+		t.Fatalf("active leases = %d, want lease retained after partial bundle", got)
+	}
+}
+
 func TestServer_TokenIsolation(t *testing.T) {
 	vmA := newFakeVM(t, "vm-token-a")
 	vmB := newFakeVM(t, "vm-token-b")
@@ -582,6 +605,24 @@ func TestServer_AbuseControlsReject(t *testing.T) {
 		}
 	})
 
+	t.Run("empty_code_does_not_consume_code_rate", func(t *testing.T) {
+		vm := newFakeVM(t, "empty-code-rate")
+		provider := &serverFakeProvider{targets: []string{vm.targetHost(t)}}
+		_, ts := newBrokerTestServer(t, provider, ServerConfig{
+			CodeRate: livechat.RateConfig{RefillPerSec: 1, Burst: 1},
+		})
+		resp := postBrokerJSON(t, ts.URL+livechat.RouteSession, sessionRequest{Code: ""})
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Fatalf("empty-code status = %d, want 403", resp.StatusCode)
+		}
+		status, _ := postBrokerSession(t, ts)
+		if status != http.StatusOK {
+			t.Fatalf("valid code after empty-code rejection = %d, want 200", status)
+		}
+	})
+
 	tests := []struct {
 		name       string
 		cfg        ServerConfig
@@ -609,6 +650,23 @@ func TestServer_AbuseControlsReject(t *testing.T) {
 				t.Fatalf("budget rejection created %d machines, want only the first", got)
 			}
 		})
+	}
+}
+
+func TestServer_RejectsURLShapedMachinePrivateIP(t *testing.T) {
+	destroyed := make(chan string, 1)
+	provider := &serverFakeProvider{
+		targets:     []string{"http://169.254.169.254"},
+		destroyedCh: destroyed,
+	}
+	_, ts := newBrokerTestServer(t, provider, ServerConfig{})
+	status, _ := postBrokerSession(t, ts)
+	if status != http.StatusServiceUnavailable {
+		t.Fatalf("session status = %d, want 503", status)
+	}
+	expectDestroyed(t, destroyed)
+	if got := provider.createdCount(); got != 1 {
+		t.Fatalf("created machines = %d, want 1 failed lease", got)
 	}
 }
 

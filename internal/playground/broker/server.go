@@ -283,13 +283,13 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		writeBrokerErr(w, http.StatusBadRequest, "bad request")
 		return
 	}
+	if body.Code == "" {
+		writeBrokerErr(w, http.StatusForbidden, "invite code rejected")
+		return
+	}
 	codeLimiterKey := "code:" + codeKey(body.Code)
 	if !s.codeRate.Allow(codeLimiterKey) {
 		writeBrokerErr(w, http.StatusTooManyRequests, "rate limited")
-		return
-	}
-	if body.Code == "" {
-		writeBrokerErr(w, http.StatusForbidden, "invite code rejected")
 		return
 	}
 
@@ -461,7 +461,7 @@ func (s *Server) handleBundle(w http.ResponseWriter, r *http.Request) {
 	}
 	rec := &statusRecorder{ResponseWriter: w}
 	s.proxy(rec, r, binding, true)
-	if rec.status >= 200 && rec.status < 300 {
+	if rec.status == http.StatusOK {
 		s.releaseToken(context.WithoutCancel(r.Context()), token)
 	}
 }
@@ -560,7 +560,9 @@ func (s *Server) proxy(w http.ResponseWriter, r *http.Request, binding *tokenLea
 		return
 	}
 	proxy := httputil.NewSingleHostReverseProxy(target)
-	proxy.FlushInterval = -1
+	if stream {
+		proxy.FlushInterval = -1
+	}
 	proxy.ErrorHandler = func(rw http.ResponseWriter, _ *http.Request, _ error) {
 		writeBrokerErr(rw, http.StatusBadGateway, "session proxy unavailable")
 	}
@@ -573,9 +575,6 @@ func (s *Server) proxy(w http.ResponseWriter, r *http.Request, binding *tokenLea
 		req.URL.RawPath = r.URL.RawPath
 		req.URL.RawQuery = r.URL.RawQuery
 		req.Host = target.Host
-	}
-	if stream {
-		proxy.FlushInterval = -1
 	}
 	proxy.ServeHTTP(w, r)
 }
@@ -596,14 +595,7 @@ func targetHost(privateIP string, port int) (string, error) {
 		return "", errors.New("broker: machine private ip is empty")
 	}
 	if strings.Contains(privateIP, "://") {
-		u, err := url.Parse(privateIP)
-		if err != nil {
-			return "", fmt.Errorf("broker: parse machine private address: %w", err)
-		}
-		if u.Host == "" {
-			return "", errors.New("broker: machine private address missing host")
-		}
-		return u.Host, nil
+		return "", errors.New("broker: machine private ip must be a host or host:port, not a URL")
 	}
 	if _, _, err := net.SplitHostPort(privateIP); err == nil {
 		return privateIP, nil

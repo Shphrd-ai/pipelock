@@ -82,7 +82,7 @@ fi
 
 # --- 4. Serve. One session per VM (--concurrency 1); "$@" allows extra overrides. -
 log "containment proven; starting server on ${LISTEN}"
-# shellcheck disable=SC2086  # word-splitting of the optional flag args is intended
+# shellcheck disable=SC2086  # word-splitting of ORCH_KEY_ARGS/MODEL_KEY_ARGS/EXTRA_ARGS is intended; secret paths are fixed under /run/playground (no spaces)
 exec "${BIN}" serve \
 	--self-managed-containment \
 	--listen "${LISTEN}" \

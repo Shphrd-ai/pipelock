@@ -558,7 +558,7 @@ func newVerifyContainmentCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&toyAgentBin, "toyagent-bin", "", "probe binary (the pipelock-playground-toyagent path); required")
-	cmd.Flags().StringVar(&agentUser, "agent-user", "", "contained agent username (default pipelock-agent)")
+	cmd.Flags().StringVar(&agentUser, "agent-user", "pipelock-agent", "contained agent username")
 	return cmd
 }
 
