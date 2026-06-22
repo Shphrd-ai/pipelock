@@ -568,7 +568,7 @@ func configureConductorRecorder(t *testing.T, cfg *Config) {
 
 func privateTempDir(t *testing.T) string {
 	t.Helper()
-	dir, err := os.MkdirTemp(".", ".conductor-test-*")
+	dir, err := os.MkdirTemp(privateConductorTestBase(t), "conductor-test-*")
 	if err != nil {
 		t.Fatalf("MkdirTemp() error = %v", err)
 	}
@@ -582,4 +582,51 @@ func privateTempDir(t *testing.T) string {
 		t.Fatalf("Abs(%s) error = %v", dir, err)
 	}
 	return abs
+}
+
+func privateConductorTestBase(t *testing.T) string {
+	t.Helper()
+	candidates := []string{os.Getenv("PIPELOCK_TEST_PRIVATE_TMP")}
+	if cache, err := os.UserCacheDir(); err == nil && cache != "" {
+		candidates = append(candidates, filepath.Join(cache, "pipelock", "tests"))
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		candidates = append(candidates, filepath.Join(home, ".cache", "pipelock", "tests"))
+	}
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		abs, err := filepath.Abs(candidate)
+		if err != nil {
+			continue
+		}
+		if err := os.MkdirAll(abs, 0o700); err != nil {
+			continue
+		}
+		if err := os.Chmod(abs, 0o700); err != nil {
+			continue
+		}
+		if hasWorldWritableAncestor(abs) {
+			continue
+		}
+		return abs
+	}
+	t.Fatal("no private temp base available for conductor tests")
+	return ""
+}
+
+func hasWorldWritableAncestor(path string) bool {
+	clean := filepath.Clean(path)
+	for {
+		info, err := os.Lstat(clean)
+		if err == nil && info.Mode().Perm()&0o002 != 0 {
+			return true
+		}
+		parent := filepath.Dir(clean)
+		if parent == clean {
+			return false
+		}
+		clean = parent
+	}
 }

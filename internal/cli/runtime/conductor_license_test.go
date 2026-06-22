@@ -94,7 +94,7 @@ func setRevokedTestFleetLicense(t *testing.T) {
 
 func conductorLicenseGateConfigYAML(t *testing.T) string {
 	t.Helper()
-	tmp, err := os.MkdirTemp(".", ".runtime-license-gate-*")
+	tmp, err := os.MkdirTemp(privateRuntimeTestBase(t), "runtime-license-gate-*")
 	if err != nil {
 		t.Fatalf("MkdirTemp: %v", err)
 	}
@@ -156,6 +156,53 @@ func conductorLicenseGateConfigYAML(t *testing.T) string {
 		"  bundle_cache_dir: " + strconv.Quote(bundleCacheDir) + "\n" +
 		"  durable_audit_queue_dir: " + strconv.Quote(auditQueueDir) + "\n" +
 		"  honor_remote_kill_switch: false\n"
+}
+
+func privateRuntimeTestBase(t *testing.T) string {
+	t.Helper()
+	candidates := []string{os.Getenv("PIPELOCK_TEST_PRIVATE_TMP")}
+	if cache, err := os.UserCacheDir(); err == nil && cache != "" {
+		candidates = append(candidates, filepath.Join(cache, "pipelock", "tests"))
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		candidates = append(candidates, filepath.Join(home, ".cache", "pipelock", "tests"))
+	}
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		abs, err := filepath.Abs(candidate)
+		if err != nil {
+			continue
+		}
+		if err := os.MkdirAll(abs, 0o700); err != nil {
+			continue
+		}
+		if err := os.Chmod(abs, 0o700); err != nil {
+			continue
+		}
+		if hasWorldWritableAncestor(abs) {
+			continue
+		}
+		return abs
+	}
+	t.Fatal("no private temp base available for runtime tests")
+	return ""
+}
+
+func hasWorldWritableAncestor(path string) bool {
+	clean := filepath.Clean(path)
+	for {
+		info, err := os.Lstat(clean)
+		if err == nil && info.Mode().Perm()&0o002 != 0 {
+			return true
+		}
+		parent := filepath.Dir(clean)
+		if parent == clean {
+			return false
+		}
+		clean = parent
+	}
 }
 
 // TestNewServer_ConductorEnabledRequiresFleetLicense locks in the runtime
