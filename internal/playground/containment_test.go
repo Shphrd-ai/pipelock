@@ -7,6 +7,7 @@ import (
 	"context"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/luckyPipewrench/pipelock/internal/playground"
@@ -171,6 +172,51 @@ func TestSelfTest_EmptyTargets_AllBlocked(t *testing.T) {
 	}
 	if len(res.Probes) != 0 {
 		t.Fatalf("expected 0 probes, got %d", len(res.Probes))
+	}
+}
+
+func TestLocalEscapeProbe_MalformedAndUnknownTargets(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		target string
+		detail string
+	}{
+		{name: "missing separator", target: "not-a-target", detail: "malformed local escape target"},
+		{name: "empty value", target: "unix:", detail: "malformed local escape target"},
+		{name: "unknown kind", target: "unknown:/tmp/socket", detail: "unknown local escape target kind"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := playground.ProbeLocalEscape(t.Context(), tt.target)
+			if result.Open || result.Blocked {
+				t.Fatalf("target %q must be Open=false Blocked=false, got: %+v", tt.target, result)
+			}
+			if result.Detail != tt.detail {
+				t.Fatalf("detail = %q, want %q", result.Detail, tt.detail)
+			}
+		})
+	}
+}
+
+func TestLocalEscapeProbe_DeviceTargets(t *testing.T) {
+	t.Parallel()
+
+	devicePath := filepath.Join(t.TempDir(), "plain-file")
+	if err := os.WriteFile(devicePath, []byte("not a device"), 0o600); err != nil {
+		t.Fatalf("write probe file: %v", err)
+	}
+	open := playground.ProbeLocalEscape(t.Context(), "device:"+devicePath)
+	if !open.Open || open.Blocked {
+		t.Fatalf("readable local path should classify as open local surface, got: %+v", open)
+	}
+
+	missing := playground.ProbeLocalEscape(t.Context(), "device:"+filepath.Join(t.TempDir(), "missing"))
+	if missing.Open || !missing.Blocked {
+		t.Fatalf("missing local path should classify as blocked/unavailable, got: %+v", missing)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -17,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -176,6 +178,82 @@ func main() {
 	}
 	if len(got) != 1 || got[0].Target != "127.0.0.1:1" || !got[0].Blocked || got[0].Open {
 		t.Fatalf("probe results = %+v, want one blocked result", got)
+	}
+}
+
+func TestRunLocalEscapeProbeParsesSubprocessOutput(t *testing.T) {
+	t.Parallel()
+
+	targetsLiteral, err := json.Marshal(LocalEscapeTargets())
+	if err != nil {
+		t.Fatalf("marshal local targets: %v", err)
+	}
+	agent := buildLLMHelper(t, `package main
+import (
+	"encoding/json"
+	"fmt"
+)
+func main() {
+	var out []map[string]any
+	var decoded []string
+	if err := json.Unmarshal([]byte(`+strconv.Quote(string(targetsLiteral))+`), &decoded); err != nil {
+		panic(err)
+	}
+	for _, target := range decoded {
+		out = append(out, map[string]any{"target": target, "open": false, "blocked": true, "detail": "blocked"})
+	}
+	data, err := json.Marshal(out)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(data))
+}
+`)
+
+	lr := &LiveRun{
+		ctx:      t.Context(),
+		agentBin: agent,
+	}
+	got, err := lr.runLocalEscapeProbe(false)
+	if err != nil {
+		t.Fatalf("runLocalEscapeProbe: %v", err)
+	}
+	if len(got) != len(LocalEscapeTargets()) {
+		t.Fatalf("probe results = %d, want %d", len(got), len(LocalEscapeTargets()))
+	}
+	for i, result := range got {
+		if result.Target != LocalEscapeTargets()[i] || !result.Blocked || result.Open {
+			t.Fatalf("result[%d] = %+v", i, result)
+		}
+	}
+}
+
+func TestRunLocalEscapeProbeRequiresRootWhenContained(t *testing.T) {
+	t.Parallel()
+
+	if os.Geteuid() == 0 {
+		t.Skip("non-root contained error branch requires non-root test process")
+	}
+
+	lr := &LiveRun{
+		ctx:      t.Context(),
+		agentBin: "/bin/echo",
+		opts:     LiveRunOpts{},
+	}
+	if _, err := lr.runLocalEscapeProbe(true); err == nil || !strings.Contains(err.Error(), rootRequirement) {
+		t.Fatalf("contained local escape probe non-root error = %v, want root requirement", err)
+	}
+}
+
+func TestRunLocalEscapeProbeReturnsExecError(t *testing.T) {
+	t.Parallel()
+
+	lr := &LiveRun{
+		ctx:      t.Context(),
+		agentBin: filepath.Join(t.TempDir(), "missing-agent"),
+	}
+	if _, err := lr.runLocalEscapeProbe(false); err == nil || !strings.Contains(err.Error(), "local escape probe exec") {
+		t.Fatalf("local escape probe exec error = %v, want exec context", err)
 	}
 }
 

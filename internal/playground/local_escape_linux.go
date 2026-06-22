@@ -7,6 +7,7 @@ package playground
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,6 +15,36 @@ import (
 
 	"golang.org/x/sys/unix"
 )
+
+type userNamespaceMountProbeOps struct {
+	lockOSThread   func()
+	unlockOSThread func()
+	unshare        func(flags int) error
+	writeFile      func(name string, data []byte, perm fs.FileMode) error
+	getuid         func() int
+	getgid         func() int
+	setresgid      func(rgid, egid, sgid int) error
+	setresuid      func(ruid, euid, suid int) error
+	mkdirTemp      func(dir, pattern string) (string, error)
+	removeAll      func(path string) error
+	mount          func(source string, target string, fstype string, flags uintptr, data string) error
+	unmount        func(target string, flags int) error
+}
+
+var realUserNamespaceMountProbeOps = userNamespaceMountProbeOps{
+	lockOSThread:   runtime.LockOSThread,
+	unlockOSThread: runtime.UnlockOSThread,
+	unshare:        unix.Unshare,
+	writeFile:      os.WriteFile,
+	getuid:         os.Getuid,
+	getgid:         os.Getgid,
+	setresgid:      unix.Setresgid,
+	setresuid:      unix.Setresuid,
+	mkdirTemp:      os.MkdirTemp,
+	removeAll:      os.RemoveAll,
+	mount:          unix.Mount,
+	unmount:        unix.Unmount,
+}
 
 func probeLocalCapability(target, capability string) ProbeResult {
 	switch capability {
@@ -66,9 +97,13 @@ func probeMountCapability(target string) ProbeResult {
 }
 
 func probeUserNamespaceMountCapability(target string) ProbeResult {
-	runtime.LockOSThread()
-	if err := unix.Unshare(unix.CLONE_NEWUSER | unix.CLONE_NEWNS); err != nil {
-		runtime.UnlockOSThread()
+	return probeUserNamespaceMountCapabilityWithOps(target, realUserNamespaceMountProbeOps)
+}
+
+func probeUserNamespaceMountCapabilityWithOps(target string, ops userNamespaceMountProbeOps) ProbeResult {
+	ops.lockOSThread()
+	if err := ops.unshare(unix.CLONE_NEWUSER | unix.CLONE_NEWNS); err != nil {
+		ops.unlockOSThread()
 		return ProbeResult{Target: target, Open: false, Blocked: true, Detail: fmt.Sprintf("blocked/unavailable: unshare: %v", err)}
 	}
 	// Do not unlock this OS thread after a successful unshare. The uid/gid map and
@@ -77,31 +112,31 @@ func probeUserNamespaceMountCapability(target string) ProbeResult {
 	// process records the result and exits instead of returning the mutated thread
 	// to the Go scheduler.
 
-	if err := os.WriteFile("/proc/self/setgroups", []byte("deny\n"), 0o600); err != nil && !os.IsNotExist(err) {
+	if err := ops.writeFile("/proc/self/setgroups", []byte("deny\n"), 0o600); err != nil && !os.IsNotExist(err) {
 		return ProbeResult{Target: target, Open: false, Blocked: true, Detail: fmt.Sprintf("blocked/unavailable: setgroups map: %v", err)}
 	}
-	if err := os.WriteFile("/proc/self/uid_map", []byte("0 "+strconv.Itoa(os.Getuid())+" 1\n"), 0o600); err != nil {
+	if err := ops.writeFile("/proc/self/uid_map", []byte("0 "+strconv.Itoa(ops.getuid())+" 1\n"), 0o600); err != nil {
 		return ProbeResult{Target: target, Open: false, Blocked: true, Detail: fmt.Sprintf("blocked/unavailable: uid map: %v", err)}
 	}
-	if err := os.WriteFile("/proc/self/gid_map", []byte("0 "+strconv.Itoa(os.Getgid())+" 1\n"), 0o600); err != nil {
+	if err := ops.writeFile("/proc/self/gid_map", []byte("0 "+strconv.Itoa(ops.getgid())+" 1\n"), 0o600); err != nil {
 		return ProbeResult{Target: target, Open: false, Blocked: true, Detail: fmt.Sprintf("blocked/unavailable: gid map: %v", err)}
 	}
-	if err := unix.Setresgid(0, 0, 0); err != nil {
+	if err := ops.setresgid(0, 0, 0); err != nil {
 		return ProbeResult{Target: target, Open: false, Blocked: true, Detail: fmt.Sprintf("blocked/unavailable: setresgid: %v", err)}
 	}
-	if err := unix.Setresuid(0, 0, 0); err != nil {
+	if err := ops.setresuid(0, 0, 0); err != nil {
 		return ProbeResult{Target: target, Open: false, Blocked: true, Detail: fmt.Sprintf("blocked/unavailable: setresuid: %v", err)}
 	}
 
-	dir, err := os.MkdirTemp("", "pipelock-local-escape-userns-mount-*")
+	dir, err := ops.mkdirTemp("", "pipelock-local-escape-userns-mount-*")
 	if err != nil {
 		return ProbeResult{Target: target, Open: false, Blocked: false, Detail: fmt.Sprintf("probe setup failed: %v", err)}
 	}
-	defer func() { _ = os.RemoveAll(dir) }()
+	defer func() { _ = ops.removeAll(dir) }()
 
-	if err := unix.Mount("none", dir, "tmpfs", 0, ""); err != nil {
+	if err := ops.mount("none", dir, "tmpfs", 0, ""); err != nil {
 		return ProbeResult{Target: target, Open: false, Blocked: true, Detail: fmt.Sprintf("blocked/unavailable: mount after userns: %v", err)}
 	}
-	_ = unix.Unmount(dir, 0)
+	_ = ops.unmount(dir, 0)
 	return ProbeResult{Target: target, Open: true, Blocked: false, Detail: "user namespace root mounted tmpfs"}
 }
