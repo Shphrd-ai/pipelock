@@ -15,40 +15,58 @@ import (
 	"syscall"
 )
 
-func resolveContainedAgent(agentUser string) (uint32, uint32, error) {
+type containedAgentIDs struct {
+	uid32 uint32
+	gid32 uint32
+	uid   int
+	gid   int
+}
+
+func resolveContainedAgent(agentUser string) (containedAgentIDs, error) {
 	if os.Geteuid() != 0 {
-		return 0, 0, fmt.Errorf("contained toy-agent execution requires root (euid=%d)", os.Geteuid())
+		return containedAgentIDs{}, fmt.Errorf("contained toy-agent execution requires root (euid=%d)", os.Geteuid())
 	}
 	if agentUser == "" {
 		agentUser = defaultContainedAgentUser
 	}
 	u, err := user.Lookup(agentUser)
 	if err != nil {
-		return 0, 0, fmt.Errorf("lookup contained agent user %q: %w", agentUser, err)
+		return containedAgentIDs{}, fmt.Errorf("lookup contained agent user %q: %w", agentUser, err)
 	}
-	uid, err := strconv.ParseUint(u.Uid, 10, 32)
+	uid32, uid, err := parseContainedAgentID(agentUser, "uid", u.Uid)
 	if err != nil {
-		return 0, 0, fmt.Errorf("parse uid for %q: %w", agentUser, err)
+		return containedAgentIDs{}, err
 	}
-	gid, err := strconv.ParseUint(u.Gid, 10, 32)
+	gid32, gid, err := parseContainedAgentID(agentUser, "gid", u.Gid)
 	if err != nil {
-		return 0, 0, fmt.Errorf("parse gid for %q: %w", agentUser, err)
+		return containedAgentIDs{}, err
 	}
-	return uint32(uid), uint32(gid), nil
+	return containedAgentIDs{uid32: uid32, gid32: gid32, uid: uid, gid: gid}, nil
+}
+
+func parseContainedAgentID(agentUser, label, raw string) (uint32, int, error) {
+	id, err := strconv.ParseUint(raw, 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse %s for %q: %w", label, agentUser, err)
+	}
+	if id > uint64(^uint(0)>>1) {
+		return 0, 0, fmt.Errorf("parse %s for %q: value %d overflows int", label, agentUser, id)
+	}
+	return uint32(id), int(id), nil
 }
 
 func configureContainedCommand(cmd *exec.Cmd, agentUser string) error {
-	uid, gid, err := resolveContainedAgent(agentUser)
+	ids, err := resolveContainedAgent(agentUser)
 	if err != nil {
 		return err
 	}
-	configureContainedCommandID(cmd, uid, gid)
+	configureContainedCommandID(cmd, ids)
 	return nil
 }
 
-func configureContainedCommandID(cmd *exec.Cmd, uid, gid uint32) {
+func configureContainedCommandID(cmd *exec.Cmd, ids containedAgentIDs) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Credential: &syscall.Credential{Uid: uid, Gid: gid},
+		Credential: &syscall.Credential{Uid: ids.uid32, Gid: ids.gid32},
 	}
 }
 
@@ -62,12 +80,12 @@ func configureContainedCommandID(cmd *exec.Cmd, uid, gid uint32) {
 // SysProcAttr must be set before Start, which is why the caller invokes this
 // before spawning the subprocess.
 func applyAgentContainment(cmd *exec.Cmd, scratchDir, agentUser string) error {
-	uid, gid, err := resolveContainedAgent(agentUser)
+	ids, err := resolveContainedAgent(agentUser)
 	if err != nil {
 		return err
 	}
-	configureContainedCommandID(cmd, uid, gid)
-	return chownTreeToAgentID(scratchDir, uid, gid)
+	configureContainedCommandID(cmd, ids)
+	return chownTreeToAgentID(scratchDir, ids)
 }
 
 // chownTreeToAgent hands the server-seeded scratch paths to the contained agent
@@ -83,14 +101,14 @@ func chownTreeToAgent(dir, agentUser string) error {
 	if dir == "" {
 		return nil
 	}
-	uid, gid, err := resolveContainedAgent(agentUser)
+	ids, err := resolveContainedAgent(agentUser)
 	if err != nil {
 		return err
 	}
-	return chownTreeToAgentID(dir, uid, gid)
+	return chownTreeToAgentID(dir, ids)
 }
 
-func chownTreeToAgentID(dir string, uid, gid uint32) error {
+func chownTreeToAgentID(dir string, ids containedAgentIDs) error {
 	if dir == "" {
 		return nil
 	}
@@ -107,7 +125,7 @@ func chownTreeToAgentID(dir string, uid, gid uint32) error {
 			}
 			return fmt.Errorf("stat %q: %w", p, statErr)
 		}
-		if err := os.Lchown(p, int(uid), int(gid)); err != nil {
+		if err := os.Lchown(p, ids.uid, ids.gid); err != nil {
 			return fmt.Errorf("chown %q to agent: %w", p, err)
 		}
 	}
