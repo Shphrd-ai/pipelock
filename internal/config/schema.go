@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
 )
 
 // Mode constants for Pipelock operating modes.

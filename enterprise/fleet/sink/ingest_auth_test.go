@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // TestHandler_ReaderTokenRequired ensures GET endpoints reject requests

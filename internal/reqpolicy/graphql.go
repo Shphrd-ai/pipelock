@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // RequestOperation is a provider-neutral classification of one outbound API

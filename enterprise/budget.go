@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // BudgetTracker enforces per-agent request budgets within a rolling window.

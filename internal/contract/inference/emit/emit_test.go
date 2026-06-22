@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
 )
 
 type fixtureSigner struct {

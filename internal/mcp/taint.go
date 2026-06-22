@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/contract/proxydecision"
-	"github.com/luckyPipewrench/pipelock/internal/envelope"
-	"github.com/luckyPipewrench/pipelock/internal/hitl"
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
-	"github.com/luckyPipewrench/pipelock/internal/redact"
-	"github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/contract/proxydecision"
+	"github.com/Shphrd-ai/pipelock/internal/envelope"
+	"github.com/Shphrd-ai/pipelock/internal/hitl"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 const (

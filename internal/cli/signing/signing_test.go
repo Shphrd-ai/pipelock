@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 func TestKeygenCmd_Basic(t *testing.T) {

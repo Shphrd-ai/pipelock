@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground/llmagent"
+	"github.com/Shphrd-ai/pipelock/internal/playground/llmagent"
 )
 
 // modelTurnRunner runs one visitor message as a single agent turn and streams the

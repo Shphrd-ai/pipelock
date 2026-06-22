@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/cli/runtime"
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/cli/runtime"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 const (

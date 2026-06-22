@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/blockreason"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/transport"
+	"github.com/Shphrd-ai/pipelock/internal/blockreason"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/transport"
 )
 
 // runStdioToolCall drives ForwardScannedInput for a single clean tools/call

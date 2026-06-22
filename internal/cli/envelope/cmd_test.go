@@ -19,10 +19,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	domenvelope "github.com/luckyPipewrench/pipelock/internal/envelope"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	domenvelope "github.com/Shphrd-ai/pipelock/internal/envelope"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const testTrustDomain = "partner.example"

@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
 )
 
 // buildRotatedChainJSONL emits `aN` receipts under key A, then reopens the same

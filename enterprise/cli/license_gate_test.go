@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/license"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // gateTestKey writes a fresh signing key and returns its path.

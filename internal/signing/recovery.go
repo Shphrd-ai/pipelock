@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
 )
 
 // recoveryExpiryCeiling is the maximum allowed gap between now and expires_at.

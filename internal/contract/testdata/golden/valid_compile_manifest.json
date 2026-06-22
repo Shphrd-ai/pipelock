@@ -9,7 +9,7 @@
     "go_version": "go1.26.0",
     "module_digest_root": "sha256:420b0c21d529c660ef95ddb5686e20bf16371f27803c77bdd676977d94deeb72",
     "module_digests": {
-      "github.com/luckyPipewrench/pipelock": "sha256:test"
+      "github.com/Shphrd-ai/pipelock": "sha256:test"
     },
     "compile_config_hash": "sha256:cfg",
     "inputs": [

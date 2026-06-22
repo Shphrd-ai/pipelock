@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	releasetrust "github.com/luckyPipewrench/pipelock/internal/release"
+	releasetrust "github.com/Shphrd-ai/pipelock/internal/release"
 )
 
 // GitHub repository coordinates. The host is ours, so naming it is fine.
@@ -59,7 +59,7 @@ const (
 
 	// releaseWorkflowIdentity is the exact GitHub Actions OIDC identity that
 	// signs release checksums for a tag.
-	releaseWorkflowIdentity = "https://github.com/luckyPipewrench/pipelock/.github/workflows/release.yaml@refs/tags/%s"
+	releaseWorkflowIdentity = "https://github.com/Shphrd-ai/pipelock/.github/workflows/release.yaml@refs/tags/%s"
 
 	// httpTimeout bounds every network operation.
 	httpTimeout = 60 * time.Second

@@ -9,7 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 func TestMetricsRecord(t *testing.T) {

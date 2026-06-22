@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/atomicfile"
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	contractstore "github.com/luckyPipewrench/pipelock/internal/contract/store"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/atomicfile"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	contractstore "github.com/Shphrd-ai/pipelock/internal/contract/store"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // Key IDs the fixture stamps onto the generated keystore + roster +

@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/license"
 )
 
 func TestValidateAgents_ValidConfig(t *testing.T) {

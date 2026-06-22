@@ -14,16 +14,16 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/blockreason"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/decide"
-	"github.com/luckyPipewrench/pipelock/internal/killswitch"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/jsonrpc"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/tools"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/transport"
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
-	session "github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/blockreason"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/decide"
+	"github.com/Shphrd-ai/pipelock/internal/killswitch"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/jsonrpc"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/tools"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/transport"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
+	session "github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 // newReverseUpstreamTransport builds the HTTP transport the MCP HTTP listener

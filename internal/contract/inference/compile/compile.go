@@ -19,12 +19,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/contract/inference"
-	"github.com/luckyPipewrench/pipelock/internal/contract/inference/aggregate"
-	"github.com/luckyPipewrench/pipelock/internal/contract/inference/emit"
-	"github.com/luckyPipewrench/pipelock/internal/contract/inference/ingest"
-	"github.com/luckyPipewrench/pipelock/internal/contract/inference/normalize"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract/inference"
+	"github.com/Shphrd-ai/pipelock/internal/contract/inference/aggregate"
+	"github.com/Shphrd-ai/pipelock/internal/contract/inference/emit"
+	"github.com/Shphrd-ai/pipelock/internal/contract/inference/ingest"
+	"github.com/Shphrd-ai/pipelock/internal/contract/inference/normalize"
 )
 
 const (

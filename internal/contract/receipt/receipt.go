@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
 )
 
 // RecordType identifies the schema version of a receipt record.

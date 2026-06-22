@@ -6,9 +6,9 @@ package proxy
 import (
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/metrics"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/metrics"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 func TestProxy_Accessors(t *testing.T) {

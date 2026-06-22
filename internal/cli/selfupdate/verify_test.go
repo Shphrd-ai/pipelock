@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	releasetrust "github.com/luckyPipewrench/pipelock/internal/release"
+	releasetrust "github.com/Shphrd-ai/pipelock/internal/release"
 )
 
 func TestRun_CosignAbsentStillVerifiesNativeManifest(t *testing.T) {

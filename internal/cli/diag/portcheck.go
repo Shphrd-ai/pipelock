@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // configuredListener describes a single listen address the operator configured

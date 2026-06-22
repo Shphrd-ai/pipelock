@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
 )
 
 // safeBaseRecord returns a minimal, public-safe action record the allowlist

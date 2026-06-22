@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/jsonrpc"
-	"github.com/luckyPipewrench/pipelock/internal/normalize"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/jsonrpc"
+	"github.com/Shphrd-ai/pipelock/internal/normalize"
 )
 
 const uninspectableJSONDepthRule = "uninspectable_json_depth"

@@ -16,12 +16,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/blockreason"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	contractruntime "github.com/luckyPipewrench/pipelock/internal/contract/runtime"
-	"github.com/luckyPipewrench/pipelock/internal/contract/runtime/contractruntimetest"
-	"github.com/luckyPipewrench/pipelock/internal/proxy"
+	"github.com/Shphrd-ai/pipelock/internal/blockreason"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	contractruntime "github.com/Shphrd-ai/pipelock/internal/contract/runtime"
+	"github.com/Shphrd-ai/pipelock/internal/contract/runtime/contractruntimetest"
+	"github.com/Shphrd-ai/pipelock/internal/proxy"
 )
 
 var updateLiveLockGoldens = flag.Bool("update", false, "regenerate live-lock replay-harness golden files")

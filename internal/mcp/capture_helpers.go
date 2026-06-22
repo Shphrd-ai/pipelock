@@ -9,14 +9,14 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/addressprotect"
-	"github.com/luckyPipewrench/pipelock/internal/capture"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/jsonrpc"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/tools"
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
-	"github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/addressprotect"
+	"github.com/Shphrd-ai/pipelock/internal/capture"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/jsonrpc"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/tools"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 // captureRPCID returns the JSON-RPC id to embed in a CaptureRequest. It returns

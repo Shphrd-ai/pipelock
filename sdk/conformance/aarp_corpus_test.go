@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/aarp"
-	"github.com/luckyPipewrench/pipelock/internal/svidsidecar"
+	"github.com/Shphrd-ai/pipelock/internal/aarp"
+	"github.com/Shphrd-ai/pipelock/internal/svidsidecar"
 )
 
 // This file is the GO arm of the four-language AARP conformance gate. It runs the

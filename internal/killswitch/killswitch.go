@@ -17,7 +17,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // EnvAPIToken is the environment variable that overrides kill_switch.api_token

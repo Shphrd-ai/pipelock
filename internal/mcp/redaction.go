@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/luckyPipewrench/pipelock/internal/mcp/jsonrpc"
-	"github.com/luckyPipewrench/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/jsonrpc"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
 )
 
 // applyMCPToolCallRedaction rewrites tools/call params.arguments through the

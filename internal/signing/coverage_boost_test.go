@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
 )
 
 // --- atomicWrite coverage tests (61.9% -> higher) ---

@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 var testNow = time.Date(2026, 4, 30, 12, 0, 0, 0, time.UTC)

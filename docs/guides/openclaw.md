@@ -23,7 +23,7 @@ Pipelock blocks the post-compromise steps of this chain: tool policy blocks dang
 brew install luckyPipewrench/tap/pipelock
 
 # Or download binary
-curl -fsSL https://github.com/luckyPipewrench/pipelock/releases/latest/download/pipelock_linux_amd64.tar.gz | tar xz
+curl -fsSL https://github.com/Shphrd-ai/pipelock/releases/latest/download/pipelock_linux_amd64.tar.gz | tar xz
 sudo mv pipelock /usr/local/bin/
 ```
 

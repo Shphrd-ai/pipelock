@@ -14,8 +14,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 func TestStore_PutTombstone_RoundTrip(t *testing.T) {

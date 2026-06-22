@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/report/compliance"
+	"github.com/Shphrd-ai/pipelock/internal/report/compliance"
 )
 
 func TestNewAttestation(t *testing.T) {

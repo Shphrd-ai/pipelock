@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/luckyPipewrench/pipelock/enterprise/testinit"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/license"
+	_ "github.com/Shphrd-ai/pipelock/enterprise/testinit"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/license"
 )
 
 // testLicenseKeyPair generates an Ed25519 keypair and a valid signed license

@@ -10,7 +10,7 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/report/compliance"
+	"github.com/Shphrd-ai/pipelock/internal/report/compliance"
 )
 
 // Schema version for attestation payloads.

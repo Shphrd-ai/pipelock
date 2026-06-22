@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 func ptrBool(v bool) *bool { return &v }

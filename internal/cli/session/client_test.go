@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/proxy"
+	"github.com/Shphrd-ai/pipelock/internal/proxy"
 )
 
 // assertBearer checks the Authorization header on a handler request.

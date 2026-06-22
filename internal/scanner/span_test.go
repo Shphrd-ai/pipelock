@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/normalize"
+	"github.com/Shphrd-ai/pipelock/internal/normalize"
 )
 
 func TestResponseMatchSpanLabelsDecodedView(t *testing.T) {

@@ -13,12 +13,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/audit"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/decide"
-	"github.com/luckyPipewrench/pipelock/internal/metrics"
-	"github.com/luckyPipewrench/pipelock/internal/proxy/baseline"
-	"github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/decide"
+	"github.com/Shphrd-ai/pipelock/internal/metrics"
+	"github.com/Shphrd-ai/pipelock/internal/proxy/baseline"
+	"github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 // SessionResult is the outcome of session profiling and adaptive signal recording.

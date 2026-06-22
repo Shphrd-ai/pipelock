@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/capture"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/capture"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // testRedactedPlaceholder is the expected value for redacted fields.

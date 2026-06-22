@@ -20,15 +20,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/contract/proxydecision"
-	"github.com/luckyPipewrench/pipelock/internal/deferred"
-	"github.com/luckyPipewrench/pipelock/internal/mcp"
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
-	plsentry "github.com/luckyPipewrench/pipelock/internal/sentry"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/contract/proxydecision"
+	"github.com/Shphrd-ai/pipelock/internal/deferred"
+	"github.com/Shphrd-ai/pipelock/internal/mcp"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
+	plsentry "github.com/Shphrd-ai/pipelock/internal/sentry"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // NOTE: Most mcp tests in the original cli package use rootCmd() which stays

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // Verdict describes the result of checking a tool call against chain patterns.

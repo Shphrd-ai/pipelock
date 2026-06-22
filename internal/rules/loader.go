@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // Confidence ordering for filtering: high=3 > medium=2 > low=1.

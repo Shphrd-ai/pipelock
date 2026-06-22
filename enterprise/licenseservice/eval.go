@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/license"
 )
 
 // Polar order status values consumed by eval fulfillment.

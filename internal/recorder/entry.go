@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/jsonscan"
+	"github.com/Shphrd-ai/pipelock/internal/jsonscan"
 )
 
 // EntryVersion is the current schema version for new writes. Readers MUST

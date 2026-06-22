@@ -11,8 +11,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/certgen"
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/certgen"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
 )
 
 // TlsCmd returns the "tls" cobra command tree.

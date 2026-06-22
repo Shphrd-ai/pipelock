@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/luckyPipewrench/pipelock/internal/capture"
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/metrics"
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/capture"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/metrics"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
 )
 
 const (

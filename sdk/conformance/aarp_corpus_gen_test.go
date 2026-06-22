@@ -16,8 +16,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/aarp"
-	"github.com/luckyPipewrench/pipelock/internal/svidsidecar"
+	"github.com/Shphrd-ai/pipelock/internal/aarp"
+	"github.com/Shphrd-ai/pipelock/internal/svidsidecar"
 )
 
 // updateAARP regenerates the AARP corpus when passed.

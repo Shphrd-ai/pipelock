@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/secperm"
+	"github.com/Shphrd-ai/pipelock/internal/secperm"
 )
 
 // Sentinel errors for salt resolution. All are errors.Is-comparable.

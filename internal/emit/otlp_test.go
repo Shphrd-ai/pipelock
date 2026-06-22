@@ -20,7 +20,7 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/luckyPipewrench/pipelock/internal/testwait"
+	"github.com/Shphrd-ai/pipelock/internal/testwait"
 )
 
 const otlpLogsPath = "/v1/logs"

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/capture"
+	"github.com/Shphrd-ai/pipelock/internal/capture"
 )
 
 const (

@@ -17,11 +17,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	contractreceipt "github.com/luckyPipewrench/pipelock/internal/contract/receipt"
-	contractruntime "github.com/luckyPipewrench/pipelock/internal/contract/runtime"
-	contractstore "github.com/luckyPipewrench/pipelock/internal/contract/store"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	contractreceipt "github.com/Shphrd-ai/pipelock/internal/contract/receipt"
+	contractruntime "github.com/Shphrd-ai/pipelock/internal/contract/runtime"
+	contractstore "github.com/Shphrd-ai/pipelock/internal/contract/store"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 func TestLearnCmdRegistersPromoteAndRollback(t *testing.T) {

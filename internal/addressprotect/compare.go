@@ -6,7 +6,7 @@ package addressprotect
 import (
 	"fmt"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // Verdict represents the result of comparing a detected address against the allowlist.

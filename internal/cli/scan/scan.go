@@ -14,8 +14,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/filescan"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/filescan"
 )
 
 // Exit codes (distinct so CI wrappers can tell findings from a broken scan):

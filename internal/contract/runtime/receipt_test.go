@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	contractreceipt "github.com/luckyPipewrench/pipelock/internal/contract/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	contractreceipt "github.com/Shphrd-ai/pipelock/internal/contract/receipt"
 )
 
 // validReceiptSignaturePlaceholder is a structurally-valid Ed25519 signature

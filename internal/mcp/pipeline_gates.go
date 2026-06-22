@@ -9,10 +9,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/decide"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/policy"
-	"github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/decide"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/policy"
+	"github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 // observeCrossAgentEmit records cross-agent taint propagation when a

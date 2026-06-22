@@ -10,7 +10,7 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"github.com/luckyPipewrench/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
 )
 
 // CanonicalPolicyHash returns a stable SHA-256 digest (hex-encoded) of the

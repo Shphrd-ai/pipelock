@@ -27,11 +27,11 @@ import (
 
 	"golang.org/x/net/publicsuffix"
 
-	"github.com/luckyPipewrench/pipelock/internal/addressprotect"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/normalize"
-	"github.com/luckyPipewrench/pipelock/internal/reqpolicy"
-	"github.com/luckyPipewrench/pipelock/internal/seedprotect"
+	"github.com/Shphrd-ai/pipelock/internal/addressprotect"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/normalize"
+	"github.com/Shphrd-ai/pipelock/internal/reqpolicy"
+	"github.com/Shphrd-ai/pipelock/internal/seedprotect"
 )
 
 // Scanner label constants. These values flow into Prometheus metrics

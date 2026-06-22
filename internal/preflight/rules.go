@@ -11,8 +11,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/projectscan"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/projectscan"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // Compiled regexes (package-level, compiled once).

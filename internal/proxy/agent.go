@@ -6,7 +6,7 @@ package proxy
 import (
 	"net/http"
 
-	"github.com/luckyPipewrench/pipelock/internal/edition"
+	"github.com/Shphrd-ai/pipelock/internal/edition"
 )
 
 // agentAnonymous is the fallback agent name when no header/query/context

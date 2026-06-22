@@ -9,8 +9,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 const (

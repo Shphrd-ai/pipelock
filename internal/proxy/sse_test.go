@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/mcp"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/mcp"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 func ssetestScanner(t *testing.T) *scanner.Scanner {

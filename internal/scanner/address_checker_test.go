@@ -6,7 +6,7 @@ package scanner
 import (
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 func TestAddressCheckerNilWhenDisabled(t *testing.T) {

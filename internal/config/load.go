@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/license"
-	"github.com/luckyPipewrench/pipelock/internal/secperm"
+	"github.com/Shphrd-ai/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/secperm"
 	"gopkg.in/yaml.v3"
 )
 

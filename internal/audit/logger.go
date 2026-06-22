@@ -17,7 +17,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/luckyPipewrench/pipelock/internal/emit"
+	"github.com/Shphrd-ai/pipelock/internal/emit"
 	"github.com/rs/zerolog"
 )
 

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/atomicfile"
+	"github.com/Shphrd-ai/pipelock/internal/atomicfile"
 )
 
 // FreshnessState tracks the highest seen version per bundle identity for

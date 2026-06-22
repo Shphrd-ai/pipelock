@@ -18,9 +18,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/atomicfile"
-	"github.com/luckyPipewrench/pipelock/internal/secperm"
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/atomicfile"
+	"github.com/Shphrd-ai/pipelock/internal/secperm"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // keyFileSchemaVersion is the wire schema version of files written by

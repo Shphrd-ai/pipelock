@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/reqpolicy"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/reqpolicy"
 )
 
 const batchHost = "graph.example.com"

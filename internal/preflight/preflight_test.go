@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/projectscan"
+	"github.com/Shphrd-ai/pipelock/internal/projectscan"
 )
 
 // writeJSON creates a file with the given JSON content under dir.

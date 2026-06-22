@@ -17,8 +17,8 @@ import (
 
 	"golang.org/x/crypto/nacl/box"
 
-	"github.com/luckyPipewrench/pipelock/internal/capture"
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/capture"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
 )
 
 const (

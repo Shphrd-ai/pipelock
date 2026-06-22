@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
 )
 
 // GenesisHash is the chain_prev_hash of the first receipt in a session.

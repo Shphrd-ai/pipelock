@@ -21,9 +21,9 @@ import (
 	"strings"
 	"time"
 
-	conductorcore "github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/controlplane"
-	"github.com/luckyPipewrench/pipelock/internal/envelope"
+	conductorcore "github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/controlplane"
+	"github.com/Shphrd-ai/pipelock/internal/envelope"
 )
 
 const (

@@ -11,10 +11,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/atomicfile"
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/atomicfile"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // Keep exported recorder public-key sidecars group-readable but not

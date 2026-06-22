@@ -4,7 +4,7 @@
   "generated_at": "2026-05-09T17:32:18Z",
   "run": {
     "provider": "github_actions",
-    "repository": "luckyPipewrench/pipelock",
+    "repository": "Shphrd-ai/pipelock",
     "workflow": "agent-egress-demo",
     "run_id": "8923477112",
     "run_attempt": "1",

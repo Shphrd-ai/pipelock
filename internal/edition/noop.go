@@ -7,8 +7,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // noopEdition is the OSS Edition. All requests use the global default

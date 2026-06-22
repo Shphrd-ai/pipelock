@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
 )
 
 // Sentinel errors for roster loading and key resolution.

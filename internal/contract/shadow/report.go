@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/capture"
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/capture"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 const (

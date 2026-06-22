@@ -20,10 +20,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/envelope"
-	"github.com/luckyPipewrench/pipelock/internal/license"
-	"github.com/luckyPipewrench/pipelock/internal/secperm"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/envelope"
+	"github.com/Shphrd-ai/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/secperm"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // ValidateTrustedDomains validates and normalizes a slice of trusted domain

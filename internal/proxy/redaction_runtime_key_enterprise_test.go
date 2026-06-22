@@ -7,9 +7,9 @@ package proxy
 import (
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 
-	_ "github.com/luckyPipewrench/pipelock/enterprise/testinit"
+	_ "github.com/Shphrd-ai/pipelock/enterprise/testinit"
 )
 
 // TestRedactionConfigKey_StableAcrossMergeAgentProfile exercises the real

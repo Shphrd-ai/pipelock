@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/license"
 )
 
 // signTestExport mints a token with priv and returns a signed issuance export

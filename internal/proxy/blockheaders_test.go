@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/blockreason"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/blockreason"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // dlpLayerLabel is the scanner layer label that DLP-stage blocks emit. Used

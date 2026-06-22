@@ -25,7 +25,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/bench/egress/harness"
+	"github.com/Shphrd-ai/pipelock/bench/egress/harness"
 )
 
 // benchVersion is the schema version of the JSON output. Bump when adding,

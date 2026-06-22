@@ -20,9 +20,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/jsonscan"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/jsonscan"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const (

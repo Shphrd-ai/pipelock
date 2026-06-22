@@ -15,9 +15,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/integrity"
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/integrity"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // ErrIntegrityViolation is returned when pipelock integrity check finds violations.

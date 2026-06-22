@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/proxy"
+	"github.com/Shphrd-ai/pipelock/internal/proxy"
 )
 
 func TestAdaptiveCmd_RegistersSubcommands(t *testing.T) {

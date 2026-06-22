@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // TestAudienceHashCanonicalizesInstanceIDOrder is a security regression for the

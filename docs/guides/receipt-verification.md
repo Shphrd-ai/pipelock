@@ -359,7 +359,7 @@ Go reference verifier. Pick whichever fits your downstream audit pipeline:
 | Go (in-tree reference) | `sdk/audit-packet/` and `cmd/pipelock-verifier/` | Server-side audit pipelines, CI workflows, EvidenceReceipt v2 receipt/chain verification |
 | TypeScript | [`sdk/verifiers/ts/`](../../sdk/verifiers/ts/) | Node-based audit / SIEM, browser-side evidence inspection |
 | Rust | [`sdk/verifiers/rust/`](../../sdk/verifiers/rust/) | Embedded use, audit-platform sidecars, no-runtime environments |
-| Python (companion) | [`pipelock-verify-python`](https://github.com/luckyPipewrench/pipelock-verify-python) | Python-based audit pipelines and Jupyter analysis. v1 chains today; EvidenceReceipt v2 envelopes after the prepared 0.2.0 release. |
+| Python (companion) | [`pipelock-verify-python`](https://github.com/Shphrd-ai/pipelock-verify-python) | Python-based audit pipelines and Jupyter analysis. v1 chains today; EvidenceReceipt v2 envelopes after the prepared 0.2.0 release. |
 
 The TypeScript and Rust verifiers ship with their own test suites that
 exercise the canonical vectors from the Go schema package, so a schema
@@ -428,7 +428,7 @@ go test ./sdk/conformance/ -run TestGenerateGoldenFiles -update
 5. Reject `broken-chain.jsonl`: chain verification must fail at seq 3.
 
 A reference Python verifier is available at
-[pipelock-verify-python](https://github.com/luckyPipewrench/pipelock-verify-python).
+[pipelock-verify-python](https://github.com/Shphrd-ai/pipelock-verify-python).
 First-party TypeScript and Rust verifiers ship in-tree under
 `sdk/verifiers/ts/` and `sdk/verifiers/rust/`; the standalone
 `pipelock-verifier` Go CLI ships under `cmd/pipelock-verifier/`. The Go,

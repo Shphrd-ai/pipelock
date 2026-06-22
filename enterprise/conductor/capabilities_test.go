@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
 )
 
 func TestNegotiateCapabilities(t *testing.T) {

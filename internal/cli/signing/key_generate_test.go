@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 func TestKeyGenerate_WritesValidKeyFile(t *testing.T) {

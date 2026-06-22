@@ -10,9 +10,9 @@ import (
 	"errors"
 	"io"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/killswitch"
-	"github.com/luckyPipewrench/pipelock/internal/metrics"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/killswitch"
+	"github.com/Shphrd-ai/pipelock/internal/metrics"
 )
 
 var errConductorEnterpriseBuildRequired = errors.New("conductor.enabled requires an enterprise build")

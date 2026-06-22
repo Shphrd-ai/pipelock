@@ -13,11 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/tools"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/transport"
-	"github.com/luckyPipewrench/pipelock/internal/sandbox"
-	session "github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/tools"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/transport"
+	"github.com/Shphrd-ai/pipelock/internal/sandbox"
+	session "github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 // RunProxyWithSandbox is like RunProxy but uses a pre-built (unstarted)

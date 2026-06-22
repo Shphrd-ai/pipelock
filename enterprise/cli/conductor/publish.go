@@ -28,11 +28,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	conductorcore "github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/controlplane"
-	clisigning "github.com/luckyPipewrench/pipelock/internal/cli/signing"
-	"github.com/luckyPipewrench/pipelock/internal/license"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	conductorcore "github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/controlplane"
+	clisigning "github.com/Shphrd-ai/pipelock/internal/cli/signing"
+	"github.com/Shphrd-ai/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const (

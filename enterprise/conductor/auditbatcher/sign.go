@@ -9,8 +9,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // SignEnvelope signs an audit batch envelope with the follower audit key.

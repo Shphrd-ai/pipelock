@@ -21,9 +21,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 	"gopkg.in/yaml.v3"
 )
 

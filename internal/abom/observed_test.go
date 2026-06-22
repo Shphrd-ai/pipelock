@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/abom"
+	"github.com/Shphrd-ai/pipelock/internal/abom"
 )
 
 func TestNewObservedInventory(t *testing.T) {

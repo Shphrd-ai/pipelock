@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 func mustMatcher(t *testing.T, rules ...config.RequestPolicyRule) *Matcher {

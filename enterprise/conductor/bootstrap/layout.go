@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/luckyPipewrench/pipelock/internal/atomicfile"
+	"github.com/Shphrd-ai/pipelock/internal/atomicfile"
 )
 
 // Layout is the on-disk file map for a dev fleet. Every path is absolute and

@@ -15,9 +15,9 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/contract/store"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract/store"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // activeFilename is the active-manifest filename inside StoreDir. It mirrors

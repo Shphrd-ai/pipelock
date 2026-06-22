@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/mcp/transport"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/transport"
 )
 
 // isSSEContentType reports whether contentType announces a Server-Sent

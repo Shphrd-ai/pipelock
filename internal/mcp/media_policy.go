@@ -11,10 +11,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/audit"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/jsonrpc"
-	"github.com/luckyPipewrench/pipelock/internal/media"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/jsonrpc"
+	"github.com/Shphrd-ai/pipelock/internal/media"
 )
 
 type mcpMediaPolicyResult struct {

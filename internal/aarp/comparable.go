@@ -6,7 +6,7 @@ package aarp
 import (
 	"sort"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
 )
 
 // ComparableAppraisal projects an Appraisal onto the stable, cross-language

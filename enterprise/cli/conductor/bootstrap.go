@@ -7,8 +7,8 @@ package conductor
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/bootstrap"
-	"github.com/luckyPipewrench/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/bootstrap"
+	"github.com/Shphrd-ai/pipelock/internal/license"
 )
 
 func bootstrapCmd() *cobra.Command {

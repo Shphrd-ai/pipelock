@@ -31,8 +31,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/fleetreceipt"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/fleetreceipt"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 var updateFleetReceipt = flag.Bool("update-fleet-receipt", false, "regenerate the fleet receipt corpus fixtures")

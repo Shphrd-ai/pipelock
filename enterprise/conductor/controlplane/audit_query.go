@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
 )
 
 // AuditBatchQuerier exposes metadata-only audit batch queries. Implementations

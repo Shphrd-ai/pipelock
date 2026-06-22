@@ -7,13 +7,13 @@
 //
 //	//go:build enterprise
 //	package foo
-//	import _ "github.com/luckyPipewrench/pipelock/enterprise/testinit"
+//	import _ "github.com/Shphrd-ai/pipelock/enterprise/testinit"
 package testinit
 
 import (
-	"github.com/luckyPipewrench/pipelock/enterprise"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/edition"
+	"github.com/Shphrd-ai/pipelock/enterprise"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/edition"
 )
 
 func init() {

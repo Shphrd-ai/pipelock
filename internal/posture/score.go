@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/cli/audit"
+	"github.com/Shphrd-ai/pipelock/internal/cli/audit"
 )
 
 // Policy levels for verification gates.

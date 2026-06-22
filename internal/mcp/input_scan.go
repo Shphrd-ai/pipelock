@@ -10,12 +10,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/addressprotect"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/extract"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/jsonrpc"
-	"github.com/luckyPipewrench/pipelock/internal/redact"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/addressprotect"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/extract"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/jsonrpc"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 const uninspectableJSONDepthReason = "input exceeds maximum inspectable nesting depth"

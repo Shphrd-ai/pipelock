@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/license"
-	"github.com/luckyPipewrench/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
 	"gopkg.in/yaml.v3"
 )
 

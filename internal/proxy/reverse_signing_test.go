@@ -21,12 +21,12 @@ import (
 	"time"
 
 	"github.com/dunglas/httpsfv"
-	"github.com/luckyPipewrench/pipelock/internal/audit"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/envelope"
-	"github.com/luckyPipewrench/pipelock/internal/killswitch"
-	"github.com/luckyPipewrench/pipelock/internal/metrics"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/envelope"
+	"github.com/Shphrd-ai/pipelock/internal/killswitch"
+	"github.com/Shphrd-ai/pipelock/internal/metrics"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // mustBase64SHA256 returns the base64-encoded SHA-256 of data.

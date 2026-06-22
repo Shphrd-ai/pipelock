@@ -13,7 +13,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 const testDSN = "https://examplePublicKey@o0.ingest.sentry.io/0"

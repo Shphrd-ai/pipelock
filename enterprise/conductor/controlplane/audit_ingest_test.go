@@ -17,9 +17,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/auditbatcher"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/auditbatcher"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 func TestHandlerIngestsSignedAuditBatch(t *testing.T) {

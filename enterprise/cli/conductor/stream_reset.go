@@ -12,8 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/controlplane"
-	"github.com/luckyPipewrench/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/controlplane"
+	"github.com/Shphrd-ai/pipelock/internal/license"
 )
 
 type streamResetOptions struct {

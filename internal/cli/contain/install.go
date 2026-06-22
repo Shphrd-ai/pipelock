@@ -18,7 +18,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
 )
 
 // installOpts collects the flag-derived state for runInstall. Mirrored as
@@ -1113,7 +1113,7 @@ func renderSystemUnit(env *installEnv) string {
 	return strings.Join([]string{
 		"[Unit]",
 		"Description=Pipelock AI Egress Proxy",
-		"Documentation=https://github.com/luckyPipewrench/pipelock",
+		"Documentation=https://github.com/Shphrd-ai/pipelock",
 		"After=network-online.target",
 		"Wants=network-online.target",
 		"",
@@ -1452,7 +1452,7 @@ func renderNFTPersistUnit(env *installEnv) string {
 	return strings.Join([]string{
 		"[Unit]",
 		"Description=Pipelock containment nftables rules",
-		"Documentation=https://github.com/luckyPipewrench/pipelock",
+		"Documentation=https://github.com/Shphrd-ai/pipelock",
 		"DefaultDependencies=no",
 		"After=local-fs.target",
 		"Before=network-pre.target",

@@ -6,7 +6,7 @@ package scanapi
 import (
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 func TestFieldLimit(t *testing.T) {

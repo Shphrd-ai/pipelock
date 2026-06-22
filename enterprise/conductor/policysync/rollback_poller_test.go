@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
 )
 
 // stubProvider returns a scripted current/target/ok/err for RollbackContext.

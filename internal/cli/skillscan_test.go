@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
 )
 
 func TestSkillScanHelp(t *testing.T) {

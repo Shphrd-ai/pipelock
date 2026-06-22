@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // captureJSONL returns a minimal recorder envelope JSONL line that passes

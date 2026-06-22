@@ -13,11 +13,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/cli"
+	"github.com/Shphrd-ai/pipelock/internal/cli"
 	// Blank import to fire the enterprise/cli init() that registers the
 	// conductor and fleet-sink commands. Without this, rootCmd() returns
 	// a tree without them and these tests would fail under -tags enterprise.
-	_ "github.com/luckyPipewrench/pipelock/enterprise/cli"
+	_ "github.com/Shphrd-ai/pipelock/enterprise/cli"
 )
 
 // Cmd is a cli.Execute()-compatible accessor for the root command. The

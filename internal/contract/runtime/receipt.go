@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	contractreceipt "github.com/luckyPipewrench/pipelock/internal/contract/receipt"
+	contractreceipt "github.com/Shphrd-ai/pipelock/internal/contract/receipt"
 )
 
 // ErrInvalidProxyDecisionInput is returned when BuildProxyDecisionReceipt is

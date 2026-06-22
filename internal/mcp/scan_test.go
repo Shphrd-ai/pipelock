@@ -12,11 +12,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/jsonrpc"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/provenance"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/jsonrpc"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/provenance"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 func testScanner(t *testing.T) *scanner.Scanner {

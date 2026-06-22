@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	releasetrust "github.com/luckyPipewrench/pipelock/internal/release"
+	releasetrust "github.com/Shphrd-ai/pipelock/internal/release"
 )
 
 // firstVersionWithUpdate is the earliest release that ships the "update"

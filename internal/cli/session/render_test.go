@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/proxy"
+	"github.com/Shphrd-ai/pipelock/internal/proxy"
 )
 
 func TestRenderList_EmptyPrintsPlaceholder(t *testing.T) {

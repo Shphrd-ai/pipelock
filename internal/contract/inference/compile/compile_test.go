@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/capture"
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/contract/inference"
-	"github.com/luckyPipewrench/pipelock/internal/contract/inference/aggregate"
-	"github.com/luckyPipewrench/pipelock/internal/contract/inference/emit"
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/capture"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract/inference"
+	"github.com/Shphrd-ai/pipelock/internal/contract/inference/aggregate"
+	"github.com/Shphrd-ai/pipelock/internal/contract/inference/emit"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
 )
 
 type testSigner struct {

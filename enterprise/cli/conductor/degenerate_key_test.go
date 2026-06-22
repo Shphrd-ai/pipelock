@@ -8,7 +8,7 @@ import (
 	"crypto/ed25519"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // TestLoadFleetReportSigningKey_RejectsDegenerate proves the conductor signing

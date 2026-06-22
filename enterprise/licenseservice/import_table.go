@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/license"
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )

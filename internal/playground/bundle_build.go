@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
 )
 
 const bundleTSLayout = "15:04:05"

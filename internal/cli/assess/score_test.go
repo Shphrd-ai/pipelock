@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/cli/audit"
-	"github.com/luckyPipewrench/pipelock/internal/cli/diag"
-	"github.com/luckyPipewrench/pipelock/internal/discover"
+	"github.com/Shphrd-ai/pipelock/internal/cli/audit"
+	"github.com/Shphrd-ai/pipelock/internal/cli/diag"
+	"github.com/Shphrd-ai/pipelock/internal/discover"
 )
 
 func TestScoreDetectionCoverage(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
 )
 
 // Cmd returns the top-level "update" command (alias "upgrade").

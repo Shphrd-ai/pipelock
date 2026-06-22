@@ -10,7 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/mcpwrap"
+	"github.com/Shphrd-ai/pipelock/internal/mcpwrap"
 )
 
 // rollbackOptions captures `pipelock hermes rollback` flags.

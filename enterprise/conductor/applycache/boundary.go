@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 type ConfigLoader func(path string) (*config.Config, error)

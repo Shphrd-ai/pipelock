@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/mcp/transport"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/transport"
 )
 
 func TestCanonicalSSEEventText_MultilineDataUsesPerLineDataFields(t *testing.T) {

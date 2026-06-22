@@ -21,16 +21,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/audit"
-	"github.com/luckyPipewrench/pipelock/internal/blockreason"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	contractruntime "github.com/luckyPipewrench/pipelock/internal/contract/runtime"
-	"github.com/luckyPipewrench/pipelock/internal/contract/runtime/contractruntimetest"
-	"github.com/luckyPipewrench/pipelock/internal/killswitch"
-	"github.com/luckyPipewrench/pipelock/internal/metrics"
-	"github.com/luckyPipewrench/pipelock/internal/redact"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
-	"github.com/luckyPipewrench/pipelock/internal/shield"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/blockreason"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	contractruntime "github.com/Shphrd-ai/pipelock/internal/contract/runtime"
+	"github.com/Shphrd-ai/pipelock/internal/contract/runtime/contractruntimetest"
+	"github.com/Shphrd-ai/pipelock/internal/killswitch"
+	"github.com/Shphrd-ai/pipelock/internal/metrics"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/shield"
 )
 
 // testGet performs a GET request with a background context (noctx-safe).

@@ -8,9 +8,9 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/edition"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/edition"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // enterpriseEdition implements edition.Edition with full multi-agent support:

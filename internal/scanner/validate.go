@@ -4,8 +4,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/luckyPipewrench/pipelock/internal/addressprotect"
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/addressprotect"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // DLPValidators maps validator names from config.DLPPattern.Validator to

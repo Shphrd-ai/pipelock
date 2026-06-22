@@ -14,7 +14,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 func enrollCobra(t *testing.T) (*cobra.Command, *bytes.Buffer) {

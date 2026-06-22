@@ -21,12 +21,12 @@ import (
 	"strings"
 	"time"
 
-	conductorcore "github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/auditbatcher"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/controlplane"
-	"github.com/luckyPipewrench/pipelock/internal/metrics"
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	conductorcore "github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/auditbatcher"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/controlplane"
+	"github.com/Shphrd-ai/pipelock/internal/metrics"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const (

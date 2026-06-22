@@ -9,7 +9,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/luckyPipewrench/pipelock/internal/normalize"
+	"github.com/Shphrd-ai/pipelock/internal/normalize"
 )
 
 // validLengths are the BIP-39 mnemonic word counts (128-256 bits of entropy).

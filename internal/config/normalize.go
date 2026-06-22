@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/envelope"
+	"github.com/Shphrd-ai/pipelock/internal/envelope"
 	"gopkg.in/yaml.v3"
 )
 

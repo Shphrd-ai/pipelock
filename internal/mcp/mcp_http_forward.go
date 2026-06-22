@@ -12,13 +12,13 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	contractruntime "github.com/luckyPipewrench/pipelock/internal/contract/runtime"
-	"github.com/luckyPipewrench/pipelock/internal/deferred"
-	"github.com/luckyPipewrench/pipelock/internal/killswitch"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/tools"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/transport"
-	session "github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	contractruntime "github.com/Shphrd-ai/pipelock/internal/contract/runtime"
+	"github.com/Shphrd-ai/pipelock/internal/deferred"
+	"github.com/Shphrd-ai/pipelock/internal/killswitch"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/tools"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/transport"
+	session "github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 func emitRequestScopedTimeout(

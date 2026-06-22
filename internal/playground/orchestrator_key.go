@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/atomicfile"
-	"github.com/luckyPipewrench/pipelock/internal/secperm"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/atomicfile"
+	"github.com/Shphrd-ai/pipelock/internal/secperm"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // PublishedOrchestratorPubKeyHex is the published public half of the stable

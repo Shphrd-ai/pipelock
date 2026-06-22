@@ -15,9 +15,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	mcpintegrity "github.com/luckyPipewrench/pipelock/internal/mcp/integrity"
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	mcpintegrity "github.com/Shphrd-ai/pipelock/internal/mcp/integrity"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 var errMCPIntegrityViolation = errors.New("MCP binary integrity violation")

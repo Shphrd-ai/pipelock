@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/licenseservice"
+	"github.com/Shphrd-ai/pipelock/enterprise/licenseservice"
 	"github.com/rs/zerolog"
 )
 

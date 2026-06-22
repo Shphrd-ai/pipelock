@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/audit"
-	"github.com/luckyPipewrench/pipelock/internal/blockreason"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
-	"github.com/luckyPipewrench/pipelock/internal/reqpolicy"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/blockreason"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/reqpolicy"
 )
 
 // blockLayerRequestPolicy labels request_policy decisions on receipts and audit

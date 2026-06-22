@@ -3,7 +3,7 @@
 
 package mcp
 
-import "github.com/luckyPipewrench/pipelock/internal/audit"
+import "github.com/Shphrd-ai/pipelock/internal/audit"
 
 func mustMCPAuditContext(logger *audit.Logger, method, resource string) audit.LogContext {
 	ctx, err := audit.NewMCPLogContext(method, resource, "")

@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/luckyPipewrench/pipelock/internal/blockreason"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	contractruntime "github.com/luckyPipewrench/pipelock/internal/contract/runtime"
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/blockreason"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	contractruntime "github.com/Shphrd-ai/pipelock/internal/contract/runtime"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
 )
 
 // Decision.Reason values the runtime evaluator emits. Aliases the typed

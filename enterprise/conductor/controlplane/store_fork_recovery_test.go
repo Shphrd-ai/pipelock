@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
 )
 
 // writeForkRecord writes a signed bundle directly to the store's bundles dir,

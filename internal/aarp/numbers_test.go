@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
 )
 
 // parseTree decodes JSON the same way the envelope path does: strict (duplicate

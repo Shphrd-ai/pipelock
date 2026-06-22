@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
 )
 
 type fakeFileInfo struct {

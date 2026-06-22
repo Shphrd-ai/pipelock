@@ -13,8 +13,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/normalize"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/normalize"
 )
 
 // Core scanner constants. These label values flow into metrics and audit logs.

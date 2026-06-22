@@ -15,10 +15,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/extract"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/transport"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/extract"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/transport"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // ErrA2AStreamFinding is returned by ScanA2AStream when a scanning finding

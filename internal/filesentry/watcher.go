@@ -6,7 +6,7 @@ package filesentry
 import (
 	"context"
 
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // Finding describes a DLP match detected in a file written to a watched directory.

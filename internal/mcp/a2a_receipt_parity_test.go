@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	contractreceipt "github.com/luckyPipewrench/pipelock/internal/contract/receipt"
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	contractreceipt "github.com/Shphrd-ai/pipelock/internal/contract/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
 )
 
 // A2A (agent-to-agent) decision points block traffic on multiple paths. Every

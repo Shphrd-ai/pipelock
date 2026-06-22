@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/emergency"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/emergency"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 func TestNewServer_ConductorAuditProducerFromConfig(t *testing.T) {

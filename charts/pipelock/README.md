@@ -255,5 +255,5 @@ same way. On a non-embedded local build `pipelock check` also prints a
 ## See also
 
 - [Pipelock docs](https://pipelab.org/learn/)
-- [Audit Packet schema](https://github.com/luckyPipewrench/pipelock/tree/main/sdk/audit-packet)
-- [pipelock-verifier CLI](https://github.com/luckyPipewrench/pipelock/tree/main/cmd/pipelock-verifier)
+- [Audit Packet schema](https://github.com/Shphrd-ai/pipelock/tree/main/sdk/audit-packet)
+- [pipelock-verifier CLI](https://github.com/Shphrd-ai/pipelock/tree/main/cmd/pipelock-verifier)

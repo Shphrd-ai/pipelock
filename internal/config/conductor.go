@@ -13,8 +13,8 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/luckyPipewrench/pipelock/internal/secperm"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/secperm"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const (

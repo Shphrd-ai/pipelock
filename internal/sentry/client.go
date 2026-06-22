@@ -13,7 +13,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // Client wraps the Sentry SDK with secret scrubbing. When disabled (enabled=false),

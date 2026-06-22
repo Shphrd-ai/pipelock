@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/license"
 )
 
 // crlRollbackFixture holds the shared material for the rollback tests: a key

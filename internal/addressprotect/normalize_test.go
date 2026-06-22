@@ -6,7 +6,7 @@ package addressprotect
 import (
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 func TestETHNormalizeAllPaths(t *testing.T) {

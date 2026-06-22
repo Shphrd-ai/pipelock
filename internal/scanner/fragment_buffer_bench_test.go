@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 func BenchmarkFragmentBuffer_Append(b *testing.B) {

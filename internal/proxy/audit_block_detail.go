@@ -4,8 +4,8 @@
 package proxy
 
 import (
-	"github.com/luckyPipewrench/pipelock/internal/audit"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // auditDetailFromResult bridges scanner.Result classification onto the

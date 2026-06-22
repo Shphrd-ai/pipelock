@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/capture"
-	"github.com/luckyPipewrench/pipelock/internal/contract/inference"
-	"github.com/luckyPipewrench/pipelock/internal/contract/inference/ingest"
-	"github.com/luckyPipewrench/pipelock/internal/contract/inference/normalize"
+	"github.com/Shphrd-ai/pipelock/internal/capture"
+	"github.com/Shphrd-ai/pipelock/internal/contract/inference"
+	"github.com/Shphrd-ai/pipelock/internal/contract/inference/ingest"
+	"github.com/Shphrd-ai/pipelock/internal/contract/inference/normalize"
 )
 
 const (

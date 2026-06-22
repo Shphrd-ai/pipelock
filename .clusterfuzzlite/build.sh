@@ -10,7 +10,7 @@ printf "package scanner\nimport _ \"github.com/AdamKorcz/go-118-fuzz-build/testi
 cat > "$SRC/pipelock/internal/scanner/fuzz_helpers.go" << 'GOEOF'
 package scanner
 
-import "github.com/luckyPipewrench/pipelock/internal/config"
+import "github.com/Shphrd-ai/pipelock/internal/config"
 
 func testConfig() *config.Config {
 	cfg := config.Defaults()
@@ -26,12 +26,12 @@ export GOFLAGS="-mod=mod"
 go mod tidy
 
 # Compile each native Go fuzz target into a libFuzzer binary.
-compile_native_go_fuzzer github.com/luckyPipewrench/pipelock/internal/scanner FuzzScanURL fuzz_scan_url
-compile_native_go_fuzzer github.com/luckyPipewrench/pipelock/internal/scanner FuzzMatchDomain fuzz_match_domain
-compile_native_go_fuzzer github.com/luckyPipewrench/pipelock/internal/scanner FuzzShannonEntropy fuzz_shannon_entropy
-compile_native_go_fuzzer github.com/luckyPipewrench/pipelock/internal/scanner FuzzScanResponseContent fuzz_scan_response_content
-compile_native_go_fuzzer github.com/luckyPipewrench/pipelock/internal/audit FuzzSanitizeString fuzz_sanitize_string
-compile_native_go_fuzzer github.com/luckyPipewrench/pipelock/internal/gitprotect FuzzParseDiff fuzz_parse_diff
-compile_native_go_fuzzer github.com/luckyPipewrench/pipelock/internal/gitprotect FuzzScanDiff fuzz_scan_diff
-compile_native_go_fuzzer github.com/luckyPipewrench/pipelock/internal/mcp FuzzScanResponse fuzz_scan_response
-compile_native_go_fuzzer github.com/luckyPipewrench/pipelock/internal/seedprotect FuzzDetect fuzz_detect
+compile_native_go_fuzzer github.com/Shphrd-ai/pipelock/internal/scanner FuzzScanURL fuzz_scan_url
+compile_native_go_fuzzer github.com/Shphrd-ai/pipelock/internal/scanner FuzzMatchDomain fuzz_match_domain
+compile_native_go_fuzzer github.com/Shphrd-ai/pipelock/internal/scanner FuzzShannonEntropy fuzz_shannon_entropy
+compile_native_go_fuzzer github.com/Shphrd-ai/pipelock/internal/scanner FuzzScanResponseContent fuzz_scan_response_content
+compile_native_go_fuzzer github.com/Shphrd-ai/pipelock/internal/audit FuzzSanitizeString fuzz_sanitize_string
+compile_native_go_fuzzer github.com/Shphrd-ai/pipelock/internal/gitprotect FuzzParseDiff fuzz_parse_diff
+compile_native_go_fuzzer github.com/Shphrd-ai/pipelock/internal/gitprotect FuzzScanDiff fuzz_scan_diff
+compile_native_go_fuzzer github.com/Shphrd-ai/pipelock/internal/mcp FuzzScanResponse fuzz_scan_response
+compile_native_go_fuzzer github.com/Shphrd-ai/pipelock/internal/seedprotect FuzzDetect fuzz_detect

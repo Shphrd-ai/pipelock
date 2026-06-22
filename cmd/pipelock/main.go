@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/luckyPipewrench/pipelock/internal/cli"
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/sandbox"
+	"github.com/Shphrd-ai/pipelock/internal/cli"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/sandbox"
 )
 
 func main() {

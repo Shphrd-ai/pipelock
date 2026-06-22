@@ -18,10 +18,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/license"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 	"github.com/spf13/cobra"
 )
 
@@ -98,7 +98,7 @@ func licenseKeygenCmd() *cobra.Command {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  Public key:  %s\n", pubPath)
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nPublic key (hex, for ldflags or config):\n  %s\n", pubHex)
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nBuild with embedded key:\n")
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  go build -ldflags \"-X github.com/luckyPipewrench/pipelock/internal/license.PublicKeyHex=%s\" ./cmd/pipelock\n", pubHex)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  go build -ldflags \"-X github.com/Shphrd-ai/pipelock/internal/license.PublicKeyHex=%s\" ./cmd/pipelock\n", pubHex)
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nFor dev builds, set license_public_key in your config YAML.\n")
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Official releases use the embedded key (ldflags) and ignore the config field.\n")
 

@@ -11,7 +11,7 @@ import (
 
 // KeyringHex is set at build time via ldflags:
 //
-//	-X github.com/luckyPipewrench/pipelock/internal/rules.KeyringHex=<hex>[,<hex>...]
+//	-X github.com/Shphrd-ai/pipelock/internal/rules.KeyringHex=<hex>[,<hex>...]
 //
 // It contains comma-separated hex-encoded Ed25519 public keys that form
 // the embedded trust root for verifying official rule bundles.

@@ -18,11 +18,11 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/luckyPipewrench/pipelock/internal/cli/audit"
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	posturepkg "github.com/luckyPipewrench/pipelock/internal/posture"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/cli/audit"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	posturepkg "github.com/Shphrd-ai/pipelock/internal/posture"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const (

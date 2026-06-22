@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/killswitch"
+	"github.com/Shphrd-ai/pipelock/internal/killswitch"
 )
 
 // hopByHopHeaders are RFC 7230 section 6.1 hop-by-hop headers that must be

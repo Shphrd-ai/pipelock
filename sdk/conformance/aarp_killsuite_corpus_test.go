@@ -7,8 +7,8 @@ import (
 	"crypto/ed25519"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/aarp"
-	"github.com/luckyPipewrench/pipelock/internal/svidsidecar"
+	"github.com/Shphrd-ai/pipelock/internal/aarp"
+	"github.com/Shphrd-ai/pipelock/internal/svidsidecar"
 )
 
 // This file builds the Evidence Theater Kill Suite arm of the AARP hostile

@@ -21,12 +21,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/audit"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/edition"
-	"github.com/luckyPipewrench/pipelock/internal/emit"
-	plsentry "github.com/luckyPipewrench/pipelock/internal/sentry"
-	"github.com/luckyPipewrench/pipelock/internal/testport"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/edition"
+	"github.com/Shphrd-ai/pipelock/internal/emit"
+	plsentry "github.com/Shphrd-ai/pipelock/internal/sentry"
+	"github.com/Shphrd-ai/pipelock/internal/testport"
 )
 
 // syncBuffer is defined in helpers_test.go (no build constraint).

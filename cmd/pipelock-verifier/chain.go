@@ -13,9 +13,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	contractreceipt "github.com/luckyPipewrench/pipelock/internal/contract/receipt"
-	actionreceipt "github.com/luckyPipewrench/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	contractreceipt "github.com/Shphrd-ai/pipelock/internal/contract/receipt"
+	actionreceipt "github.com/Shphrd-ai/pipelock/internal/receipt"
 )
 
 // chainOptions holds resolved CLI flags for the chain subcommand.

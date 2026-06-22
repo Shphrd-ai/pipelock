@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // Semantic config-validation checks for the doctor command.

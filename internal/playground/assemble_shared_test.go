@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground"
-	"github.com/luckyPipewrench/pipelock/internal/replaycapture"
+	"github.com/Shphrd-ai/pipelock/internal/playground"
+	"github.com/Shphrd-ai/pipelock/internal/replaycapture"
 )
 
 func TestAssembleFromEvidence_ProducesVerifiablePacket(t *testing.T) {

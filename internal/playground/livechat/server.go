@@ -19,7 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground"
+	"github.com/Shphrd-ai/pipelock/internal/playground"
 )
 
 // Route paths for the live-chat API.

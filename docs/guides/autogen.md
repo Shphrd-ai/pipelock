@@ -9,7 +9,7 @@ AutoGen v0.4+ and Docker Compose deployment.
 
 ```bash
 # 1. Install pipelock
-go install github.com/luckyPipewrench/pipelock/cmd/pipelock@latest
+go install github.com/Shphrd-ai/pipelock/cmd/pipelock@latest
 
 # 2. Generate a config (or copy a preset)
 pipelock generate config --preset balanced > pipelock.yaml
@@ -263,7 +263,7 @@ networks:
 
 services:
   pipelock:
-    # Pin to a specific version for production. See https://github.com/luckyPipewrench/pipelock/releases for available tags.
+    # Pin to a specific version for production. See https://github.com/Shphrd-ai/pipelock/releases for available tags.
     image: ghcr.io/luckypipewrench/pipelock:latest
     networks:
       - pipelock-internal

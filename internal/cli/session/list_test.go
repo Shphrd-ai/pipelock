@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
 )
 
 func TestListCmd_HappyPathHuman(t *testing.T) {

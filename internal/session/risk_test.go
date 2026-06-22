@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 func TestSessionRiskObserve(t *testing.T) {

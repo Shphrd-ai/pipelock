@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/projectscan"
-	"github.com/luckyPipewrench/pipelock/internal/sarif"
+	"github.com/Shphrd-ai/pipelock/internal/projectscan"
+	"github.com/Shphrd-ai/pipelock/internal/sarif"
 	"github.com/spf13/cobra"
 )
 

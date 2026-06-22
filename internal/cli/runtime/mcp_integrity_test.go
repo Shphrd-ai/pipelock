@@ -14,8 +14,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	mcpintegrity "github.com/luckyPipewrench/pipelock/internal/mcp/integrity"
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	mcpintegrity "github.com/Shphrd-ai/pipelock/internal/mcp/integrity"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const osWindows = "windows"

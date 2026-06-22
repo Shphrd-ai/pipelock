@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
 )
 
 // Domain-separation contexts. Every signing input is the JCS canonicalization of

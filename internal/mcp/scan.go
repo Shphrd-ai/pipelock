@@ -17,11 +17,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/jsonrpc"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/provenance"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/transport"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/jsonrpc"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/provenance"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/transport"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // ResponseScanOptions carries per-server suppression context for stdio MCP

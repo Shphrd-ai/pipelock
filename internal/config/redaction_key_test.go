@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/luckyPipewrench/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
 )
 
 func enabledRedactionConfig() *Config {

@@ -19,9 +19,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
-	"github.com/luckyPipewrench/pipelock/internal/redact"
-	"github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 // recorderEntryType is the recorder entry type for action receipts.

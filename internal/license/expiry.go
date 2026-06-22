@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/atomicfile"
+	"github.com/Shphrd-ai/pipelock/internal/atomicfile"
 )
 
 const (

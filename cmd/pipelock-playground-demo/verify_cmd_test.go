@@ -19,8 +19,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground"
-	"github.com/luckyPipewrench/pipelock/internal/replaycapture"
+	"github.com/Shphrd-ai/pipelock/internal/playground"
+	"github.com/Shphrd-ai/pipelock/internal/replaycapture"
 )
 
 // cmdCanaryValue builds the canary at runtime (gosec G101).

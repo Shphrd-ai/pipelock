@@ -17,10 +17,10 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/bench/egress/mocks/httpecho"
-	"github.com/luckyPipewrench/pipelock/bench/egress/mocks/sse"
-	"github.com/luckyPipewrench/pipelock/bench/egress/mocks/toolchain"
-	"github.com/luckyPipewrench/pipelock/bench/egress/mocks/wsfeed"
+	"github.com/Shphrd-ai/pipelock/bench/egress/mocks/httpecho"
+	"github.com/Shphrd-ai/pipelock/bench/egress/mocks/sse"
+	"github.com/Shphrd-ai/pipelock/bench/egress/mocks/toolchain"
+	"github.com/Shphrd-ai/pipelock/bench/egress/mocks/wsfeed"
 )
 
 // LatencyConfig parameterizes the latency runs.

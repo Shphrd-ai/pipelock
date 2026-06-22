@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
 )
 
 // Test-local constants - repeated string literals belong in a const block

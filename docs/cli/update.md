@@ -39,7 +39,7 @@ Every step below must succeed; **any failure aborts the update with the
 installed binary unchanged**:
 
 1. **Resolve the release.** Fetch `releases/latest` (or `releases/tags/<tag>`
-   with `--version`) from the GitHub API for `luckyPipewrench/pipelock`. The
+   with `--version`) from the GitHub API for `Shphrd-ai/pipelock`. The
    HTTP client honors `HTTPS_PROXY` / `HTTP_PROXY` from the environment, so the
    updater works inside a contained Pipelock deployment.
 2. **Publisher authenticity.** Download `checksums.txt` plus its
@@ -47,7 +47,7 @@ installed binary unchanged**:
    (`checksums.txt.pem`).
    - If a `cosign` binary is on `PATH`, run `cosign verify-blob` pinned to the
      GitHub Actions OIDC issuer (`https://token.actions.githubusercontent.com`)
-     and the `luckyPipewrench/pipelock` release workflow identity for the
+     and the `Shphrd-ai/pipelock` release workflow identity for the
      target tag. If it fails, the update **aborts**.
    - If `cosign` is **not** on `PATH`, the update **aborts** by default before
      any binary replacement. Passing `--insecure-skip-signature` changes this to

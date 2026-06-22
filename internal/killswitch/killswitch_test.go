@@ -13,7 +13,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // Package-level test constants for strings used 3+ times across test files.

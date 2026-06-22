@@ -19,13 +19,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cli/audit"
-	"github.com/luckyPipewrench/pipelock/internal/cli/diag"
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/license"
-	"github.com/luckyPipewrench/pipelock/internal/report/attestation"
-	"github.com/luckyPipewrench/pipelock/internal/report/compliance"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/cli/audit"
+	"github.com/Shphrd-ai/pipelock/internal/cli/diag"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/report/attestation"
+	"github.com/Shphrd-ai/pipelock/internal/report/compliance"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // checkAssessLicense reads the manifest to find the config, loads it,

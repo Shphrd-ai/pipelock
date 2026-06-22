@@ -15,12 +15,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/deferred"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/policy"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/tools"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/transport"
-	"github.com/luckyPipewrench/pipelock/internal/testwait"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/deferred"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/policy"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/tools"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/transport"
+	"github.com/Shphrd-ai/pipelock/internal/testwait"
 )
 
 func deferApprovalPolicy(profile config.DeferResolverProfile) *policy.Config {

@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	testModulePath    = "github.com/luckyPipewrench/pipelock"
+	testModulePath    = "github.com/Shphrd-ai/pipelock"
 	testModuleDigest  = "sha256:abc123"
 	testModulePath2   = "golang.org/x/crypto"
 	testModuleDigest2 = "sha256:def456"

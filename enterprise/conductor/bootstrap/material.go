@@ -22,12 +22,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/controlplane"
-	"github.com/luckyPipewrench/pipelock/internal/certgen"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/license"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/controlplane"
+	"github.com/Shphrd-ai/pipelock/internal/certgen"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const (

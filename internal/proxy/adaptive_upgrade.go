@@ -1,8 +1,8 @@
 package proxy
 
 import (
-	"github.com/luckyPipewrench/pipelock/internal/audit"
-	"github.com/luckyPipewrench/pipelock/internal/metrics"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/metrics"
 )
 
 // adaptiveUpgrade carries the inputs shared by the adaptive-enforcement audit

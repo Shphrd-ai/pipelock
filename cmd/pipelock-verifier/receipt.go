@@ -12,8 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	actionreceipt "github.com/luckyPipewrench/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	actionreceipt "github.com/Shphrd-ai/pipelock/internal/receipt"
 )
 
 type receiptOptions struct {

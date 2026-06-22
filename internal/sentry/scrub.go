@@ -8,8 +8,8 @@ import (
 
 	"github.com/getsentry/sentry-go"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
 )
 
 // safetyNetPatterns are always applied regardless of user config.

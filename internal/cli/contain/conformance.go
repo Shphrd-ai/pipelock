@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
 )
 
 // This file is the ONLY exported surface the containment-conformance

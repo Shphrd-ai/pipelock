@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/luckyPipewrench/pipelock/internal/secperm"
+	"github.com/Shphrd-ai/pipelock/internal/secperm"
 )
 
 // adaptiveResetter is the optional capability ForwardScanned uses to clear a

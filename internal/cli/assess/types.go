@@ -8,10 +8,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/cli/audit"
-	"github.com/luckyPipewrench/pipelock/internal/cli/diag"
-	"github.com/luckyPipewrench/pipelock/internal/discover"
-	"github.com/luckyPipewrench/pipelock/internal/report/compliance"
+	"github.com/Shphrd-ai/pipelock/internal/cli/audit"
+	"github.com/Shphrd-ai/pipelock/internal/cli/diag"
+	"github.com/Shphrd-ai/pipelock/internal/discover"
+	"github.com/Shphrd-ai/pipelock/internal/report/compliance"
 )
 
 // Schema and scoring version constants.

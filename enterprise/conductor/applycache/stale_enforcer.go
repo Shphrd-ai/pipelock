@@ -12,7 +12,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // StaleKillSwitch is the subset of the kill-switch controller the stale enforcer

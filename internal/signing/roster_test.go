@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
 )
 
 // RFC 8032 section 7.1 test 1 private seed, split per G101 lint rule.

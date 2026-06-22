@@ -4,7 +4,7 @@ Threat model for the Pipelock Audit Packet (Audit Packet v0). Audience: a relyin
 
 ## What an Audit Packet is
 
-An Audit Packet is the bundle Pipelock writes after a Pipelock-mediated agent run. It pairs a verifier verdict over a chain of Ed25519-signed action receipts with the enforcement posture that produced them. The canonical schema is [`sdk/audit-packet/v0.json`](../../sdk/audit-packet/v0.json); the on-wire receipt format is documented at [pipelab.org/learn/action-receipt-spec/](https://pipelab.org/learn/action-receipt-spec/). The first producer is the [`pipelock-agent-egress-action`](https://github.com/luckyPipewrench/pipelock-agent-egress-action) GitHub Action; producers on other CI surfaces follow the same schema.
+An Audit Packet is the bundle Pipelock writes after a Pipelock-mediated agent run. It pairs a verifier verdict over a chain of Ed25519-signed action receipts with the enforcement posture that produced them. The canonical schema is [`sdk/audit-packet/v0.json`](../../sdk/audit-packet/v0.json); the on-wire receipt format is documented at [pipelab.org/learn/action-receipt-spec/](https://pipelab.org/learn/action-receipt-spec/). The first producer is the [`pipelock-agent-egress-action`](https://github.com/Shphrd-ai/pipelock-agent-egress-action) GitHub Action; producers on other CI surfaces follow the same schema.
 
 This document describes what the packet does and does not prove about the run. It is the text a hostile-reader review of a packet should be checked against.
 
@@ -36,7 +36,7 @@ The chain records what Pipelock observed. It is silent about traffic that bypass
 
 A missing receipt is not a proof of absence. The packet does not enumerate traffic Pipelock should have seen but didn't. A relying party that needs negative-space evidence cannot derive it from the packet alone. Complement with runner-level network telemetry that operates below the agent's reach.
 
-The current set of paths the Pipelock binary itself does not intercept is documented in [current-unsupported-paths](current-unsupported-paths.md). The egress-action's v0 boundary is documented in the [action README](https://github.com/luckyPipewrench/pipelock-agent-egress-action#v0-enforcement-boundary).
+The current set of paths the Pipelock binary itself does not intercept is documented in [current-unsupported-paths](current-unsupported-paths.md). The egress-action's v0 boundary is documented in the [action README](https://github.com/Shphrd-ai/pipelock-agent-egress-action#v0-enforcement-boundary).
 
 ### 2. Compromised runner environment
 

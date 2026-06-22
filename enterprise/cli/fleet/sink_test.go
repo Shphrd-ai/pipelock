@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	"github.com/luckyPipewrench/pipelock/enterprise/fleet/sink"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/fleet/sink"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 func TestTrustedAuditKeyResolver_InlineAndFile(t *testing.T) {

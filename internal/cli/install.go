@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/atomicfile"
+	"github.com/Shphrd-ai/pipelock/internal/atomicfile"
 )
 
 // execMode is the permission used for the installed pipelock binary. It

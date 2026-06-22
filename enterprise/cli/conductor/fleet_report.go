@@ -19,11 +19,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/controlplane"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/fleetreport"
-	clisigning "github.com/luckyPipewrench/pipelock/internal/cli/signing"
-	"github.com/luckyPipewrench/pipelock/internal/license"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/controlplane"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/fleetreport"
+	clisigning "github.com/Shphrd-ai/pipelock/internal/cli/signing"
+	"github.com/Shphrd-ai/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 type fleetReportOptions struct {

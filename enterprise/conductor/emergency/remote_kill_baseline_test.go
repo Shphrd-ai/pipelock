@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
 )
 
 // writeEnrolledMarker drops a minimal enrollment marker next to the replay

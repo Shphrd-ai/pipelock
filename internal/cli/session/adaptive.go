@@ -10,7 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/proxy"
+	"github.com/Shphrd-ai/pipelock/internal/proxy"
 )
 
 // AdaptiveCmd is the top-level `pipelock adaptive` operator command.

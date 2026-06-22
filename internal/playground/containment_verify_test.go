@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground"
+	"github.com/Shphrd-ai/pipelock/internal/playground"
 )
 
 const hcwFile = "host-containment-witness.json"

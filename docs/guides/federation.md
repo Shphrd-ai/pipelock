@@ -269,4 +269,4 @@ deployment, enabling it before clients sign envelopes will fail closed with
 - [`receipt-transports.md`](receipt-transports.md) — receipt verification recipe.
 - [`mediation-envelope.md`](mediation-envelope.md) — outbound envelope format and signing.
 - [`learn-and-lock.md`](learn-and-lock.md) — `EvidenceReceipt v2` envelope (independent of mediation-envelope verification).
-- [`pipelock-verify-python`](https://github.com/luckyPipewrench/pipelock-verify-python) — external Python verifier; prepared v0.2.0 update uses well-known fetch for individual receipt verification once published.
+- [`pipelock-verify-python`](https://github.com/Shphrd-ai/pipelock-verify-python) — external Python verifier; prepared v0.2.0 update uses well-known fetch for individual receipt verification once published.

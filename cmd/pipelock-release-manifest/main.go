@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	releasetrust "github.com/luckyPipewrench/pipelock/internal/release"
+	releasetrust "github.com/Shphrd-ai/pipelock/internal/release"
 )
 
 var pipelockArchiveRE = regexp.MustCompile(`^pipelock_([^_]+)_([^_]+)_([^_]+)\.(tar\.gz|zip)$`)
@@ -93,7 +93,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	}
 	manifest := releasetrust.Manifest{
 		Schema:             "pipelock-release-v1",
-		Repo:               "github.com/luckyPipewrench/pipelock",
+		Repo:               "github.com/Shphrd-ai/pipelock",
 		Tag:                *tag,
 		Commit:             *commit,
 		CreatedUTC:         time.Now().UTC().Format(time.RFC3339),

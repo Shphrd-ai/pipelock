@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/blockreason"
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/blockreason"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
 )
 
 // Canonical request_policy_deny header values, derived from the blockreason

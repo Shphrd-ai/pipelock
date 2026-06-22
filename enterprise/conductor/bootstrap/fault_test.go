@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/controlplane"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/controlplane"
 )
 
 func freshMaterial(t *testing.T) (Layout, Options, controlplane.FollowerIdentity, *materialSet) {

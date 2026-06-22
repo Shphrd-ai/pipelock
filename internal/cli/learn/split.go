@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/luckyPipewrench/pipelock/internal/atomicfile"
+	"github.com/Shphrd-ai/pipelock/internal/atomicfile"
 )
 
 // Sentinel errors returned by the split / pin operator-affordance

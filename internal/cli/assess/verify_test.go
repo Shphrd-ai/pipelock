@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // setupFinalizedRunSigned creates a fully finalized, signed assessment run.

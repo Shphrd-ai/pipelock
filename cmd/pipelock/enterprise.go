@@ -5,10 +5,10 @@
 package main
 
 import (
-	"github.com/luckyPipewrench/pipelock/enterprise"
-	_ "github.com/luckyPipewrench/pipelock/enterprise/cli"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/edition"
+	"github.com/Shphrd-ai/pipelock/enterprise"
+	_ "github.com/Shphrd-ai/pipelock/enterprise/cli"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/edition"
 )
 
 func init() {

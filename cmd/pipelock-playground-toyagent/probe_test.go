@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground"
+	"github.com/Shphrd-ai/pipelock/internal/playground"
 )
 
 func TestRunProbe_OpenAndRefused(t *testing.T) {

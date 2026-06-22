@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/proxy"
+	"github.com/Shphrd-ai/pipelock/internal/proxy"
 )
 
 func TestExplainCmd_HappyPath(t *testing.T) {

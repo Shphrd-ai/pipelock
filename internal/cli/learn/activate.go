@@ -17,12 +17,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/contract/activation"
-	contractreceipt "github.com/luckyPipewrench/pipelock/internal/contract/receipt"
-	contractstore "github.com/luckyPipewrench/pipelock/internal/contract/store"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract/activation"
+	contractreceipt "github.com/Shphrd-ai/pipelock/internal/contract/receipt"
+	contractstore "github.com/Shphrd-ai/pipelock/internal/contract/store"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const (

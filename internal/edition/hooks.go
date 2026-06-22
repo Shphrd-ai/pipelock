@@ -3,7 +3,7 @@
 
 package edition
 
-import "github.com/luckyPipewrench/pipelock/internal/config"
+import "github.com/Shphrd-ai/pipelock/internal/config"
 
 // NewEditionFunc creates an Edition from config. Set by enterprise builds.
 // Default (OSS) creates a noopEdition.

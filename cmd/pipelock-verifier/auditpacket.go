@@ -15,9 +15,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
-	auditpacket "github.com/luckyPipewrench/pipelock/sdk/audit-packet"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
+	auditpacket "github.com/Shphrd-ai/pipelock/sdk/audit-packet"
 )
 
 // Stable status labels emitted in the textual report and the JSON

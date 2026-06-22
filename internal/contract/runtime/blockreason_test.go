@@ -6,7 +6,7 @@ package runtime
 import (
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/blockreason"
+	"github.com/Shphrd-ai/pipelock/internal/blockreason"
 )
 
 // TestBlockReasonForDecision_AllSupportedStrings asserts that every Decision

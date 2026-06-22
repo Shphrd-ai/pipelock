@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
 )
 
 // AuditKeyResolver resolves follower audit signing keys from the authenticated

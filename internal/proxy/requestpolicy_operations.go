@@ -11,7 +11,7 @@ import (
 	"mime"
 	"mime/multipart"
 
-	"github.com/luckyPipewrench/pipelock/internal/reqpolicy"
+	"github.com/Shphrd-ai/pipelock/internal/reqpolicy"
 )
 
 // multipartOperationsMaxBytes caps the bytes read from a multipart "operations"

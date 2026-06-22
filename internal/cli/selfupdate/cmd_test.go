@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	releasetrust "github.com/luckyPipewrench/pipelock/internal/release"
+	releasetrust "github.com/Shphrd-ai/pipelock/internal/release"
 )
 
 func TestCmd_Construction(t *testing.T) {

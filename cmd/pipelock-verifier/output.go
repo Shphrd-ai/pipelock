@@ -12,8 +12,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	sigutil "github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	sigutil "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const unpinnedReceiptBanner = "UNPINNED — signature is self-consistent but the signer was NOT checked against a trusted key"

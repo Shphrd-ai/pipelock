@@ -8,7 +8,7 @@ package runtime
 import (
 	"io"
 
-	"github.com/luckyPipewrench/pipelock/internal/killswitch"
+	"github.com/Shphrd-ai/pipelock/internal/killswitch"
 )
 
 // RegisterKillSwitchSignal is a no-op on Windows where SIGUSR1 does not exist.

@@ -10,10 +10,10 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/luckyPipewrench/pipelock/internal/atomicfile"
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/contract/inference/aggregate"
-	contractcompile "github.com/luckyPipewrench/pipelock/internal/contract/inference/compile"
+	"github.com/Shphrd-ai/pipelock/internal/atomicfile"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract/inference/aggregate"
+	contractcompile "github.com/Shphrd-ai/pipelock/internal/contract/inference/compile"
 )
 
 func reviewCmd() *cobra.Command {

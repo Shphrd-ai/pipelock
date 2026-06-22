@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/controlplane"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/controlplane"
 )
 
 const maxResponseBytes = 64 * 1024

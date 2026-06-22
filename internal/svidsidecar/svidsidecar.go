@@ -34,8 +34,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/aarp"
-	"github.com/luckyPipewrench/pipelock/internal/svid"
+	"github.com/Shphrd-ai/pipelock/internal/aarp"
+	"github.com/Shphrd-ai/pipelock/internal/svid"
 )
 
 // Sidecar is the on-disk --svid input. Its JSON shape is the cross-language

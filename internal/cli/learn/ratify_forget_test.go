@@ -17,8 +17,8 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	contractreceipt "github.com/luckyPipewrench/pipelock/internal/contract/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	contractreceipt "github.com/Shphrd-ai/pipelock/internal/contract/receipt"
 )
 
 func TestLearnCmdRegistersRatifyAndForget(t *testing.T) {

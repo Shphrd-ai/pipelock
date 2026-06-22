@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
 )
 
 // buildChain creates a valid hash-chained sequence of entries.

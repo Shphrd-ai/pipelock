@@ -3,9 +3,9 @@ package proxy
 import (
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/audit"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/metrics"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/metrics"
 )
 
 // adaptiveUpgradeCounterValue reads the pipelock_adaptive_upgrades_total counter

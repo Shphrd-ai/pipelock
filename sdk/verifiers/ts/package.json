@@ -7,10 +7,10 @@
   "homepage": "https://pipelab.org/learn/action-receipt-spec/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/luckyPipewrench/pipelock.git",
+    "url": "git+https://github.com/Shphrd-ai/pipelock.git",
     "directory": "sdk/verifiers/ts"
   },
-  "bugs": "https://github.com/luckyPipewrench/pipelock/issues",
+  "bugs": "https://github.com/Shphrd-ai/pipelock/issues",
   "keywords": [
     "pipelock",
     "verifier",

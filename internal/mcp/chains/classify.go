@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // categoryKeywords maps tool categories to keywords that appear in tool names.

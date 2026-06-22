@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
 )
 
 // TestApplyRollbackHeadGuards exercises the nil-receiver, structurally invalid

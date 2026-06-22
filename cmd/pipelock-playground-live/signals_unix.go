@@ -11,7 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground/livechat"
+	"github.com/Shphrd-ai/pipelock/internal/playground/livechat"
 )
 
 // watchKillSwitch wires the operator kill switch to signals: SIGUSR1 trips it

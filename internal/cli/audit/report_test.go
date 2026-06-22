@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/report"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/report"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const (

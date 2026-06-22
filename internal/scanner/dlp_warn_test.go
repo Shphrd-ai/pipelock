@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // testDLPConfig returns a minimal config with SSRF disabled and one pattern.

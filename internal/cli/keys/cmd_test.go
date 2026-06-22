@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // runStatus executes `keys status` with args, capturing stdout via SetOut (the

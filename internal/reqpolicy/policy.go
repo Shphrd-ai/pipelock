@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // methodOverrideHeaders are the headers some frameworks honor to tunnel a

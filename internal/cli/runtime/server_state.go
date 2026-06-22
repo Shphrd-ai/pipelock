@@ -7,13 +7,13 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/mcp"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/chains"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/policy"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/tools"
-	"github.com/luckyPipewrench/pipelock/internal/rules"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/mcp"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/chains"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/policy"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/tools"
+	"github.com/Shphrd-ai/pipelock/internal/rules"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 func (s *Server) currentConfig() *config.Config {

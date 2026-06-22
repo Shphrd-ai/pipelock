@@ -9,7 +9,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
 )
 
 // Quarantine audit event names. A quarantine is a high-severity event: a stored

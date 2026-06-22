@@ -15,7 +15,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // ed25519PubKeyHexLen is the expected hex-encoded length of a 32-byte

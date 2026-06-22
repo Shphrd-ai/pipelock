@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // discRule blocks a POST to the host when the JSON body's top-level "action"

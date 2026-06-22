@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground"
+	"github.com/Shphrd-ai/pipelock/internal/playground"
 )
 
 type failingContainmentVerifier struct{}

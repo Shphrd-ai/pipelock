@@ -19,7 +19,7 @@ The threat model that governs how to read a packet, including what a verified ve
 ## Where packets come from
 
 The first packet producer is the
-[`pipelock-agent-egress-action`](https://github.com/luckyPipewrench/pipelock-agent-egress-action)
+[`pipelock-agent-egress-action`](https://github.com/Shphrd-ai/pipelock-agent-egress-action)
 GitHub Action. It runs an agent script under a Linux netns + iptables + setpriv boundary,
 emits signed receipts via Pipelock's flight recorder, runs the receipt verifier after exit,
 and writes the four artifact files below into the Audit Packet directory:
@@ -84,7 +84,7 @@ schema needs to make that visible to relying parties.
 The Go binding lives in this directory:
 
 ```go
-import auditpacket "github.com/luckyPipewrench/pipelock/sdk/audit-packet"
+import auditpacket "github.com/Shphrd-ai/pipelock/sdk/audit-packet"
 
 var p auditpacket.Packet
 if err := json.Unmarshal(data, &p); err != nil {

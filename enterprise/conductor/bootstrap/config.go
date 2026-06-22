@@ -7,7 +7,7 @@ package bootstrap
 import (
 	"fmt"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/controlplane"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/controlplane"
 )
 
 // followerConfigYAML renders a complete, validation-clean follower config for

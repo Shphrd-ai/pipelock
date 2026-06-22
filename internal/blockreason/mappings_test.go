@@ -6,7 +6,7 @@ package blockreason_test
 import (
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/blockreason"
+	"github.com/Shphrd-ai/pipelock/internal/blockreason"
 )
 
 // TestSeverityFor_FullVocabulary pins the Reason -> Severity table for every

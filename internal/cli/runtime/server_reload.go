@@ -11,13 +11,13 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/audit"
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/license"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/policy"
-	"github.com/luckyPipewrench/pipelock/internal/rules"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/policy"
+	"github.com/Shphrd-ai/pipelock/internal/rules"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // Reload applies a single hot-reload cycle against newCfg. Mirrors the

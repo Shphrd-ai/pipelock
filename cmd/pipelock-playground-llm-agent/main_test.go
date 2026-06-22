@@ -19,7 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground/llmagent"
+	"github.com/Shphrd-ai/pipelock/internal/playground/llmagent"
 )
 
 func noEnv(string) string { return "" }

@@ -30,13 +30,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/applycache"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/auditbatcher"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/emergency"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/applycache"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/auditbatcher"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/emergency"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 func TestNewConductorMTLSClientConfiguresClientCertificate(t *testing.T) {

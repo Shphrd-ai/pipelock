@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
 )
 
 // Test-local constants for envelope signing field values that repeat

@@ -13,8 +13,8 @@ import (
 	"net/url"
 	"unicode/utf8"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/normalize"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/normalize"
 )
 
 // Checker is the runtime orchestrator for address protection.

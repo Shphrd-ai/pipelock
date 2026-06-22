@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/report/attestation"
+	"github.com/Shphrd-ai/pipelock/internal/report/attestation"
 )
 
 // setupFinalizedRunWithAttestation creates a fully finalized, signed assessment

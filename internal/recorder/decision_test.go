@@ -18,7 +18,7 @@ import (
 
 	"golang.org/x/crypto/nacl/box"
 
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 func TestDecisionRecord_SignAndVerify(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/luckyPipewrench/pipelock/internal/mcpwrap"
+	"github.com/Shphrd-ai/pipelock/internal/mcpwrap"
 )
 
 const (

@@ -18,10 +18,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
-	"github.com/luckyPipewrench/pipelock/internal/testwait"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/testwait"
 )
 
 func TestProducer_EnqueuesSignedCheckpointSegment(t *testing.T) {

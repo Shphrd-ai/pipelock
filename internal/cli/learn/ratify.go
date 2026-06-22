@@ -21,12 +21,12 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/luckyPipewrench/pipelock/internal/atomicfile"
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/contract/activation"
-	contractreceipt "github.com/luckyPipewrench/pipelock/internal/contract/receipt"
-	contractstore "github.com/luckyPipewrench/pipelock/internal/contract/store"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/atomicfile"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract/activation"
+	contractreceipt "github.com/Shphrd-ai/pipelock/internal/contract/receipt"
+	contractstore "github.com/Shphrd-ai/pipelock/internal/contract/store"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const (

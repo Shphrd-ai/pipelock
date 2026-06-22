@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/license"
 )
 
 // setTestFleetLicense issues a fresh Enterprise-tier license (with the fleet

@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
 )
 
 // newClientFn is the factory the subcommands use to build a live client.

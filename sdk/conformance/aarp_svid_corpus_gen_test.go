@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/aarp"
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/svidsidecar"
+	"github.com/Shphrd-ai/pipelock/internal/aarp"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/svidsidecar"
 )
 
 // This file generates the SVID X.509 attestation arm of the AARP hostile corpus.

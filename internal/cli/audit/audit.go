@@ -12,9 +12,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/projectscan"
-	"github.com/luckyPipewrench/pipelock/internal/sarif"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/projectscan"
+	"github.com/Shphrd-ai/pipelock/internal/sarif"
 )
 
 // Cmd returns the "audit" subcommand and its children.

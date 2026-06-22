@@ -27,7 +27,7 @@ These must be proven by tests, not assumed from docs or deployment.
 
 | Item | Value |
 |------|-------|
-| Module | `github.com/luckyPipewrench/pipelock` |
+| Module | `github.com/Shphrd-ai/pipelock` |
 | Go | 1.25+ (CI tests 1.25 and 1.26) |
 | License | Apache 2.0 (core), ELv2 (`enterprise/`) |
 | Binary | Single Go binary; size varies by OS, build tags, and release flags. |
@@ -209,4 +209,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide. PRs are s
 
 ## Security
 
-Report vulnerabilities via [GitHub Security Advisories](https://github.com/luckyPipewrench/pipelock/security/advisories), not public issues.
+Report vulnerabilities via [GitHub Security Advisories](https://github.com/Shphrd-ai/pipelock/security/advisories), not public issues.

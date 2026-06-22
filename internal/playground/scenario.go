@@ -3,7 +3,7 @@
 
 package playground
 
-import "github.com/luckyPipewrench/pipelock/internal/replaycapture"
+import "github.com/Shphrd-ai/pipelock/internal/replaycapture"
 
 // LiveDemoScenarioID is the playground live-demo scenario. It is intentionally
 // separate from the replay gallery's URL-exfil scenario because the live toy

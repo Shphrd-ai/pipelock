@@ -247,7 +247,7 @@ cross_request_detection:
 
 If you find a pattern that consistently produces false positives on common traffic, file an issue:
 
-**[github.com/luckyPipewrench/pipelock/issues](https://github.com/luckyPipewrench/pipelock/issues)**
+**[github.com/Shphrd-ai/pipelock/issues](https://github.com/Shphrd-ai/pipelock/issues)**
 
 Include:
 - The log entry (scanner, rule, severity)

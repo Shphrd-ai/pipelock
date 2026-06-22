@@ -10,9 +10,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/extract"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/policy"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/extract"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/policy"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // jsonNull is the literal JSON null, used to detect nil-equivalent RawMessage values.

@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/svidsidecar"
+	"github.com/Shphrd-ai/pipelock/internal/svidsidecar"
 )
 
 const (

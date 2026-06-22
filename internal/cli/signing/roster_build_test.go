@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // rosterBuildFixture seeds a working root + activation + compile key triple

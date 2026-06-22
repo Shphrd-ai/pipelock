@@ -8,7 +8,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
 )
 
 // HONESTY RULE (enforced by the renderer):

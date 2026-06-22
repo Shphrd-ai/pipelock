@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	contractreceipt "github.com/luckyPipewrench/pipelock/internal/contract/receipt"
-	contractruntime "github.com/luckyPipewrench/pipelock/internal/contract/runtime"
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
+	contractreceipt "github.com/Shphrd-ai/pipelock/internal/contract/receipt"
+	contractruntime "github.com/Shphrd-ai/pipelock/internal/contract/runtime"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
 )
 
 const testSpanDigest = "sha256:" +

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // PipelockHome holds the --home persistent flag value. Root command binds

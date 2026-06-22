@@ -41,7 +41,7 @@ Core commit access may be revoked only by Josh for security risk, inactivity, re
 ## Security Response
 
 Report security issues through GitHub Security Advisories at:
-https://github.com/luckyPipewrench/pipelock/security/advisories/new
+https://github.com/Shphrd-ai/pipelock/security/advisories/new
 
 Do not open public issues for vulnerabilities.
 

@@ -23,7 +23,7 @@ import (
 
 	"golang.org/x/crypto/nacl/box"
 
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // Default values for recorder configuration.

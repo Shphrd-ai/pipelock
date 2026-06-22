@@ -16,10 +16,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/emergency"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/enrollmentclient"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/emergency"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/enrollmentclient"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // stubKillSwitch satisfies emergency.KillSwitchSetter for restore tests.

@@ -6,7 +6,7 @@ package receipt
 import (
 	"net/http"
 
-	"github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 // ClassifyHTTP infers an action type from an HTTP method.

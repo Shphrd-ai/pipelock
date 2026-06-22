@@ -9,7 +9,7 @@ import (
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
 
-	"github.com/luckyPipewrench/pipelock/internal/abom"
+	"github.com/Shphrd-ai/pipelock/internal/abom"
 )
 
 const (

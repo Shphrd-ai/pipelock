@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/cli/diag"
+	"github.com/Shphrd-ai/pipelock/internal/cli/diag"
 )
 
 // Trust-gap regression tests for the schema-v2 evidence-integrity contract.

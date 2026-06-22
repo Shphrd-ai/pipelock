@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
 )
 
 // MCPRequest is the normalized input needed to evaluate mcp_tool_call rules.

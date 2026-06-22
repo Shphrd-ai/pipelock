@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/svid"
+	"github.com/Shphrd-ai/pipelock/internal/svid"
 )
 
 func TestSVID_P384CurveConfusion(t *testing.T) {

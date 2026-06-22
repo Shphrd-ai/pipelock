@@ -27,7 +27,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/cli/contain"
+	"github.com/Shphrd-ai/pipelock/internal/cli/contain"
 )
 
 const containmentFixtureDir = "testdata/containment"

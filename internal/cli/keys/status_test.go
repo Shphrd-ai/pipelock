@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // Test-local constants so goconst stays quiet across subtests.

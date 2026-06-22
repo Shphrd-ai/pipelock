@@ -13,7 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/controlplane"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/controlplane"
 )
 
 // streamStatusHandler serves the given stream-status response for GET and a

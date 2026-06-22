@@ -14,8 +14,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/integrity"
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/integrity"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // testRoot builds a minimal root command that hosts all signing subcommands,

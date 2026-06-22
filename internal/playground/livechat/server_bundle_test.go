@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground"
+	"github.com/Shphrd-ai/pipelock/internal/playground"
 )
 
 func TestServer_Bundle_AuthAndMethodChecks(t *testing.T) {

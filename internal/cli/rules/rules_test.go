@@ -18,9 +18,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	domrules "github.com/luckyPipewrench/pipelock/internal/rules"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	domrules "github.com/Shphrd-ai/pipelock/internal/rules"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // Test-scoped constants for repeated string literals.

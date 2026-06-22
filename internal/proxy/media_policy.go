@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/audit"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/media"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/media"
 )
 
 // MediaPolicyVerdict is the decision a media policy evaluation produces for

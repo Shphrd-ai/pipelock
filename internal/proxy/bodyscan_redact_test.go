@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/redact"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // TestScanRequestBody_Redaction_BeforeDLPEarlyReturn is the load-bearing

@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/license"
 )
 
 // privateFleetDir returns a fleet directory whose ancestors are not

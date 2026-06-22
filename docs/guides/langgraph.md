@@ -9,7 +9,7 @@ deployment.
 
 ```bash
 # 1. Install pipelock
-go install github.com/luckyPipewrench/pipelock/cmd/pipelock@latest
+go install github.com/Shphrd-ai/pipelock/cmd/pipelock@latest
 
 # 2. Generate a config (or copy a preset)
 pipelock generate config --preset generic-agent > pipelock.yaml
@@ -197,7 +197,7 @@ Use `dockerfile_lines` in `langgraph.json` to install Pipelock into the image:
     "env": ".env",
     "dockerfile_lines": [
         "RUN apt-get update && apt-get install -y curl",
-        "RUN curl -fsSL https://github.com/luckyPipewrench/pipelock/releases/latest/download/pipelock_linux_amd64.tar.gz | tar xz -C /usr/local/bin/",
+        "RUN curl -fsSL https://github.com/Shphrd-ai/pipelock/releases/latest/download/pipelock_linux_amd64.tar.gz | tar xz -C /usr/local/bin/",
         "COPY pipelock-config.yaml /etc/pipelock/config.yaml"
     ]
 }

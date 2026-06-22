@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // discOutcome is the result of evaluating a discriminator predicate against a

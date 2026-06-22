@@ -7,7 +7,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
 )
 
 // hasNonIdentityEncoding reports whether the Content-Encoding header carries

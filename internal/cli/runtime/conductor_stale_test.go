@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/applycache"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/killswitch"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/applycache"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/killswitch"
 )
 
 func staleEnforcerBaseConfig(dir string) config.Conductor {

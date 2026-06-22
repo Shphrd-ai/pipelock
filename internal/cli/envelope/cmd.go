@@ -22,8 +22,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	domenvelope "github.com/luckyPipewrench/pipelock/internal/envelope"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	domenvelope "github.com/Shphrd-ai/pipelock/internal/envelope"
 )
 
 const (

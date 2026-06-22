@@ -13,8 +13,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const followerURIScheme = "spiffe"

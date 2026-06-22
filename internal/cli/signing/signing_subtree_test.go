@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // Deterministic ed25519 seeds for roster test fixtures, split per G101 lint.

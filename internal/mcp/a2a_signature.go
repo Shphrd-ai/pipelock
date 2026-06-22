@@ -14,9 +14,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/jcs"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/jcs"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // CardSigOutcome is the result of evaluating an Agent Card's signatures.

@@ -10,11 +10,11 @@ import (
 	"io"
 	"sync"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/killswitch"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/tools"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/transport"
-	session "github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/killswitch"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/tools"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/transport"
+	session "github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 // RunWSProxy proxies MCP JSON-RPC between stdin/stdout and a WebSocket upstream.

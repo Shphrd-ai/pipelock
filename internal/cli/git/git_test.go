@@ -15,8 +15,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/gitprotect"
-	"github.com/luckyPipewrench/pipelock/internal/sarif"
+	"github.com/Shphrd-ai/pipelock/internal/gitprotect"
+	"github.com/Shphrd-ai/pipelock/internal/sarif"
 )
 
 const cleanDiff = `diff --git a/main.go b/main.go

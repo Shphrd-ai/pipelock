@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/seedprotect"
+	"github.com/Shphrd-ai/pipelock/internal/seedprotect"
 )
 
 var (

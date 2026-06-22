@@ -344,4 +344,4 @@ The runtime watches the active-manifest store via fsnotify with a 100ms debounce
 - [`docs/configuration.md`](../configuration.md#learn-and-lock) — `learn` configuration reference.
 - [`docs/guides/receipt-transports.md`](receipt-transports.md) — verifying receipts externally.
 - [`docs/guides/federation.md`](federation.md) — cross-org envelope verification (independent of contracts).
-- [`pipelock-verify-python`](https://github.com/luckyPipewrench/pipelock-verify-python) — external Python verifier; prepared v0.2.0 update adds individual EvidenceReceipt v2 envelope verification once published.
+- [`pipelock-verify-python`](https://github.com/Shphrd-ai/pipelock-verify-python) — external Python verifier; prepared v0.2.0 update adds individual EvidenceReceipt v2 envelope verification once published.

@@ -7,7 +7,7 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // conductorRuntimeChanged reports whether two configs disagree on any

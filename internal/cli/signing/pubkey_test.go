@@ -17,8 +17,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 func TestPubkeyCmd_KeyFilePrintsPublicOnly(t *testing.T) {

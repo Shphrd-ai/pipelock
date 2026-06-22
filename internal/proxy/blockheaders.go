@@ -6,8 +6,8 @@ package proxy
 import (
 	"net/http"
 
-	"github.com/luckyPipewrench/pipelock/internal/blockreason"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/blockreason"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // reasonFromScanner maps a scanner.Scanner* layer label to the public

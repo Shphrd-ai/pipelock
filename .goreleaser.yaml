@@ -23,14 +23,14 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/luckyPipewrench/pipelock/internal/cliutil.Version={{.Version}}
-      - -X github.com/luckyPipewrench/pipelock/internal/cliutil.BuildDate={{.Date}}
-      - -X github.com/luckyPipewrench/pipelock/internal/cliutil.GitCommit={{.ShortCommit}}
-      - -X github.com/luckyPipewrench/pipelock/internal/cliutil.GoVersion={{.Env.GOVERSION}}
-      - -X github.com/luckyPipewrench/pipelock/internal/proxy.Version={{.Version}}
-      - -X github.com/luckyPipewrench/pipelock/internal/license.PublicKeyHex={{.Env.LICENSE_PUBLIC_KEY}}
-      - -X github.com/luckyPipewrench/pipelock/internal/rules.KeyringHex={{.Env.RULES_KEYRING_HEX}}
-      - -X github.com/luckyPipewrench/pipelock/internal/release.PublicKeyringHex={{.Env.RELEASE_KEYRING_HEX}}
+      - -X github.com/Shphrd-ai/pipelock/internal/cliutil.Version={{.Version}}
+      - -X github.com/Shphrd-ai/pipelock/internal/cliutil.BuildDate={{.Date}}
+      - -X github.com/Shphrd-ai/pipelock/internal/cliutil.GitCommit={{.ShortCommit}}
+      - -X github.com/Shphrd-ai/pipelock/internal/cliutil.GoVersion={{.Env.GOVERSION}}
+      - -X github.com/Shphrd-ai/pipelock/internal/proxy.Version={{.Version}}
+      - -X github.com/Shphrd-ai/pipelock/internal/license.PublicKeyHex={{.Env.LICENSE_PUBLIC_KEY}}
+      - -X github.com/Shphrd-ai/pipelock/internal/rules.KeyringHex={{.Env.RULES_KEYRING_HEX}}
+      - -X github.com/Shphrd-ai/pipelock/internal/release.PublicKeyringHex={{.Env.RELEASE_KEYRING_HEX}}
 
   # License service: cluster-only webhook handler for Polar subscription events.
   # Linux-only (runs in k8s), not distributed via Homebrew or public archives.
@@ -75,10 +75,10 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/luckyPipewrench/pipelock/internal/cliutil.Version={{.Version}}
-      - -X github.com/luckyPipewrench/pipelock/internal/cliutil.BuildDate={{.Date}}
-      - -X github.com/luckyPipewrench/pipelock/internal/cliutil.GitCommit={{.ShortCommit}}
-      - -X github.com/luckyPipewrench/pipelock/internal/cliutil.GoVersion={{.Env.GOVERSION}}
+      - -X github.com/Shphrd-ai/pipelock/internal/cliutil.Version={{.Version}}
+      - -X github.com/Shphrd-ai/pipelock/internal/cliutil.BuildDate={{.Date}}
+      - -X github.com/Shphrd-ai/pipelock/internal/cliutil.GitCommit={{.ShortCommit}}
+      - -X github.com/Shphrd-ai/pipelock/internal/cliutil.GoVersion={{.Env.GOVERSION}}
 
 archives:
   - id: pipelock
@@ -135,7 +135,7 @@ brews:
       name: homebrew-tap
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    homepage: "https://github.com/luckyPipewrench/pipelock"
+    homepage: "https://github.com/Shphrd-ai/pipelock"
     description: "Security firewall for AI agents"
     license: "Apache-2.0 AND Elastic-2.0"
     directory: Formula

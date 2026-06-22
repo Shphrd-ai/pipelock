@@ -24,7 +24,7 @@ var (
 func testManifest() Manifest {
 	return Manifest{
 		Schema:             "pipelock-release-v1",
-		Repo:               "github.com/luckyPipewrench/pipelock",
+		Repo:               "github.com/Shphrd-ai/pipelock",
 		Tag:                "v2.8.0",
 		Commit:             strings.Repeat("a", 40),
 		CreatedUTC:         time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC).Format(time.RFC3339),

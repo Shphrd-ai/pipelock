@@ -10,7 +10,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground"
+	"github.com/Shphrd-ai/pipelock/internal/playground"
 )
 
 type stubVerifier struct{ err error }

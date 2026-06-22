@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/preflight"
-	"github.com/luckyPipewrench/pipelock/internal/projectscan"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/preflight"
+	"github.com/Shphrd-ai/pipelock/internal/projectscan"
 	"github.com/spf13/cobra"
 )
 

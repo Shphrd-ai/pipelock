@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	domsigning "github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	domsigning "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // rosterRef captures the two ways a deployment pins its trust roots: a roster

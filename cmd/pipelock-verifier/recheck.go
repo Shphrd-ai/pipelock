@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	contractreceipt "github.com/luckyPipewrench/pipelock/internal/contract/receipt"
-	"github.com/luckyPipewrench/pipelock/internal/normalize"
+	contractreceipt "github.com/Shphrd-ai/pipelock/internal/contract/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/normalize"
 )
 
 const transformProfileV1 = "pipelock-transform-v1"

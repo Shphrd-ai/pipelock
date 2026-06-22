@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // FindingHook is the callback signature for metric / audit emission.

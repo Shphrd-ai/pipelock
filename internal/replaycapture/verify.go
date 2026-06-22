@@ -9,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
-	auditpacket "github.com/luckyPipewrench/pipelock/sdk/audit-packet"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
+	auditpacket "github.com/Shphrd-ai/pipelock/sdk/audit-packet"
 )
 
 // VerifyPacketDir reproduces the shipped `pipelock-verifier audit-packet` checks

@@ -8,8 +8,8 @@ import (
 	"crypto/ed25519"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const testCardURL = "https://agent.example.com/.well-known/agent-card.json"

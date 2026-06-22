@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
 )
 
 // AuditBatchEvidence is the local-only raw evidence view used by offline report

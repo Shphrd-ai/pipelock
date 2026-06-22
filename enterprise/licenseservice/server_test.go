@@ -23,8 +23,8 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/luckyPipewrench/pipelock/internal/license"
-	"github.com/luckyPipewrench/pipelock/internal/testwait"
+	"github.com/Shphrd-ai/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/testwait"
 )
 
 const (

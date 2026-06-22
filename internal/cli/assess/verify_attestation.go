@@ -12,9 +12,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/report/attestation"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/report/attestation"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // assessVerifyAttestationCmd creates the cobra command for "assess verify-attestation".

@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // Version is the JSON-RPC protocol version used by MCP.

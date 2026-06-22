@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/discover"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/discover"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // TestInitCmd_ProvisionsFlightRecorder proves done-state #1: a stock `pipelock

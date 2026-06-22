@@ -18,8 +18,8 @@ import (
 
 	"golang.org/x/crypto/nacl/box"
 
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
 )
 
 // dropSentinelInterval controls how many drops occur between sentinel entries

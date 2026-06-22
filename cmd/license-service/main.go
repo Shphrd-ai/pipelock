@@ -19,9 +19,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/licenseservice"
-	"github.com/luckyPipewrench/pipelock/internal/license"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/enterprise/licenseservice"
+	"github.com/Shphrd-ai/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 	"github.com/rs/zerolog"
 )
 

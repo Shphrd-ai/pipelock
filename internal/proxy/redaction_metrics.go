@@ -4,8 +4,8 @@
 package proxy
 
 import (
-	"github.com/luckyPipewrench/pipelock/internal/metrics"
-	"github.com/luckyPipewrench/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/metrics"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
 )
 
 func recordBodyRedactionMetrics(m *metrics.Metrics, transport, agent string, report *redact.Report) {

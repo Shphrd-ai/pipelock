@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/mcpwrap"
+	"github.com/Shphrd-ai/pipelock/internal/mcpwrap"
 )
 
 // runMCPOnlyInstall installs in mcp-only mode against opts and returns combined

@@ -13,8 +13,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/luckyPipewrench/pipelock/internal/normalize"
-	"github.com/luckyPipewrench/pipelock/internal/seedprotect"
+	"github.com/Shphrd-ai/pipelock/internal/normalize"
+	"github.com/Shphrd-ai/pipelock/internal/seedprotect"
 )
 
 // textURLTokenRe matches URL tokens (http/https/ws/wss/ftp) so their hostnames

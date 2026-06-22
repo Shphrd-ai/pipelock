@@ -1,5 +1,5 @@
 BINARY := pipelock
-MODULE := github.com/luckyPipewrench/pipelock
+MODULE := github.com/Shphrd-ai/pipelock
 VERSION    ?= $(shell (git describe --tags --always --dirty 2>/dev/null || echo "v0.1.0-dev") | sed 's/^v//')
 BUILD_DATE := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	auditpacket "github.com/luckyPipewrench/pipelock/sdk/audit-packet"
+	auditpacket "github.com/Shphrd-ai/pipelock/sdk/audit-packet"
 )
 
 // exampleFile is the golden minimal packet that conforms to v0.json.

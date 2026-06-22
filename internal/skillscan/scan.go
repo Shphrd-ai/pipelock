@@ -10,7 +10,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/filescan"
+	"github.com/Shphrd-ai/pipelock/internal/filescan"
 )
 
 func Scan(opts Options) (Result, error) {

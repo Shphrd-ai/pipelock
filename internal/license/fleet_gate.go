@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // EnvLicenseKey is the env variable carrying the signed license token. The

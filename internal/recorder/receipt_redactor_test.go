@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 func TestReceiptRedactor(t *testing.T) {

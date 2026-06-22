@@ -15,19 +15,19 @@ import (
 
 	"golang.org/x/net/netutil"
 
-	"github.com/luckyPipewrench/pipelock/internal/audit"
-	"github.com/luckyPipewrench/pipelock/internal/capture"
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/edition"
-	"github.com/luckyPipewrench/pipelock/internal/filesentry"
-	"github.com/luckyPipewrench/pipelock/internal/hitl"
-	"github.com/luckyPipewrench/pipelock/internal/killswitch"
-	"github.com/luckyPipewrench/pipelock/internal/mcp"
-	"github.com/luckyPipewrench/pipelock/internal/mcp/tools"
-	"github.com/luckyPipewrench/pipelock/internal/proxy"
-	"github.com/luckyPipewrench/pipelock/internal/scanapi"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/capture"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/edition"
+	"github.com/Shphrd-ai/pipelock/internal/filesentry"
+	"github.com/Shphrd-ai/pipelock/internal/hitl"
+	"github.com/Shphrd-ai/pipelock/internal/killswitch"
+	"github.com/Shphrd-ai/pipelock/internal/mcp"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/tools"
+	"github.com/Shphrd-ai/pipelock/internal/proxy"
+	"github.com/Shphrd-ai/pipelock/internal/scanapi"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 func (s *Server) startFileSentry(ctx context.Context, cfg *config.Config, cancel context.CancelFunc) (func(), error) {

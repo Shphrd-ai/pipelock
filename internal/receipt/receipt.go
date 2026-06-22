@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/luckyPipewrench/pipelock/internal/jsonscan"
+	"github.com/Shphrd-ai/pipelock/internal/jsonscan"
 )
 
 // ReceiptVersion is the current receipt envelope schema version.

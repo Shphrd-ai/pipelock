@@ -5,20 +5,20 @@
 # Pipelock
 
 <p align="center">
-  <a href="https://github.com/luckyPipewrench/pipelock/actions/workflows/ci.yaml"><img alt="CI" src="https://github.com/luckyPipewrench/pipelock/actions/workflows/ci.yaml/badge.svg"></a>
-  <a href="https://github.com/luckyPipewrench/pipelock/actions/workflows/security.yaml"><img alt="Security" src="https://github.com/luckyPipewrench/pipelock/actions/workflows/security.yaml/badge.svg"></a>
-  <a href="https://github.com/luckyPipewrench/pipelock/releases"><img alt="Release" src="https://img.shields.io/github/v/release/luckyPipewrench/pipelock"></a>
+  <a href="https://github.com/Shphrd-ai/pipelock/actions/workflows/ci.yaml"><img alt="CI" src="https://github.com/Shphrd-ai/pipelock/actions/workflows/ci.yaml/badge.svg"></a>
+  <a href="https://github.com/Shphrd-ai/pipelock/actions/workflows/security.yaml"><img alt="Security" src="https://github.com/Shphrd-ai/pipelock/actions/workflows/security.yaml/badge.svg"></a>
+  <a href="https://github.com/Shphrd-ai/pipelock/releases"><img alt="Release" src="https://img.shields.io/github/v/release/Shphrd-ai/pipelock"></a>
   <a href="LICENSE"><img alt="Core Apache 2.0" src="https://img.shields.io/badge/Core-Apache_2.0-blue.svg"></a>
   <a href="enterprise/LICENSE"><img alt="Enterprise ELv2" src="https://img.shields.io/badge/Enterprise-ELv2-orange.svg"></a>
   <a href="https://landscape.cncf.io/?item=provisioning--security-compliance--pipelock"><img alt="CNCF Landscape: Security &amp; Compliance" src="https://img.shields.io/badge/CNCF%20Landscape-Security%20%26%20Compliance-1a73e8?logo=cncf&logoColor=white"></a>
 </p>
 
 <p align="center">
-  <a href="https://scorecard.dev/viewer/?uri=github.com/luckyPipewrench/pipelock"><img alt="OpenSSF Scorecard" src="https://api.scorecard.dev/projects/github.com/luckyPipewrench/pipelock/badge"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/Shphrd-ai/pipelock"><img alt="OpenSSF Scorecard" src="https://api.scorecard.dev/projects/github.com/Shphrd-ai/pipelock/badge"></a>
   <a href="https://www.bestpractices.dev/projects/11948"><img alt="OpenSSF Best Practices" src="https://www.bestpractices.dev/projects/11948/badge?level=silver"></a>
-  <a href="https://codecov.io/gh/luckyPipewrench/pipelock"><img alt="codecov" src="https://codecov.io/gh/luckyPipewrench/pipelock/graph/badge.svg"></a>
-  <a href="https://goreportcard.com/report/github.com/luckyPipewrench/pipelock"><img alt="Go Report" src="https://goreportcard.com/badge/github.com/luckyPipewrench/pipelock"></a>
-  <a href="https://github.com/luckyPipewrench/pipelock/blob/main/.github/workflows/ci.yaml#L21-L35"><img alt="pipelock self-scanned" src="https://img.shields.io/badge/pipelock-self--scanned-00FFC8?style=flat&labelColor=1A1A2E&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNCAxNCI+PHBhdGggZmlsbD0iIzAwRkZDOCIgZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik03IDAuNWMtMS45MyAwLTMuNSAxLjY2LTMuNSAzLjd2MS4zSDNjLS44MyAwLTEuNSAuNjctMS41IDEuNXY2YzAgLjgzLjY3IDEuNSAxLjUgMS41aDhjLjgzIDAgMS41LS42NyAxLjUtMS41VjdjMC0uODMtLjY3LTEuNS0xLjUtMS41aC0uNVY0LjJjMC0yLjA0LTEuNTctMy43LTMuNS0zLjdabS0yIDVWNC4yYzAtMS40OSAxLjEyLTIuNyAyLjUtMi43czIuNSAxLjIxIDIuNSAyLjd2MS4zSDVaTTIuNSA1aDJ2MS4yaC0yVjVabTcgMGgydjEuMmgtMlY1Wk03IDguMmMtLjY5IDAtMS4yNS41Ni0xLjI1IDEuMjUgMCAuNDQuMjMuODMuNTcgMS4wNXYxLjVoMS4zNnYtMS41Yy4zNC0uMjIuNTctLjYxLjU3LTEuMDUgMC0uNjktLjU2LTEuMjUtMS4yNS0xLjI1WiIvPjwvc3ZnPgo="></a>
+  <a href="https://codecov.io/gh/Shphrd-ai/pipelock"><img alt="codecov" src="https://codecov.io/gh/Shphrd-ai/pipelock/graph/badge.svg"></a>
+  <a href="https://goreportcard.com/report/github.com/Shphrd-ai/pipelock"><img alt="Go Report" src="https://goreportcard.com/badge/github.com/Shphrd-ai/pipelock"></a>
+  <a href="https://github.com/Shphrd-ai/pipelock/blob/main/.github/workflows/ci.yaml#L21-L35"><img alt="pipelock self-scanned" src="https://img.shields.io/badge/pipelock-self--scanned-00FFC8?style=flat&labelColor=1A1A2E&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNCAxNCI+PHBhdGggZmlsbD0iIzAwRkZDOCIgZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik03IDAuNWMtMS45MyAwLTMuNSAxLjY2LTMuNSAzLjd2MS4zSDNjLS44MyAwLTEuNSAuNjctMS41IDEuNXY2YzAgLjgzLjY3IDEuNSAxLjUgMS41aDhjLjgzIDAgMS41LS42NyAxLjUtMS41VjdjMC0uODMtLjY3LTEuNS0xLjUtMS41aC0uNVY0LjJjMC0yLjA0LTEuNTctMy43LTMuNS0zLjdabS0yIDVWNC4yYzAtMS40OSAxLjEyLTIuNyAyLjUtMi43czIuNSAxLjIxIDIuNSAyLjd2MS4zSDVaTTIuNSA1aDJ2MS4yaC0yVjVabTcgMGgydjEuMmgtMlY1Wk03IDguMmMtLjY5IDAtMS4yNS41Ni0xLjI1IDEuMjUgMCAuNDQuMjMuODMuNTcgMS4wNXYxLjVoMS4zNnYtMS41Yy4zNC0uMjIuNTctLjYxLjU3LTEuMDUgMC0uNjktLjU2LTEuMjUtMS4yNS0xLjI1WiIvPjwvc3ZnPgo="></a>
 </p>
 
 **Open-source AI agent firewall for [Verifiable Egress Control (VEC)](https://pipelab.org/learn/verifiable-egress-control/).** Pipelock sits between AI agents and the network and inspects the actual content crossing every mediated transport — HTTP, WebSocket, CONNECT, MCP, and A2A — for secret exfiltration, prompt injection, and SSRF, then emits mediator-signed [action receipts](https://pipelab.org/learn/action-receipt-spec/) that third parties can verify outside the agent runtime. The detections are exercised by a public adversarial benchmark anyone can run ([agent-egress-bench](https://github.com/luckyPipewrench/agent-egress-bench)). Learn more: [Open-source AI firewall](https://pipelab.org/learn/open-source-ai-firewall/).
@@ -62,13 +62,13 @@ pipelock check --url "https://docs.python.org/3/"                # allowed
 
 ```bash
 # Download a binary (no dependencies)
-# See https://github.com/luckyPipewrench/pipelock/releases
+# See https://github.com/Shphrd-ai/pipelock/releases
 
 # Docker
 docker pull ghcr.io/luckypipewrench/pipelock:latest
 
 # From source (requires Go 1.25+)
-go install github.com/luckyPipewrench/pipelock/cmd/pipelock@latest
+go install github.com/Shphrd-ai/pipelock/cmd/pipelock@latest
 ```
 
 </details>
@@ -394,7 +394,7 @@ Production recipes (Docker Compose with network isolation, Kubernetes sidecar + 
 
 ```yaml
 # .github/workflows/pipelock.yaml
-- uses: luckyPipewrench/pipelock@v2
+- uses: Shphrd-ai/pipelock@v2
   with:
     scan-diff: 'true'
     fail-on-findings: 'true'
@@ -585,7 +585,7 @@ Run `make test` to verify locally. Independent benchmark: the public [agent-egre
 
 Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-If Pipelock is useful, please [star this repository](https://github.com/luckyPipewrench/pipelock). It helps others find the project.
+If Pipelock is useful, please [star this repository](https://github.com/Shphrd-ai/pipelock). It helps others find the project.
 
 ## License
 
@@ -603,3 +603,40 @@ code that activates with a valid license key. Building from source with `go inst
 repository `Dockerfile` produces a Community-only binary.
 
 See [LICENSE](LICENSE) for the Apache 2.0 text and [enterprise/LICENSE](enterprise/LICENSE) for the ELv2 text.
+
+---
+
+## Shphrd-ai Fork Strategy
+
+This repository is maintained by [Shphrd-ai](https://github.com/Shphrd-ai) as a
+security-research fork of [luckyPipewrench/pipelock](https://github.com/Shphrd-ai/pipelock).
+
+### What we extend
+
+| Area | Change |
+|---|---|
+| Scanner rules | CyberShepherd-curated policy rules for MCP and agent-framework traffic |
+| Threat detection | Additional injection-pattern detectors for AI agent attack surfaces |
+| Deployment | Shphrd-ai Helm chart values and Kubernetes manifests |
+| CI | Module path updated to `github.com/Shphrd-ai/pipelock`; action reference updated |
+
+### What we sync from upstream
+
+- Core proxy engine (`internal/proxy`, `internal/scanner`)
+- Protocol support and SDK updates
+- Security patches and CVE fixes from `luckyPipewrench/pipelock` releases
+- Governance, license, and CoC documents
+
+### Sync cadence
+
+We track upstream releases via the `upstream-v*` tags in this repo.
+To pull upstream changes:
+
+```sh
+git remote add upstream https://github.com/Shphrd-ai/pipelock.git
+git fetch upstream
+git merge upstream/main --no-ff
+```
+
+Upstream release tags are preserved verbatim (e.g., `upstream-v2.4.0`) so
+Shphrd-ai extensions are always attributable against a known upstream baseline.

@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
 )
 
 // The public-safe field allowlist is the load-bearing privacy control for the

@@ -14,8 +14,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
 )
 
 // stubMetrics records emit-failure reasons for assertion.

@@ -121,7 +121,7 @@ func New(toolName, version string) *Log {
 				Driver: ToolComponent{
 					Name:           toolName,
 					Version:        version,
-					InformationURI: "https://github.com/luckyPipewrench/pipelock",
+					InformationURI: "https://github.com/Shphrd-ai/pipelock",
 				},
 			},
 		}},
@@ -141,7 +141,7 @@ func (l *Log) AddRule(id, description string) int {
 	l.Runs[0].Tool.Driver.Rules = append(l.Runs[0].Tool.Driver.Rules, ReportingDescriptor{
 		ID:               id,
 		ShortDescription: Message{Text: description},
-		HelpURI:          "https://github.com/luckyPipewrench/pipelock",
+		HelpURI:          "https://github.com/Shphrd-ai/pipelock",
 	})
 	return idx
 }

@@ -20,9 +20,9 @@ import (
 	"github.com/gobwas/ws"
 	gobwasutil "github.com/gobwas/ws/wsutil"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/redact"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // Transport-parity regression fixtures. These tests pin the observable

@@ -2,7 +2,7 @@
 # Pipelock Demo — shows DLP blocking, domain blocking, and integrity detection.
 #
 # Prerequisites:
-#   go install github.com/luckyPipewrench/pipelock/cmd/pipelock@latest
+#   go install github.com/Shphrd-ai/pipelock/cmd/pipelock@latest
 #
 # Usage:
 #   ./examples/demo.sh
@@ -113,4 +113,4 @@ echo "  3. A legitimate fetch to example.com succeeded"
 echo "  4. Integrity monitoring detected a tampered workspace file"
 echo "  5. Git diff scanning caught a secret in a code change"
 echo ""
-echo "Try it yourself: go install github.com/luckyPipewrench/pipelock/cmd/pipelock@latest"
+echo "Try it yourself: go install github.com/Shphrd-ai/pipelock/cmd/pipelock@latest"

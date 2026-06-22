@@ -86,7 +86,7 @@ func TestHermesLiveE2E(t *testing.T) {
 	run(venvPip, nil, "install", "--quiet", "--disable-pip-version-check", "hermes-agent=="+hermesE2EVersion)
 
 	// 2. Build the real pipelock binary the plugin shells out to.
-	run("go", nil, "build", "-o", bin, "github.com/luckyPipewrench/pipelock/cmd/pipelock")
+	run("go", nil, "build", "-o", bin, "github.com/Shphrd-ai/pipelock/cmd/pipelock")
 
 	// 3. Real full install into the temp HOME.
 	installEnv := append(os.Environ(), "HOME="+home)

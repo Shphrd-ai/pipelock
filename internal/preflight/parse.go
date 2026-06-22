@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/projectscan"
+	"github.com/Shphrd-ai/pipelock/internal/projectscan"
 )
 
 // claudeSettings represents Claude Code .claude/settings.json.

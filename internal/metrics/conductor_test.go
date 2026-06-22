@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/auditbatcher"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/auditbatcher"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 

@@ -12,7 +12,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/report/compliance"
+	"github.com/Shphrd-ai/pipelock/internal/report/compliance"
 )
 
 // Hex color constants for HTML rendering. Shared across grade, severity,

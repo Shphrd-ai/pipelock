@@ -16,11 +16,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/atomicfile"
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/contract/activation"
-	contractreceipt "github.com/luckyPipewrench/pipelock/internal/contract/receipt"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/atomicfile"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract/activation"
+	contractreceipt "github.com/Shphrd-ai/pipelock/internal/contract/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const localErasureTombstone = "local_erasure_tombstone"

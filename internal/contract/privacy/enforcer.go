@@ -8,7 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
 )
 
 // Decision is the per-field outcome from Enforcer.Apply.

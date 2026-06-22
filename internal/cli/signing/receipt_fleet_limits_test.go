@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/fleetreceipt"
+	"github.com/Shphrd-ai/pipelock/internal/fleetreceipt"
 )
 
 const fleetLimitL1NoReplay = "L1 does not replay raw audit-batch payloads during offline verification."

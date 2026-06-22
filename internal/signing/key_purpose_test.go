@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
 )
 
 func TestKeyPurpose_String(t *testing.T) {

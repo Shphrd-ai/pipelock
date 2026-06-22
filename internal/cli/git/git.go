@@ -13,9 +13,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/gitprotect"
-	"github.com/luckyPipewrench/pipelock/internal/sarif"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/gitprotect"
+	"github.com/Shphrd-ai/pipelock/internal/sarif"
 )
 
 // ErrSecretsFound is returned when pipelock git scan-diff detects secrets.

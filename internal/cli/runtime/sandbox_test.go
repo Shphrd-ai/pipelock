@@ -10,7 +10,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/sandbox"
+	"github.com/Shphrd-ai/pipelock/internal/sandbox"
 )
 
 func TestSingleConnListener_AcceptOnce(t *testing.T) {

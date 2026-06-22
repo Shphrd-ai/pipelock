@@ -8,7 +8,7 @@ mode and HTTP fetch proxy mode.
 
 ```bash
 # 1. Install pipelock
-go install github.com/luckyPipewrench/pipelock/cmd/pipelock@latest
+go install github.com/Shphrd-ai/pipelock/cmd/pipelock@latest
 
 # 2. Verify it works
 pipelock version

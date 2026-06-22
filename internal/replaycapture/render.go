@@ -10,7 +10,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
 )
 
 // boundedInt converts a chain sequence (uint64) to int, saturating at MaxInt.

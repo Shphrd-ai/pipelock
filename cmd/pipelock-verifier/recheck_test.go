@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	contractreceipt "github.com/luckyPipewrench/pipelock/internal/contract/receipt"
+	contractreceipt "github.com/Shphrd-ai/pipelock/internal/contract/receipt"
 )
 
 func TestTransformProfileV1Fixtures(t *testing.T) {

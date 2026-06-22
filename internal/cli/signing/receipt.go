@@ -15,9 +15,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/fleetreceipt"
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
-	sigutil "github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/fleetreceipt"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
+	sigutil "github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const unpinnedReceiptBanner = "UNPINNED — signature is self-consistent but the signer was NOT checked against a trusted key"

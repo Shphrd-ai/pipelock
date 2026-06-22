@@ -14,7 +14,7 @@ import (
 	"github.com/gobwas/ws"
 	gobwasutil "github.com/gobwas/ws/wsutil"
 
-	plwsutil "github.com/luckyPipewrench/pipelock/internal/wsutil"
+	plwsutil "github.com/Shphrd-ai/pipelock/internal/wsutil"
 )
 
 // WSClient implements MessageReader and MessageWriter over a WebSocket connection

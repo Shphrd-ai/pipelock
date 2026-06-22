@@ -20,16 +20,16 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/applycache"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/auditbatcher"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/emergency"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/policysync"
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/killswitch"
-	"github.com/luckyPipewrench/pipelock/internal/metrics"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/applycache"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/auditbatcher"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/emergency"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/policysync"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/killswitch"
+	"github.com/Shphrd-ai/pipelock/internal/metrics"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const (

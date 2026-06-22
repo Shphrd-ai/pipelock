@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
 
 	// Pure-Go SQLite driver.
 	_ "modernc.org/sqlite"

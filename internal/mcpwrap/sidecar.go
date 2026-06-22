@@ -14,7 +14,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/luckyPipewrench/pipelock/internal/secperm"
+	"github.com/Shphrd-ai/pipelock/internal/secperm"
 )
 
 // SidecarOp is a deferred filesystem operation produced by WrapServer /

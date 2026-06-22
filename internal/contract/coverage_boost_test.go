@@ -162,13 +162,13 @@ func TestVerificationMetadata_ComputeTombstoneIndexRoot_MultiHashSorted(t *testi
 func TestCompileManifest_ComputeModuleDigestRoot_MultipleEntries(t *testing.T) {
 	t.Parallel()
 	m1 := CompileManifest{ModuleDigests: map[string]string{
-		"github.com/luckyPipewrench/pipelock": "sha256:a",
+		"github.com/Shphrd-ai/pipelock": "sha256:a",
 		"github.com/spf13/cobra":              "sha256:b",
 		"github.com/goccy/go-yaml":            "sha256:c",
 	}}
 	m2 := CompileManifest{ModuleDigests: map[string]string{
 		"github.com/goccy/go-yaml":            "sha256:c",
-		"github.com/luckyPipewrench/pipelock": "sha256:a",
+		"github.com/Shphrd-ai/pipelock": "sha256:a",
 		"github.com/spf13/cobra":              "sha256:b",
 	}}
 	r1, err := m1.ComputeModuleDigestRoot()

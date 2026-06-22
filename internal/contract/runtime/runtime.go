@@ -14,12 +14,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/contract/inference/normalize"
-	contractreceipt "github.com/luckyPipewrench/pipelock/internal/contract/receipt"
-	"github.com/luckyPipewrench/pipelock/internal/contract/store"
-	"github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/contract/inference/normalize"
+	contractreceipt "github.com/Shphrd-ai/pipelock/internal/contract/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/contract/store"
+	"github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 // Lifecycle constants alias the canonical schema-package values so the

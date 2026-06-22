@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // svgTestCfg returns a minimal BrowserShield config for SVG rewrites. Only

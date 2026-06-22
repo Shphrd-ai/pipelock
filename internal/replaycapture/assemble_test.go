@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
-	auditpacket "github.com/luckyPipewrench/pipelock/sdk/audit-packet"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
+	auditpacket "github.com/Shphrd-ai/pipelock/sdk/audit-packet"
 )
 
 // fixedStamp is a deterministic generated_at for assembly tests. Relative to

@@ -13,12 +13,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/mcp"
-	mcptools "github.com/luckyPipewrench/pipelock/internal/mcp/tools"
-	"github.com/luckyPipewrench/pipelock/internal/rules"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/mcp"
+	mcptools "github.com/Shphrd-ai/pipelock/internal/mcp/tools"
+	"github.com/Shphrd-ai/pipelock/internal/rules"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // ErrTestFailed is returned when one or more test vectors fail.
@@ -482,7 +482,7 @@ func buildTestVectors(extraPoison []*mcptools.ExtraPoisonPattern) []testVector {
 			Category: "dlp",
 			Attack:   "Legitimate URL — false positive check",
 			Run: func(sc *scanner.Scanner) vectorResult {
-				r := sc.Scan(context.Background(), "https://github.com/luckyPipewrench/pipelock/issues")
+				r := sc.Scan(context.Background(), "https://github.com/Shphrd-ai/pipelock/issues")
 				return vectorResult{Blocked: !r.Allowed, Expected: false, Detail: r.Reason}
 			},
 		},
@@ -542,7 +542,7 @@ func buildTestVectors(extraPoison []*mcptools.ExtraPoisonPattern) []testVector {
 			Category: "entropy",
 			Attack:   "Standard URL with readable path — false positive check",
 			Run: func(sc *scanner.Scanner) vectorResult {
-				r := sc.Scan(context.Background(), "https://github.com/luckyPipewrench/pipelock/blog/2026/how-to-build-apis")
+				r := sc.Scan(context.Background(), "https://github.com/Shphrd-ai/pipelock/blog/2026/how-to-build-apis")
 				return vectorResult{Blocked: !r.Allowed, Expected: false, Detail: r.Reason}
 			},
 		},
@@ -836,7 +836,7 @@ func buildTestVectors(extraPoison []*mcptools.ExtraPoisonPattern) []testVector {
 			Category: "clean",
 			Attack:   "Standard docs URL — false positive check",
 			Run: func(sc *scanner.Scanner) vectorResult {
-				r := sc.Scan(context.Background(), "https://github.com/luckyPipewrench/pipelock")
+				r := sc.Scan(context.Background(), "https://github.com/Shphrd-ai/pipelock")
 				return vectorResult{Blocked: !r.Allowed, Expected: false, Detail: r.Reason}
 			},
 		},

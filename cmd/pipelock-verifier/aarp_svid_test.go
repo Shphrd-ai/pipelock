@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
 )
 
 // testCertDER builds a self-signed Ed25519 certificate DER. With isCA it is a

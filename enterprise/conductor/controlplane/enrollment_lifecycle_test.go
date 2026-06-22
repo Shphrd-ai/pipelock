@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // newLifecycleTestHandler builds a handler wired to a fresh file enrollment

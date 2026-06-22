@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	releasetrust "github.com/luckyPipewrench/pipelock/internal/release"
+	releasetrust "github.com/Shphrd-ai/pipelock/internal/release"
 )
 
 const (
@@ -182,7 +182,7 @@ func signedReleaseManifest(t *testing.T, version, goos, archiveName string, arch
 	t.Helper()
 	manifest := releasetrust.Manifest{
 		Schema:             "pipelock-release-v1",
-		Repo:               "github.com/luckyPipewrench/pipelock",
+		Repo:               "github.com/Shphrd-ai/pipelock",
 		Tag:                version,
 		Commit:             strings.Repeat("a", 40),
 		CreatedUTC:         time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC).Format(time.RFC3339),

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/capture"
+	"github.com/Shphrd-ai/pipelock/internal/capture"
 )
 
 // fakeAWSKey builds a fake AWS access key ID at runtime to avoid G101 (gosec

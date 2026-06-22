@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/luckyPipewrench/pipelock/internal/mcp/jsonrpc"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/jsonrpc"
 )
 
 // maxTrackedRequests caps the number of pending request IDs to prevent

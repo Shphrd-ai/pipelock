@@ -13,7 +13,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
 )
 
 // remoteKillEnumerator is the read-only interface the stream-status handler uses

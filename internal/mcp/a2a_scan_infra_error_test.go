@@ -6,7 +6,7 @@ package mcp
 import (
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // Synthetic scanner.Result builders for A2A aggregator tests. Mirrors what

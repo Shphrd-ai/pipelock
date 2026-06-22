@@ -6,8 +6,8 @@ package scanner
 import (
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/normalize"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/normalize"
 )
 
 // compiledCanaryToken stores normalized canary values for fast matching.

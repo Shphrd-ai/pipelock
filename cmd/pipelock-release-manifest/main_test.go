@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	releasetrust "github.com/luckyPipewrench/pipelock/internal/release"
+	releasetrust "github.com/Shphrd-ai/pipelock/internal/release"
 )
 
 func TestRunGenerateUnsignedThenOfflineSign(t *testing.T) {
@@ -169,7 +169,7 @@ func TestRunSignOnlyRejectsKeyMismatch(t *testing.T) {
 	other := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{0x45}, ed25519.SeedSize))
 	manifest := releasetrust.Manifest{
 		Schema:             "pipelock-release-v1",
-		Repo:               "github.com/luckyPipewrench/pipelock",
+		Repo:               "github.com/Shphrd-ai/pipelock",
 		Tag:                "v2.8.0",
 		Commit:             strings.Repeat("d", 40),
 		CreatedUTC:         "2026-06-19T12:00:00Z",

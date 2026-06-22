@@ -7,7 +7,7 @@
 // The files in testdata/ are the byte-for-byte contract that any receipt
 // verifier (Go, Python, or otherwise) MUST agree on. Go verifies them via
 // the tests in this package. The reference Python verifier lives at
-// https://github.com/luckyPipewrench/pipelock-verify-python and consumes
+// https://github.com/Shphrd-ai/pipelock-verify-python and consumes
 // the same files.
 //
 // Golden files:

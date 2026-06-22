@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/controlplane"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/controlplane"
 )
 
 // followerSPIFFEID builds the SPIFFE URI SAN for a fleet follower in the

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
 )
 
 // The corpus under testdata/corpus is a VENDORED copy of the receipt-verifier

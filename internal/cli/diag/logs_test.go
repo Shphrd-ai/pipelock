@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/testwait"
+	"github.com/Shphrd-ai/pipelock/internal/testwait"
 	"github.com/spf13/cobra"
 )
 

@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/luckyPipewrench/pipelock/internal/audit"
-	"github.com/luckyPipewrench/pipelock/internal/contract/proxydecision"
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/contract/proxydecision"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
 )
 
 // v2 action_type labels for the proxy_decision payload. They classify the

@@ -30,7 +30,7 @@ Releases follow [Semantic Versioning](https://semver.org/). Tags pushed to `main
 
 ## Security
 
-Vulnerabilities are reported through [GitHub Security Advisories](https://github.com/luckyPipewrench/pipelock/security/advisories/new) and handled per the timeline in [SECURITY.md](SECURITY.md).
+Vulnerabilities are reported through [GitHub Security Advisories](https://github.com/Shphrd-ai/pipelock/security/advisories/new) and handled per the timeline in [SECURITY.md](SECURITY.md).
 
 ## Continuity
 
@@ -38,6 +38,6 @@ Repository admin access is shared with at least one additional maintainer to ens
 
 ## Contact
 
-- **Security issues:** [GitHub Security Advisories](https://github.com/luckyPipewrench/pipelock/security/advisories/new)
-- **Bugs and features:** [GitHub Issues](https://github.com/luckyPipewrench/pipelock/issues)
-- **General questions:** [GitHub Discussions](https://github.com/luckyPipewrench/pipelock/discussions)
+- **Security issues:** [GitHub Security Advisories](https://github.com/Shphrd-ai/pipelock/security/advisories/new)
+- **Bugs and features:** [GitHub Issues](https://github.com/Shphrd-ai/pipelock/issues)
+- **General questions:** [GitHub Discussions](https://github.com/Shphrd-ai/pipelock/discussions)

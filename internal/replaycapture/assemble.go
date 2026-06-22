@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
-	auditpacket "github.com/luckyPipewrench/pipelock/sdk/audit-packet"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
+	auditpacket "github.com/Shphrd-ai/pipelock/sdk/audit-packet"
 )
 
 // Safe, synthetic constants stamped into the (unsigned) Audit Packet envelope.

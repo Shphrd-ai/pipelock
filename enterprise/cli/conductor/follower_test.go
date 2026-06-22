@@ -14,8 +14,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/emergency"
-	"github.com/luckyPipewrench/pipelock/internal/license"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/emergency"
+	"github.com/Shphrd-ai/pipelock/internal/license"
 )
 
 func TestFollowerResetReplayState_RequiresStateDir(t *testing.T) {

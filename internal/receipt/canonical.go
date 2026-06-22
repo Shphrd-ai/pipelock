@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 func canonicalActionRecord(version int, ar ActionRecord) ([]byte, error) {

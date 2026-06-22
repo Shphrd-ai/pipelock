@@ -12,9 +12,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/gitprotect"
-	"github.com/luckyPipewrench/pipelock/internal/projectscan"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/gitprotect"
+	"github.com/Shphrd-ai/pipelock/internal/projectscan"
 )
 
 // Suppression source constants for SuppressResult.

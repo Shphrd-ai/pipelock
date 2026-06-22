@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // sidecarCanaryResult holds the outcome of the in-cluster canary phase.

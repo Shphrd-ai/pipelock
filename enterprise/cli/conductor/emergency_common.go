@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
-	conductorcore "github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	clisigning "github.com/luckyPipewrench/pipelock/internal/cli/signing"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	conductorcore "github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	clisigning "github.com/Shphrd-ai/pipelock/internal/cli/signing"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 const (

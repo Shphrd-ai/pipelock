@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/mcpwrap"
+	"github.com/Shphrd-ai/pipelock/internal/mcpwrap"
 )
 
 // fullOpts builds installOptions wired entirely under tmp so tests never touch

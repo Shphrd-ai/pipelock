@@ -11,7 +11,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/aarp"
+	"github.com/Shphrd-ai/pipelock/internal/aarp"
 )
 
 const claimsDictionaryPath = "../claims/aarp-v0.1-claims.json"

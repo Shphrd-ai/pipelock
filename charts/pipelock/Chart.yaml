@@ -6,7 +6,7 @@ version: 0.5.0
 appVersion: "2.8.0"
 home: https://pipelab.org
 sources:
-  - https://github.com/luckyPipewrench/pipelock
+  - https://github.com/Shphrd-ai/pipelock
 maintainers:
   - name: Josh Waldrep
     url: https://github.com/luckyPipewrench
@@ -17,18 +17,18 @@ keywords:
   - dlp
   - prompt-injection
   - egress-control
-icon: https://raw.githubusercontent.com/luckyPipewrench/pipelock/main/assets/pipelock-logo.svg
+icon: https://raw.githubusercontent.com/Shphrd-ai/pipelock/main/assets/pipelock-logo.svg
 annotations:
   artifacthub.io/license: Apache-2.0
   artifacthub.io/containsSecurityUpdates: "true"
-  artifacthub.io/changesURL: https://github.com/luckyPipewrench/pipelock/releases
+  artifacthub.io/changesURL: https://github.com/Shphrd-ai/pipelock/releases
   artifacthub.io/links: |
     - name: Documentation
       url: https://pipelab.org/learn/
     - name: Release notes
-      url: https://github.com/luckyPipewrench/pipelock/releases
+      url: https://github.com/Shphrd-ai/pipelock/releases
     - name: Audit Packet verifier
-      url: https://github.com/luckyPipewrench/pipelock-verify-python
+      url: https://github.com/Shphrd-ai/pipelock-verify-python
   artifacthub.io/changes: |
     - kind: added
       description: Pipelock appVersion 2.8.0 with defer authorization, fleet receipt reporting, and operator lifecycle tooling.

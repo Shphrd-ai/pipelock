@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/jsonscan"
+	"github.com/Shphrd-ai/pipelock/internal/jsonscan"
 )
 
 const (
@@ -112,7 +112,7 @@ func ValidateManifest(m Manifest) error {
 	if m.Schema != "pipelock-release-v1" {
 		return fmt.Errorf("%w: unsupported schema %q", ErrReleaseManifest, m.Schema)
 	}
-	if m.Repo != "github.com/luckyPipewrench/pipelock" {
+	if m.Repo != "github.com/Shphrd-ai/pipelock" {
 		return fmt.Errorf("%w: repo %q", ErrReleaseManifest, m.Repo)
 	}
 	if strings.TrimSpace(m.Tag) == "" {

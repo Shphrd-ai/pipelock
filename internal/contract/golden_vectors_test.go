@@ -258,7 +258,7 @@ func TestGolden_CompileManifest(t *testing.T) {
 		PipelockVersion:       "v2.4.0-test",
 		PipelockBuildSHA:      "test",
 		GoVersion:             "go1.26.0",
-		ModuleDigests:         map[string]string{"github.com/luckyPipewrench/pipelock": "sha256:test"},
+		ModuleDigests:         map[string]string{"github.com/Shphrd-ai/pipelock": "sha256:test"},
 		CompileConfigHash:     "sha256:cfg",
 		Inputs:                []InputRef{{Path: "test.jsonl", SHA256: "sha256:i1", EventCount: 100}},
 		ObservationWindowRoot: "sha256:obswin",

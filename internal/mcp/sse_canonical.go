@@ -6,7 +6,7 @@ package mcp
 import (
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/mcp/transport"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/transport"
 )
 
 // canonicalSSEEventText builds the full scannable representation of an SSE

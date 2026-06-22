@@ -3,7 +3,7 @@
 
 package runtime
 
-import "github.com/luckyPipewrench/pipelock/internal/blockreason"
+import "github.com/Shphrd-ai/pipelock/internal/blockreason"
 
 // Decision.Reason values produced by EvaluateHTTP / evaluateContractLive /
 // applyModeGate. Kept private to the runtime package because the canonical

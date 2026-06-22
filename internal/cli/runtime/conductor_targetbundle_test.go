@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/applycache"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/applycache"
 )
 
 // TestTargetBundleActiveError covers the branch where cache.Active() fails (no

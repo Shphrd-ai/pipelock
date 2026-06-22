@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
 )
 
 // newTestEngine builds an Engine with a fresh lab key under a temp dir.

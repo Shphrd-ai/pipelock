@@ -17,8 +17,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/contract"
-	"github.com/luckyPipewrench/pipelock/internal/svid"
+	"github.com/Shphrd-ai/pipelock/internal/contract"
+	"github.com/Shphrd-ai/pipelock/internal/svid"
 )
 
 // ContextSVIDBinding is the domain separator for the SVID proof-of-possession

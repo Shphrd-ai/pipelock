@@ -6,10 +6,10 @@ package mcp
 import (
 	"io"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/deferred"
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
-	session "github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/deferred"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
+	session "github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 func EmitDeferredResolutionReceipt(opts MCPProxyOpts, logW io.Writer, res deferred.Resolution) error {

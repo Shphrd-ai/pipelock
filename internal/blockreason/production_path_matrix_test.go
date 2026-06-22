@@ -13,14 +13,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/blockreason"
+	"github.com/Shphrd-ai/pipelock/internal/blockreason"
 )
 
 // blockreasonImportPath is the canonical import path the matrix anchors on.
 // Matching by import path (not by selector identifier name) means the gate
 // stays correct under aliased imports and ignores unrelated locals named
 // `blockreason`.
-const blockreasonImportPath = "github.com/luckyPipewrench/pipelock/internal/blockreason"
+const blockreasonImportPath = "github.com/Shphrd-ai/pipelock/internal/blockreason"
 
 // TestProductionPathMatrix walks the in-tree Go source for every canonical
 // blockreason.Reason and asserts each one is referenced from at least one

@@ -19,9 +19,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/luckyPipewrench/pipelock/internal/mcp/jsonrpc"
-	"github.com/luckyPipewrench/pipelock/internal/normalize"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/jsonrpc"
+	"github.com/Shphrd-ai/pipelock/internal/normalize"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // ToolDef represents a single tool definition in an MCP tools/list response.

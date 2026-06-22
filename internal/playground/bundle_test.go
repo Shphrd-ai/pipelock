@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground"
+	"github.com/Shphrd-ai/pipelock/internal/playground"
 )
 
 // TestGenerateBundle_LiveDemo_RealData drives a real uncontained live-demo run

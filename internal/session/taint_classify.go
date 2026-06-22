@@ -10,8 +10,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/mcp/chains"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/chains"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // ClassifyURLSource maps a URL to a taint level using host-based trust rules.

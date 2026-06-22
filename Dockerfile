@@ -15,13 +15,13 @@ ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags enterprise \
     -ldflags "-s -w \
-      -X github.com/luckyPipewrench/pipelock/internal/cliutil.Version=${VERSION} \
-      -X github.com/luckyPipewrench/pipelock/internal/cliutil.BuildDate=${BUILD_DATE} \
-      -X github.com/luckyPipewrench/pipelock/internal/cliutil.GitCommit=${GIT_COMMIT} \
-      -X github.com/luckyPipewrench/pipelock/internal/cliutil.GoVersion=$(go version | awk '{print $3}') \
-      -X github.com/luckyPipewrench/pipelock/internal/proxy.Version=${VERSION} \
-      -X github.com/luckyPipewrench/pipelock/internal/license.PublicKeyHex=${LICENSE_PUBLIC_KEY} \
-      -X github.com/luckyPipewrench/pipelock/internal/rules.KeyringHex=${RULES_KEYRING_HEX}" \
+      -X github.com/Shphrd-ai/pipelock/internal/cliutil.Version=${VERSION} \
+      -X github.com/Shphrd-ai/pipelock/internal/cliutil.BuildDate=${BUILD_DATE} \
+      -X github.com/Shphrd-ai/pipelock/internal/cliutil.GitCommit=${GIT_COMMIT} \
+      -X github.com/Shphrd-ai/pipelock/internal/cliutil.GoVersion=$(go version | awk '{print $3}') \
+      -X github.com/Shphrd-ai/pipelock/internal/proxy.Version=${VERSION} \
+      -X github.com/Shphrd-ai/pipelock/internal/license.PublicKeyHex=${LICENSE_PUBLIC_KEY} \
+      -X github.com/Shphrd-ai/pipelock/internal/rules.KeyringHex=${RULES_KEYRING_HEX}" \
     -o /pipelock ./cmd/pipelock
 
 # Scratch-based final image (~15MB)

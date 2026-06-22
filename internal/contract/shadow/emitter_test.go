@@ -18,8 +18,8 @@ import (
 
 	"github.com/google/uuid"
 
-	contractreceipt "github.com/luckyPipewrench/pipelock/internal/contract/receipt"
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
+	contractreceipt "github.com/Shphrd-ai/pipelock/internal/contract/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
 )
 
 type testSigner struct {

@@ -17,9 +17,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	posturepkg "github.com/luckyPipewrench/pipelock/internal/posture"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	posturepkg "github.com/Shphrd-ai/pipelock/internal/posture"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // Exit codes for posture verify. These are part of the CLI's stable contract.

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 // allSignals enumerates every SignalType so tests catch missing entries in

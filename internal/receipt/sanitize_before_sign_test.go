@@ -19,9 +19,9 @@ import (
 
 	"golang.org/x/crypto/nacl/box"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/recorder"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/recorder"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
 )
 
 // fakeSecret is built at runtime so the literal never appears in the binary or

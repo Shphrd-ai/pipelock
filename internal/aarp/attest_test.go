@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/svid"
+	"github.com/Shphrd-ai/pipelock/internal/svid"
 )
 
 const (

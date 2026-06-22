@@ -511,7 +511,7 @@ The v2.2.0 operationalization arc wires the receipt system into every transport,
   - A2A in the forward proxy: header scan, stream scan, response body scan.
 - **Fetch error-path receipt coverage:** Post-forward deny paths (redirect block, response scan block) now emit block receipts. Foundation for #402. (#377)
 - **Action receipts from MCP proxy:** The MCP proxy emits signed action receipts for every tool call, tool response, and policy decision across stdio, HTTP, and HTTP reverse proxy transports. (#385)
-- **Cross-implementation receipt conformance suite:** `sdk/conformance/` ships golden test vectors with deterministic seeds so any language implementation can verify byte-for-byte against the Go reference. Reference Python verifier at [pipelock-verify-python](https://github.com/luckyPipewrench/pipelock-verify-python). (#379)
+- **Cross-implementation receipt conformance suite:** `sdk/conformance/` ships golden test vectors with deterministic seeds so any language implementation can verify byte-for-byte against the Go reference. Reference Python verifier at [pipelock-verify-python](https://github.com/Shphrd-ai/pipelock-verify-python). (#379)
 
 #### Posture
 - **Posture capsule verify CLI:** `pipelock posture verify` evaluates a signed capsule against a named policy (`enterprise`, `strict`, or `none`), computes a weighted evidence score (0-100), and exits with distinct codes for integrity vs policy failure. Flags: `--policy` (default `enterprise`), `--min-score` (default `85`, pass `0` to skip), `--max-age` (default `30d`, `Nd` format only), `--max-receipt-age` (default `7d`, `Nd` format), `--require-discovery`, `--json`. Strict policy treats zero-discovered-MCP-servers as a hard failure (vacuous-truth gap closed). Policy version bumped to `"2"`. (#391, #397, #398)
@@ -1137,7 +1137,7 @@ Pipelock 1.0.0 is the production-ready release. All scanning layers, proxy modes
 ### Added
 - HTTP forward proxy: standard CONNECT tunneling and absolute-URI HTTP forwarding on the same port as the fetch proxy. Set `HTTPS_PROXY=http://localhost:8888` and all agent HTTP traffic flows through the scanner pipeline. Configurable tunnel duration and idle timeout controls (PR #123)
 - Tunnel observability: Prometheus metrics (tunnel count, bytes transferred, duration histogram, active gauge), JSON stats, and structured audit logs for tunnel open/close events (PR #123)
-- GitHub Action (`luckyPipewrench/pipelock`): composite action for CI/CD agent security scanning with checksum-verified binary download, multi-arch (amd64/arm64) and multi-OS (Linux/macOS) support, fail-closed audit gate, PR diff secret scanning, inline GitHub annotations on findings, and job summary (PR #125)
+- GitHub Action (`Shphrd-ai/pipelock`): composite action for CI/CD agent security scanning with checksum-verified binary download, multi-arch (amd64/arm64) and multi-OS (Linux/macOS) support, fail-closed audit gate, PR diff secret scanning, inline GitHub annotations on findings, and job summary (PR #125)
 - CI workflow examples for basic and advanced GitHub Action usage (PR #125)
 
 ### Changed

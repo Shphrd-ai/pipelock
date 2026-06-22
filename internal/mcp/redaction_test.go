@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
 )
 
 func TestApplyMCPToolCallRedaction_PreservesWhitespace(t *testing.T) {

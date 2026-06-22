@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 // fullyPopulatedActionRecordV1 sets every signed field, including the nested

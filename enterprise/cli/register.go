@@ -9,9 +9,9 @@
 package entcli
 
 import (
-	conductorcli "github.com/luckyPipewrench/pipelock/enterprise/cli/conductor"
-	fleetcli "github.com/luckyPipewrench/pipelock/enterprise/cli/fleet"
-	"github.com/luckyPipewrench/pipelock/internal/cli"
+	conductorcli "github.com/Shphrd-ai/pipelock/enterprise/cli/conductor"
+	fleetcli "github.com/Shphrd-ai/pipelock/enterprise/cli/fleet"
+	"github.com/Shphrd-ai/pipelock/internal/cli"
 )
 
 func init() {

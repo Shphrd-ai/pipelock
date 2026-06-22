@@ -4,7 +4,7 @@
 package decide
 
 import (
-	"github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 // RecordSignal is a nil-safe wrapper around RecordEscalation. It handles

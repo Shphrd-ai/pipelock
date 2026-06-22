@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/luckyPipewrench/pipelock/internal/projectscan"
+	"github.com/Shphrd-ai/pipelock/internal/projectscan"
 )
 
 const (

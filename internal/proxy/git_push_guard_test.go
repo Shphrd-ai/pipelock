@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 func TestGitPushRepoFromURL(t *testing.T) {

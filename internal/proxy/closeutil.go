@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/luckyPipewrench/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
 )
 
 // safeClose calls Close on c and logs any error via the audit logger.

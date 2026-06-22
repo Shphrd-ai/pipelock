@@ -19,9 +19,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground/llmagent"
-	"github.com/luckyPipewrench/pipelock/internal/proxy"
-	"github.com/luckyPipewrench/pipelock/internal/receipt"
+	"github.com/Shphrd-ai/pipelock/internal/playground/llmagent"
+	"github.com/Shphrd-ai/pipelock/internal/proxy"
+	"github.com/Shphrd-ai/pipelock/internal/receipt"
 )
 
 func TestMapModelEvent(t *testing.T) {

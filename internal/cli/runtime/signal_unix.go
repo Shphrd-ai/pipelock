@@ -12,7 +12,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/luckyPipewrench/pipelock/internal/killswitch"
+	"github.com/Shphrd-ai/pipelock/internal/killswitch"
 )
 
 // RegisterKillSwitchSignal sets up SIGUSR1 to toggle the kill switch.

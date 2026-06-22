@@ -11,7 +11,7 @@ Thanks for your interest in making AI agents more secure.
 ## Quick Start
 
 ```bash
-git clone https://github.com/luckyPipewrench/pipelock.git
+git clone https://github.com/Shphrd-ai/pipelock.git
 cd pipelock
 make build
 make test
@@ -219,7 +219,7 @@ Pipelock keeps its direct dependency set intentionally small. Any new dependency
 
 ## Security
 
-- **Vulnerabilities**: Report via [GitHub Security Advisories](https://github.com/luckyPipewrench/pipelock/security/advisories), NOT public issues
+- **Vulnerabilities**: Report via [GitHub Security Advisories](https://github.com/Shphrd-ai/pipelock/security/advisories), NOT public issues
 - **Don't weaken capability separation:** the proxy must never access agent secrets
 - **Don't bypass fail-closed defaults:** if in doubt, block
 - See [SECURITY.md](SECURITY.md) for the full policy
@@ -233,7 +233,7 @@ Pipelock keeps its direct dependency set intentionally small. Any new dependency
 
 ## Contributor License Agreement
 
-We use a [Contributor License Agreement](https://cla-assistant.io/luckyPipewrench/pipelock) (CLA) for all contributions. When you open your first PR, the CLA Assistant bot will ask you to sign electronically. This is a one-time process that takes about 30 seconds.
+We use a [Contributor License Agreement](https://cla-assistant.io/Shphrd-ai/pipelock) (CLA) for all contributions. When you open your first PR, the CLA Assistant bot will ask you to sign electronically. This is a one-time process that takes about 30 seconds.
 
 The CLA is based on the [Apache Individual Contributor License Agreement](https://www.apache.org/licenses/icla.pdf). It grants the project the right to use your contribution under the project's license terms while you retain ownership of your work.
 

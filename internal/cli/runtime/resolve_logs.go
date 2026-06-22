@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // emitResolveInfoLogs writes the operator-facing notices that correspond

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/session"
+	"github.com/Shphrd-ai/pipelock/internal/session"
 )
 
 func TestClassifyHTTP(t *testing.T) {

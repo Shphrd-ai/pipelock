@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 func TestExtractResponseKeywords(t *testing.T) {

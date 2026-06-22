@@ -34,9 +34,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground"
-	"github.com/luckyPipewrench/pipelock/internal/playground/llmagent"
-	"github.com/luckyPipewrench/pipelock/internal/proxy"
+	"github.com/Shphrd-ai/pipelock/internal/playground"
+	"github.com/Shphrd-ai/pipelock/internal/playground/llmagent"
+	"github.com/Shphrd-ai/pipelock/internal/proxy"
 )
 
 // Environment fallbacks for values better kept out of argv/shell history. These

@@ -1,4 +1,4 @@
-module github.com/luckyPipewrench/pipelock
+module github.com/Shphrd-ai/pipelock
 
 go 1.25.0
 

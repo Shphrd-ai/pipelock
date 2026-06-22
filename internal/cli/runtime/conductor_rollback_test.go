@@ -15,11 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/applycache"
-	"github.com/luckyPipewrench/pipelock/enterprise/conductor/policysync"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/applycache"
+	"github.com/Shphrd-ai/pipelock/enterprise/conductor/policysync"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
 )
 
 // rollbackSigner is a single ed25519 rollback-purpose signer for runtime tests.

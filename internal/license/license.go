@@ -179,7 +179,7 @@ func splitToken(token string) (payload, sig []byte, err error) {
 
 // PublicKeyHex is set at build time via ldflags:
 //
-//	-X github.com/luckyPipewrench/pipelock/internal/license.PublicKeyHex=<hex>
+//	-X github.com/Shphrd-ai/pipelock/internal/license.PublicKeyHex=<hex>
 //
 // Official releases embed the production public key. Dev builds leave it
 // empty, which means license verification always fails and agents require

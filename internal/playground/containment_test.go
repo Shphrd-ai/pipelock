@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/playground"
+	"github.com/Shphrd-ai/pipelock/internal/playground"
 )
 
 // --------------------------------------------------------------------------

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // TestBoundaryApplyAbortsWhenEntitlementLostBeforeReload proves the in-flight

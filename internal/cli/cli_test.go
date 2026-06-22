@@ -22,13 +22,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luckyPipewrench/pipelock/internal/cli/diag"
-	"github.com/luckyPipewrench/pipelock/internal/cli/runtime"
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/signing"
-	"github.com/luckyPipewrench/pipelock/internal/testport"
-	"github.com/luckyPipewrench/pipelock/internal/testwait"
+	"github.com/Shphrd-ai/pipelock/internal/cli/diag"
+	"github.com/Shphrd-ai/pipelock/internal/cli/runtime"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/signing"
+	"github.com/Shphrd-ai/pipelock/internal/testport"
+	"github.com/Shphrd-ai/pipelock/internal/testwait"
 )
 
 type cliTestBuffer struct {

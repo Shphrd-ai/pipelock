@@ -14,13 +14,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/luckyPipewrench/pipelock/internal/audit"
-	"github.com/luckyPipewrench/pipelock/internal/cliutil"
-	"github.com/luckyPipewrench/pipelock/internal/config"
-	"github.com/luckyPipewrench/pipelock/internal/edition"
-	"github.com/luckyPipewrench/pipelock/internal/emit"
-	"github.com/luckyPipewrench/pipelock/internal/scanner"
-	plsentry "github.com/luckyPipewrench/pipelock/internal/sentry"
+	"github.com/Shphrd-ai/pipelock/internal/audit"
+	"github.com/Shphrd-ai/pipelock/internal/cliutil"
+	"github.com/Shphrd-ai/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/edition"
+	"github.com/Shphrd-ai/pipelock/internal/emit"
+	"github.com/Shphrd-ai/pipelock/internal/scanner"
+	plsentry "github.com/Shphrd-ai/pipelock/internal/sentry"
 )
 
 // Standard HTTP server timeouts. Used by all internal servers (kill switch API,

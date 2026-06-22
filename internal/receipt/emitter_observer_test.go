@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/luckyPipewrench/pipelock/internal/config"
+	"github.com/Shphrd-ai/pipelock/internal/config"
 )
 
 // TestEmitter_OnReceipt_FiresInChainOrder verifies the streaming observer is

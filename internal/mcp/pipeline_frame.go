@@ -9,8 +9,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/luckyPipewrench/pipelock/internal/mcp/jsonrpc"
-	"github.com/luckyPipewrench/pipelock/internal/redact"
+	"github.com/Shphrd-ai/pipelock/internal/mcp/jsonrpc"
+	"github.com/Shphrd-ai/pipelock/internal/redact"
 )
 
 // ErrInvalidMethodType is surfaced via MCPFrame.ParseErr when a
