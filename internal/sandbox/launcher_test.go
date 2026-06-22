@@ -42,6 +42,23 @@ var sandboxLaunchSmoke struct {
 	stderr string
 }
 
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
 // requireSandboxPrimitives skips when the kernel lacks the namespace/Landlock
 // primitives the launch tests exercise, so a genuinely unsupported environment
 // is reported as a skip-with-reason rather than a launch that errors (non-strict
@@ -69,14 +86,14 @@ func probeSandboxLaunch(workspace string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), sandboxSmokeTimeout)
 	defer cancel()
 
-	var stderr bytes.Buffer
+	stderr := &lockedBuffer{}
 	done := make(chan error, 1)
 	go func() {
 		cmd, err := LaunchSandboxed(LaunchConfig{
 			Ctx:       ctx,
 			Command:   []string{"true"},
 			Workspace: workspace,
-			Stderr:    &stderr,
+			Stderr:    stderr,
 		})
 		if err != nil {
 			done <- err
@@ -90,6 +107,11 @@ func probeSandboxLaunch(workspace string) (string, error) {
 		return stderr.String(), err
 	case <-time.After(sandboxSmokeTimeout + sandboxWatchdogGrace):
 		cancel()
+		select {
+		case err := <-done:
+			return stderr.String(), err
+		case <-time.After(sandboxWatchdogGrace):
+		}
 		return stderr.String(), context.DeadlineExceeded
 	}
 }
