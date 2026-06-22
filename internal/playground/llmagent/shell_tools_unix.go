@@ -6,6 +6,7 @@
 package llmagent
 
 import (
+	"errors"
 	"os/exec"
 	"syscall"
 	"time"
@@ -31,7 +32,10 @@ func boundToProcessGroup(cmd *exec.Cmd) {
 		}
 		// With Setpgid the leader's pid equals its pgid, so -pid addresses the
 		// whole group. Ignore ESRCH (already gone).
-		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
+			return err
+		}
+		return nil
 	}
 	cmd.WaitDelay = processGroupWaitDelay
 }

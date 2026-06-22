@@ -1,6 +1,8 @@
 // Copyright 2026 Josh Waldrep
 // SPDX-License-Identifier: Apache-2.0
 
+//go:build !windows
+
 package llmagent
 
 import (
@@ -63,8 +65,8 @@ func TestRunCommand_RunsInScratchAndCapturesOutput(t *testing.T) {
 	if ev.Kind != EventToolResult || ev.Tool != ToolRunCommand || ev.Note != "ran" {
 		t.Fatalf("event = %+v", ev)
 	}
-	if ev.Detail == "" {
-		t.Fatal("run_command event should echo the command in Detail")
+	if ev.Detail != "shell command" {
+		t.Fatalf("run_command event detail = %q, want generic shell detail", ev.Detail)
 	}
 }
 

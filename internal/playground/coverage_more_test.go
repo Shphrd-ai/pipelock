@@ -357,6 +357,8 @@ func TestContainmentAvailableFalseWhenPipelockMissing(t *testing.T) {
 }
 
 func TestContainmentEnforcedUsesEnforcementOnlyVerify(t *testing.T) {
+	// Not parallel: this test mutates PATH and PIPELOCK_ARGS_LOG, and concurrent
+	// tests that spawn pipelock would observe the fake executable/env.
 	dir := t.TempDir()
 	argsLog := filepath.Join(dir, "args.log")
 	pipelockPath := filepath.Join(dir, "pipelock")
@@ -403,6 +405,14 @@ func TestVerifyModelLiveContained(t *testing.T) {
 				t.Fatalf("expected nil, got %v", err)
 			}
 		})
+	}
+}
+
+func TestHostContainmentEnforcedReasonOldWitnessFormat(t *testing.T) {
+	t.Parallel()
+	reason := hostContainmentEnforcedReason(HostContainmentWitness{})
+	if !strings.Contains(reason, "older format") {
+		t.Fatalf("reason = %q, want older-format diagnostic", reason)
 	}
 }
 

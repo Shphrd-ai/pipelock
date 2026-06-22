@@ -399,11 +399,18 @@ func verifyHostContainment(runDir string, lm LaunchManifest, orchestratorPubHex 
 		rep.Checks = append(rep.Checks, Check{
 			Name:   checkHostContainEnforced,
 			OK:     false,
-			Reason: "host-containment not proven: differential failed, target suite missing/substituted, or a direct-egress route was open",
+			Reason: hostContainmentEnforcedReason(hcw),
 		})
 		return
 	}
 	rep.Checks = append(rep.Checks, Check{Name: checkHostContainEnforced, OK: true})
+}
+
+func hostContainmentEnforcedReason(hcw HostContainmentWitness) string {
+	if hcw.ProxyTarget == "" || hcw.ProxyAgentProbe.Target == "" {
+		return "host-containment witness uses an older format without proxy-contract proof; regenerate the bundle with this release"
+	}
+	return "host-containment not proven: differential failed, proxy contract missing/substituted, target suite missing/substituted, or a direct-egress route was open"
 }
 
 func verifyRedWitnessArtifact(runDir string, lm LaunchManifest, rc *RedCaseResult) (Witness, []string) {
@@ -465,6 +472,9 @@ func verifyLiveDemoSemantics(runDir string, lm LaunchManifest, witness Witness) 
 	// strict deterministic one. AgentKind is covered by the manifest signature, so
 	// it cannot be flipped to dodge the stricter check.
 	if lm.AgentKind == AgentKindModel {
+		if lm.ScenarioID != LiveDemoScenarioID {
+			return fmt.Errorf("unsupported model-mode scenario %q", lm.ScenarioID)
+		}
 		return verifyModelLiveContained(receipts, witness)
 	}
 

@@ -154,6 +154,9 @@ func parseFlags(args []string, getenv func(string) string) (config, error) {
 	if err := fl.Parse(args); err != nil {
 		return config{}, err
 	}
+	if cfg.dev && cfg.allowExec {
+		return config{}, fmt.Errorf("--allow-exec requires contained mode and cannot be combined with --dev")
+	}
 	cfg.secretValues = resolveSecretValues(getenv)
 	if cfg.modelBaseURL == "" || cfg.model == "" {
 		return config{}, fmt.Errorf("--model-base-url and --model are required")
@@ -180,6 +183,9 @@ func parseFlags(args []string, getenv func(string) string) (config, error) {
 // command line (argv is world-readable).
 func resolveAPIKey(secretFd int, secretFile string, getenv func(string) string) (string, error) {
 	if secretFd >= 0 {
+		if secretFd < 3 {
+			return "", fmt.Errorf("--secret-fd must be an inherited descriptor >= 3")
+		}
 		f := os.NewFile(uintptr(secretFd), "model-key-fd")
 		if f == nil {
 			return "", fmt.Errorf("--secret-fd %d is not a valid file descriptor", secretFd)
@@ -209,7 +215,7 @@ func resolveAPIKey(secretFd int, secretFile string, getenv func(string) string) 
 	if k := strings.TrimSpace(getenv(envModelKey)); k != "" {
 		return k, nil
 	}
-	return "", fmt.Errorf("no model API key: set --secret-file or %s", envModelKey)
+	return "", fmt.Errorf("no model API key: set --secret-fd, --secret-file, or %s", envModelKey)
 }
 
 // resolveSecretValues reads the env var names listed in envSecretEnv and returns
